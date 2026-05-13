@@ -1,0 +1,15 @@
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.23
+pydantic==2.5.0
+python-dotenv==1.0.0
+psycopg2-binary==2.9.9
+mysqlclient==2.2.0
+requests==2.31.0
+aiofiles==23.2.1
+python-multipart==0.0.6
+cors==1.0.1
+cryptography==41.0.7
+pyjwt==2.8.1
+passlib==1.7.4
+python-jose==3.3.0
