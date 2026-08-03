@@ -7,7 +7,7 @@ class AppTheme {
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: Brightness.light,
       primary: AppColors.primary, onPrimary: Colors.white, secondary: AppColors.accentOrange,
-      onSecondary: Colors.white, surface: AppColors.cardColor, background: AppColors.bgColor, error: AppColors.danger),
+      onSecondary: Colors.white, surface: AppColors.cardColor, error: AppColors.danger),
     primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.bgColor,
     fontFamily: 'Inter',
@@ -49,21 +49,21 @@ class AppTheme {
     dividerTheme: const DividerThemeData(color: AppColors.borderLight, thickness: 1, space: 24),
 
     navigationRailTheme: NavigationRailThemeData(backgroundColor: AppColors.sidebarColor, elevation: 0,
-      indicatorColor: AppColors.primary.withOpacity(0.15), indicatorShape: RoundedRectangleBorder(borderRadius: AppStyles.radius12),
+      indicatorColor: AppColors.primary.withValues(alpha: 0.15), indicatorShape: RoundedRectangleBorder(borderRadius: AppStyles.radius12),
       selectedLabelTextStyle: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
       unselectedLabelTextStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
       selectedIconTheme: const IconThemeData(color: Colors.white, size: 20),
       unselectedIconTheme: const IconThemeData(color: Color(0xFF94A3B8), size: 20)),
 
     navigationBarTheme: NavigationBarThemeData(backgroundColor: Colors.white,
-      indicatorColor: AppColors.primary.withOpacity(0.12), height: 64,
+      indicatorColor: AppColors.primary.withValues(alpha: 0.12), height: 64,
       labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(fontSize: 11,
         fontWeight: s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
         color: s.contains(WidgetState.selected) ? AppColors.primary : AppColors.textMuted)),
       iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(size: 22,
         color: s.contains(WidgetState.selected) ? AppColors.primary : AppColors.textMuted))),
 
-    chipTheme: ChipThemeData(backgroundColor: AppColors.bgColor, selectedColor: AppColors.primary.withOpacity(0.12),
+    chipTheme: ChipThemeData(backgroundColor: AppColors.bgColor, selectedColor: AppColors.primary.withValues(alpha: 0.12),
       disabledColor: AppColors.borderLight, labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       shape: RoundedRectangleBorder(borderRadius: AppStyles.radius8), side: BorderSide.none),
@@ -83,6 +83,6 @@ class AppTheme {
 
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primary : Colors.white),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primary.withOpacity(0.5) : AppColors.borderColor)),
+      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? AppColors.primary.withValues(alpha: 0.5) : AppColors.borderColor)),
   );
 }

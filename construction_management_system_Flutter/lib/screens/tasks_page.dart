@@ -213,8 +213,9 @@ class _TasksPageState extends State<TasksPage> {
         if (projects.length > 1)
           _dropdown(projects.map<String>((p) => p['project_name'] as String).toList()..insert(0, 'All'),
               'All', (v) {
-            if (v == 'All') _switchProject(null);
-            else {
+            if (v == 'All') {
+              _switchProject(null);
+            } else {
               final found = projects.firstWhere((p) => p['project_name'] == v, orElse: () => null);
               if (found != null) _switchProject(found['project_id']);
             }

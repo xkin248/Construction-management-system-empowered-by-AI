@@ -32,7 +32,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   List _projects = [];
   int? _selectedProjectId;
   String? _workerName;
-  String? _workerTrade;
 
   Map? _taskBoard;
   String _lastUpdated = '';
@@ -91,8 +90,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     try {
       final me = await ApiService().me();
       _workerName = me['name']?.toString();
-      final sp = await SharedPreferences.getInstance();
-      _workerTrade = (sp.getString('user_role') == 'worker') ? null : null;
     } catch (_) {}
   }
 
@@ -586,7 +583,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             const Spacer(),
             if (_lastUpdated.isNotEmpty)
-              Text('${_lastUpdated.substring(11, 16)}',
+              Text(_lastUpdated.substring(11, 16),
                   style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
             IconButton(
               icon: const Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),

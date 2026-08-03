@@ -161,7 +161,7 @@ class _NotificationsTabState extends State<_NotificationsTab> {
               Text(sub, style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
             ]),
           ),
-          Switch(value: settings[key] == true, activeColor: AppColors.accent, onChanged: (v) => _toggle(key, v)),
+          Switch(value: settings[key] == true, activeThumbColor: AppColors.accent, onChanged: (v) => _toggle(key, v)),
         ]),
       );
 
@@ -350,7 +350,9 @@ class _UsersTabState extends State<_UsersTab> {
           builder: (ctx, setD) => Column(
             mainAxisSize: MainAxisSize.min,
             children: _roles.map((r) => RadioListTile<String>(
+                  // ignore: deprecated_member_use
                   value: r, groupValue: role, title: Text(r.replaceAll('_', ' ')),
+                  // ignore: deprecated_member_use
                   onChanged: (v) => setD(() => role = v!),
                 )).toList(),
           ),

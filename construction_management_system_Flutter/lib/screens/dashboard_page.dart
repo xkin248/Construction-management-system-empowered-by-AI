@@ -74,7 +74,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.all(20),
         children: [
           // ── KPI Cards Row ──
-          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late),
+          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late, absent),
           const SizedBox(height: 20),
 
           // ── Charts Row ──
@@ -108,14 +108,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // ── KPI row builder ──
-  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late) {
+  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late, absent) {
     return LayoutBuilder(builder: (ctx, cs) {
       final isWide = cs.maxWidth > 600;
       final cards = [
         _kpiCard(
           label: 'Workers On Site',
           value: '$onSite/$totalWorkers',
-          sub: '${present > 0 ? '${late > 0 ? '$late late' : '0 late'}' : '0 late'} • ${(totalWorkers - onSite)} absent',
+          sub: '$late late • $absent absent',
           icon: Icons.groups_rounded,
           iconColor: AppColors.accent,
         ),
