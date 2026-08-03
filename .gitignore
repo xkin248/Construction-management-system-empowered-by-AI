@@ -1,0 +1,95 @@
+# ==========================================
+# BuildSmart Construction Management System
+# Root .gitignore
+# ==========================================
+
+# Flutter / Dart
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/.dart_tool/
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.pub/
+**/build/
+**/coverage/
+
+# Android
+**/android/local.properties
+**/android/key.properties
+**/android/.gradle/
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+
+# iOS
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Secrets & Keys
+*.keystore
+*.jks
+key.properties
+*.p12
+*.pem
+.env
+.env.*
+!.env.example
+
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code (keep workspace settings but ignore personal)
+.vscode/settings.json
+.vscode/launch.json
+
+# Misc
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+
+# Symbolication
+app.*.symbols
+
+# Obfuscation
+app.*.map.json
+
+# Python (Backend)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+eggs/
+.eggs/
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Backend specific
+construction_management_system_Backend/*.db
+construction_management_system_Backend/*.sqlite
+construction_management_system_Backend/.env

@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — BuildSmart</title>
+  <meta name="description" content="Sign in to BuildSmart AI Construction Management System." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23ea580c'/><text y='22' x='7' font-size='18' font-weight='900' fill='white' font-family='Arial'>B</text></svg>" />
+  <style>
+    :root {
+      --panel-bg: #10141c;
+      --panel-bg2: #171d29;
+      --accent: #f97316;
+      --accent-dark: #ea580c;
+      --accent-light: #fff3e8;
+      --text-primary: #0b1a30;
+      --text-secondary: #6b7280;
+      --text-muted: #9ca3af;
+      --border: #e5e9f0;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-primary);
+      background: #ffffff;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ================= LEFT — BRAND PANEL ================= */
+    .brand-panel {
+      position: relative;
+      flex: 1 1 46%;
+      max-width: 560px;
+      background:
+        radial-gradient(circle at 15% 15%, rgba(249, 115, 22, 0.28), transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(249, 115, 22, 0.18), transparent 50%),
+        linear-gradient(160deg, var(--panel-bg) 0%, var(--panel-bg2) 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 48px 52px;
+      overflow: hidden;
+    }
+
+    .brand-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      opacity: 0.35;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 42px 42px;
+      pointer-events: none;
+    }
+
+    .brand-top,
+    .brand-mid,
+    .brand-bottom {
+      position: relative;
+      z-index: 1;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo .logo-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 11px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 6px 18px rgba(249, 115, 22, 0.35);
+    }
+
+    .brand-logo .logo-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: #fff;
+    }
+
+    .brand-logo .logo-text {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .brand-logo .logo-text span {
+      color: var(--accent);
+    }
+
+    .brand-mid {
+      max-width: 420px;
+    }
+
+    .brand-mid .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #ffd8b8;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 999px;
+      margin-bottom: 22px;
+    }
+
+    .brand-mid .tag .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #34d399;
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.25);
+    }
+
+    .brand-mid h1 {
+      font-size: 34px;
+      line-height: 1.25;
+      font-weight: 800;
+      margin: 0 0 14px 0;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-mid p {
+      font-size: 15px;
+      line-height: 1.7;
+      color: #c3c9d6;
+      margin: 0;
+    }
+
+    .brand-features {
+      margin-top: 34px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .brand-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .brand-feature .f-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .brand-feature .f-icon svg {
+      width: 17px;
+      height: 17px;
+      stroke: var(--accent);
+    }
+
+    .brand-feature .f-text b {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #f2f4f8;
+      margin-bottom: 2px;
+    }
+
+    .brand-feature .f-text span {
+      font-size: 12.5px;
+      color: #9aa1b1;
+    }
+
+    .brand-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 12px;
+      color: #8890a0;
+    }
+
+    .brand-bottom .stars {
+      color: var(--accent);
+      letter-spacing: 2px;
+    }
+
+    /* ================= RIGHT — FORM PANEL ================= */
+    .form-panel {
+      flex: 1 1 54%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      background: #ffffff;
+    }
+
+    .form-wrap {
+      width: 100%;
+      max-width: 380px;
+    }
+
+    .mobile-logo {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .mobile-logo .logo-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mobile-logo .logo-icon svg {
+      width: 21px;
+      height: 21px;
+      fill: #fff;
+    }
+
+    .mobile-logo .logo-text {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text-primary);
+    }
+
+    .mobile-logo .logo-text span {
+      color: var(--accent-dark);
+    }
+
+    .form-wrap h2 {
+      font-size: 25px;
+      font-weight: 800;
+      margin: 0 0 6px 0;
+      letter-spacing: -0.3px;
+    }
+
+    .form-wrap .subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 28px;
+    }
+
+    .flash-messages {
+      margin-bottom: 18px;
+    }
+
+    .flash {
+      padding: 11px 13px;
+      border-radius: 9px;
+      font-size: 13px;
+      margin-bottom: 10px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .flash-success {
+      background: #ecfdf3;
+      color: #12805c;
+      border: 1px solid #b7ecd3;
+    }
+
+    .flash-warning {
+      background: #fffaeb;
+      color: #92650b;
+      border: 1px solid #fbe3a1;
+    }
+
+    .flash-error {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fbd2d2;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      margin-bottom: 7px;
+      color: #374151;
+    }
+
+    .input-shell {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-shell svg.i-left {
+      position: absolute;
+      left: 14px;
+      width: 17px;
+      height: 17px;
+      stroke: #9aa1b1;
+      pointer-events: none;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 14px 12px 42px;
+      border: 1.5px solid var(--border);
+      border-radius: 9px;
+      font-size: 14.5px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: #fbfbfd;
+      color: var(--text-primary);
+    }
+
+    .form-input::placeholder {
+      color: #b0b6c2;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.12);
+    }
+
+    .toggle-pw {
+      position: absolute;
+      right: 12px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      display: flex;
+      color: #9aa1b1;
+    }
+
+    .toggle-pw svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+    }
+
+    .row-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: -4px 0 22px 0;
+      font-size: 13px;
+    }
+
+    .remember {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .remember input {
+      accent-color: var(--accent);
+      width: 15px;
+      height: 15px;
+    }
+
+    .row-between a {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .row-between a:hover {
+      text-decoration: underline;
+    }
+
+    .auth-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      padding: 13px;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.15s, transform 0.05s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 8px 20px rgba(249, 115, 22, 0.28);
+    }
+
+    .auth-btn:hover {
+      background: var(--accent-dark);
+    }
+
+    .auth-btn:active {
+      transform: translateY(1px);
+    }
+
+    .auth-btn:disabled {
+      opacity: 0.7;
+      cursor: default;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 26px 0;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .auth-links {
+      text-align: center;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+    }
+
+    .auth-links a {
+      color: var(--accent-dark);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .auth-links a:hover {
+      text-decoration: underline;
+    }
+
+    .auth-footer {
+      margin-top: 34px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    @media (max-width: 860px) {
+      .brand-panel {
+        display: none;
+      }
+
+      .mobile-logo {
+        display: flex;
+      }
+
+      .form-panel {
+        padding: 32px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Brand / marketing panel -->
+  <div class="brand-panel">
+    <div class="brand-top">
+      <div class="brand-logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path
+              d="M4 17v-4H2v-2h2V7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4h2v2h-2v4h-2v-4H6v4H4zm2-6h12V8H6v3zm4-1h4V9h-4v1z" />
+          </svg>
+        </div>
+        <div class="logo-text">Build<span>Smart</span></div>
+      </div>
+    </div>
+
+    <div class="brand-mid">
+      <div class="tag"><span class="dot"></span> All systems operational</div>
+      <h1>Run your job sites with clarity, not chaos.</h1>
+      <p>One dashboard for attendance, daily reports, tasks and issues — with AI helping you spot problems before
+        they cost you.</p>
+
+      <div class="brand-features">
+        <div class="brand-feature">
+          <div class="f-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3 3" />
+            </svg>
+          </div>
+          <div class="f-text">
+            <b>Geofenced attendance</b>
+            <span>Check-ins verified on site, in real time.</span>
+          </div>
+        </div>
+        <div class="brand-feature">
+          <div class="f-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z" />
+            </svg>
+          </div>
+          <div class="f-text">
+            <b>Gemini-powered insights</b>
+            <span>AI drafts your daily reports and flags risks.</span>
+          </div>
+        </div>
+        <div class="brand-feature">
+          <div class="f-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+          </div>
+          <div class="f-text">
+            <b>Tasks & issues in one place</b>
+            <span>Track progress across every project, every crew.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="brand-bottom">
+      <span>CIDB Construction 4.0 Ready</span>
+      <span class="stars">★★★★★</span>
+    </div>
+  </div>
+
+  <!-- Form panel -->
+  <div class="form-panel">
+    <div class="form-wrap">
+
+      <div class="mobile-logo">
+        <div class="logo-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path
+              d="M4 17v-4H2v-2h2V7a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v4h2v2h-2v4h-2v-4H6v4H4zm2-6h12V8H6v3zm4-1h4V9h-4v1z" />
+          </svg>
+        </div>
+        <div class="logo-text">Build<span>Smart</span></div>
+      </div>
+
+      <h2>Welcome back</h2>
+      <div class="subtitle">Sign in to continue to your dashboard</div>
+
+      <div id="flash-messages" class="flash-messages"></div>
+
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <div class="input-shell">
+            <svg class="i-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 6-10 7L2 6" />
+            </svg>
+            <input type="email" id="email" name="email" class="form-input" placeholder="manager@buildsmart.my"
+              required autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-shell">
+            <svg class="i-left" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="10" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required
+              autocomplete="current-password" style="padding-right:42px" />
+            <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password" tabindex="-1">
+              <svg id="eye-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="row-between">
+          <label class="remember"><input type="checkbox" /> Remember me</label>
+        </div>
+
+        <button type="submit" class="auth-btn" id="login-btn">
+          Login
+        </button>
+      </form>
+
+      <div class="divider">SITE ACCESS</div>
+
+      <div class="auth-links">
+        Don't have an account? <a href="register.html">Register</a>
+      </div>
+
+      <div class="auth-footer">
+        Powered by Google Gemini AI &bull; CIDB Construction 4.0
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // window.API_BASE is injected by the Flutter app (see main.dart) before this
+    // page loads, so it points at the right host for the current platform
+    // (10.0.2.2 on the Android emulator, localhost elsewhere). Fall back to
+    // localhost for when this page is opened directly in a desktop browser.
+    const API_BASE = window.API_BASE || 'http://localhost:8000';
+
+    function showFlash(message, category) {
+      const box = document.getElementById('flash-messages');
+      box.innerHTML = '<div class="flash flash-' + category + '">' + message + '</div>';
+    }
+
+    // Password visibility toggle
+    const pwInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('toggle-pw');
+    const eyeIcon = document.getElementById('eye-icon');
+    const eyeOpen = '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>';
+    const eyeClosed = '<path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 1 0 2.8 2.8"/><path d="M9.9 4.24A9.6 9.6 0 0 1 12 4c7 0 11 8 11 8a17.6 17.6 0 0 1-3.06 4.14M6.1 6.1C3.6 7.7 2 10 2 10s2.8 6 10 6a9.5 9.5 0 0 0 3.4-.6"/>';
+    toggleBtn.addEventListener('click', () => {
+      const isPassword = pwInput.type === 'password';
+      pwInput.type = isPassword ? 'text' : 'password';
+      eyeIcon.innerHTML = isPassword ? eyeClosed : eyeOpen;
+    });
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('login-btn');
+      btn.disabled = true; btn.textContent = 'Logging in…';
+
+      try {
+        const body = new URLSearchParams();
+        body.set('username', email);
+        body.set('password', password);
+        const res = await fetch(`${API_BASE}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+        localStorage.setItem('bs_token', data.access_token);
+        localStorage.setItem('bs_user', JSON.stringify(data.user || {}));
+
+        // Hand the token back to the native Flutter app too, so the native
+        // tabs (Attendance / Report / Profile) share the same login session.
+        if (window.FlutterBridge) {
+          window.FlutterBridge.postMessage(JSON.stringify({ type: 'login', token: data.access_token }));
+        }
+
+        showFlash('Login successful, redirecting…', 'success');
+        window.location.href = 'dashboard.html';
+      } catch (err) {
+        showFlash(err.message || 'Login failed. Please check your credentials.', 'error');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Login';
+      }
+    });
+  </script>
+
+</body>
+
+</html>

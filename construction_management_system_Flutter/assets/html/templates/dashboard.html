@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Dashboard — AI Construction System</title>
+  <meta name="description" content="BuildSmart AI Construction Management System — real-time site overview, task management, and attendance tracking."/>
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#f97316"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="BuildSmart"/>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f97316'/><text y='22' x='7' font-size='18' font-weight='900' fill='white' font-family='Arial'>B</text></svg>"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar (desktop) ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">B</div>
+      <div class="logo-text">
+        <h1>BuildSmart</h1>
+        <p>AI Construction System</p>
+      </div>
+      <!-- Mobile close button -->
+      <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main Menu</div>
+
+      <a href="dashboard.html"    class="nav-item active" id="nav-dashboard">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      <a href="projects.html"     class="nav-item " id="nav-projects">
+        <span class="nav-icon">🏗</span> Projects
+      </a>
+      <a href="tasks.html"        class="nav-item " id="nav-tasks">
+        <span class="nav-icon">✔</span> Tasks
+      </a>
+      <a href="attendance.html"   class="nav-item " id="nav-attendance">
+        <span class="nav-icon">📅</span> Attendance
+      </a>
+      <a href="workers.html"      class="nav-item " id="nav-workers">
+        <span class="nav-icon">👷</span> Workers
+      </a>
+      <a href="ai_assistant.html" class="nav-item " id="nav-ai">
+        <span class="nav-icon">🤖</span> AI Assignment
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Operations</div>
+
+      <a href="daily_report.html" class="nav-item " id="nav-daily-report">
+        <span class="nav-icon">📋</span> Daily Report
+      </a>
+      <a href="issues.html"       class="nav-item " id="nav-issues">
+        <span class="nav-icon">⚠</span> Issues
+      </a>
+      <a href="notifications.html" class="nav-item " id="nav-notifications" style="position:relative">
+        <span class="nav-icon">🔔</span> Notifications
+        
+        
+        <span style="margin-left:auto;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 6px;min-width:18px;text-align:center">2</span>
+        
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Settings</div>
+      <a href="settings.html"     class="nav-item " id="nav-settings">
+        <span class="nav-icon">⚙</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">AR</div>
+        <div class="user-info">
+          <div class="name">Ahmad Razif</div>
+          <div class="role">Project Manager</div>
+        </div>
+        <a href="login.html" onclick="localStorage.removeItem('bs_token')" class="logout-btn tooltip" data-tip="Logout" id="logout-btn" title="Logout">⏻</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ── Main Content ── -->
+  <div class="main-content">
+
+    <!-- Top Nav -->
+    <header class="topnav">
+      <!-- Mobile menu button -->
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+
+      <div class="search-bar" style="position:relative;flex:1;max-width:380px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Search projects, workers, tasks..." autocomplete="off"/>
+        <!-- Search Results Dropdown -->
+        <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;max-height:340px;overflow-y:auto">
+        </div>
+      </div>
+      <div class="topnav-right">
+        <div class="project-selector" id="project-selector-btn">
+          <span class="project-dot"></span>
+          <span class="project-selector-text">KL Tower Block A</span>
+          <span>▾</span>
+        </div>
+
+        <!-- Notification Bell -->
+        <a href="notifications.html" id="notif-bell" style="position:relative;width:36px;height:36px;border-radius:50%;background:var(--bg-main);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;transition:var(--transition)" title="Notifications">
+          🔔
+          
+          
+          <span id="notif-badge" style="position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+          
+        </a>
+
+        <!-- Avatar with dropdown -->
+        <div style="position:relative">
+          <div class="topnav-avatar" id="topnav-avatar" style="cursor:pointer" title="Profile">AR</div>
+          <div id="avatar-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;min-width:220px;overflow:hidden">
+            <div style="padding:16px;border-bottom:1px solid var(--border);background:var(--bg-main)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="topnav-avatar" style="width:38px;height:38px;font-size:13px">AR</div>
+                <div>
+                  <div style="font-size:13px;font-weight:700">Ahmad Razif</div>
+                  <div style="font-size:11px;color:var(--text-secondary)">Project Manager</div>
+                  <div style="font-size:10px;color:var(--text-muted)">ahmad@buildsmart.my</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:8px">
+              <a href="settings.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>⚙</span> Settings
+              </a>
+              <a href="notifications.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>🔔</span> Notifications
+              </a>
+              <div style="border-top:1px solid var(--border);margin:6px 0"></div>
+              <a href="login.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:#dc2626;font-size:13px;font-weight:600;transition:var(--transition)" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'">
+                <span>⏻</span> Log Out
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Flash Messages -->
+    
+      
+    
+
+    <!-- Page Body -->
+    <main class="page-content fade-in">
+      
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Project Dashboard</h2>
+    <p>
+      <span id="today-date"></span> —
+      <span class="live-dot"></span>Real-time site overview
+    </p>
+  </div>
+  <span class="live-badge">Live Monitoring Active</span>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Workers On Site</span>
+      <div class="stat-icon" style="background:#fff3e8;color:var(--accent)">👷</div>
+    </div>
+    <div class="stat-value">47<span style="font-size:16px;font-weight:500;color:var(--text-secondary)">/51</span></div>
+    <div class="stat-sub">3 absent • 2 late</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Active Tasks</span>
+      <div class="stat-icon" style="background:#dbeafe;color:#2563eb">📋</div>
+    </div>
+    <div class="stat-value">34</div>
+    <div class="stat-sub">6 completed today</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Overall Productivity</span>
+      <div class="stat-icon" style="background:#dcfce7;color:#16a34a">📈</div>
+    </div>
+    <div class="stat-value">78%</div>
+    <div class="stat-change up">
+      ▲
+      4% from last week
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Alerts</span>
+      <div class="stat-icon" style="background:#fee2e2;color:#dc2626">⚠</div>
+    </div>
+    <div class="stat-value">2</div>
+    <div class="stat-sub">1 critical, 1 medium</div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="charts-row">
+  <!-- Weekly Attendance Chart -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-title">Weekly Attendance</div>
+        <div class="chart-subtitle">All projects combined</div>
+      </div>
+      <a href="attendance.html" class="btn btn-ghost" style="font-size:12px">View All →</a>
+    </div>
+    <canvas id="attendanceChart" height="200"></canvas>
+  </div>
+
+  <!-- Task Distribution Donut -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-title">Task Distribution</div>
+        <div class="chart-subtitle">All active projects</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:center;padding:10px 0">
+      <canvas id="taskDonut" width="180" height="180"></canvas>
+    </div>
+    <div class="chart-legend">
+      <div class="legend-item">
+        <span class="legend-label"><span class="legend-dot" style="background:#22c55e"></span>Completed</span>
+        <span class="legend-value">42%</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-label"><span class="legend-dot" style="background:#f97316"></span>In Progress</span>
+        <span class="legend-value">33%</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-label"><span class="legend-dot" style="background:#e5e7eb"></span>Pending</span>
+        <span class="legend-value">25%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Productivity Trend -->
+<div class="chart-card" style="margin-bottom:0">
+  <div class="chart-card-header">
+    <div>
+      <div class="chart-title">Productivity Trend by Project</div>
+      <div class="chart-subtitle">Weekly task completion rate (%)</div>
+    </div>
+  </div>
+  <canvas id="productivityChart" height="120"></canvas>
+</div>
+
+    </main>
+  </div>
+
+  <!-- ── Mobile Bottom Navigation Bar ── -->
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <a href="dashboard.html"    class="mobile-nav-item active">
+      <span class="mobile-nav-icon">⊞</span>
+      <span class="mobile-nav-label">Home</span>
+    </a>
+    <a href="tasks.html"        class="mobile-nav-item ">
+      <span class="mobile-nav-icon">✔</span>
+      <span class="mobile-nav-label">Tasks</span>
+    </a>
+    <a href="attendance.html"   class="mobile-nav-item ">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">Attendance</span>
+    </a>
+    <a href="ai_assistant.html" class="mobile-nav-item ">
+      <span class="mobile-nav-icon">🤖</span>
+      <span class="mobile-nav-label">AI</span>
+    </a>
+    <a href="notifications.html" class="mobile-nav-item " style="position:relative">
+      <span class="mobile-nav-icon">🔔</span>
+      
+      
+      <span style="position:absolute;top:6px;right:calc(50% - 16px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+      
+      <span class="mobile-nav-label">Alerts</span>
+    </a>
+  </nav>
+</div>
+
+<script src="js/app.js"></script>
+
+<script>
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+// Weekly Attendance Bar Chart
+const actx = document.getElementById('attendanceChart').getContext('2d');
+new Chart(actx, {
+  type: 'bar',
+  data: {
+    labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Today'],
+    datasets: [
+      { label:'Present', data:[42,44,40,44,43,35,47], backgroundColor:'#f97316', borderRadius:4, borderSkipped:false },
+      { label:'Late',    data:[3,2,4,2,3,1,2],  backgroundColor:'#fde68a', borderRadius:4, borderSkipped:false },
+      { label:'Absent',  data:[5,4,6,4,4,8,4],  backgroundColor:'#e5e7eb', borderRadius:4, borderSkipped:false },
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{ display:false } },
+    scales:{
+      x:{ grid:{ display:false }, ticks:{ font:{size:11} } },
+      y:{ grid:{ color:'#f0f2f8' }, ticks:{ font:{size:11} }, max:60 }
+    }
+  }
+});
+
+// Task Distribution Donut
+const dctx = document.getElementById('taskDonut').getContext('2d');
+new Chart(dctx, {
+  type:'doughnut',
+  data:{
+    datasets:[{ data:[42,33,25], backgroundColor:['#22c55e','#f97316','#e5e7eb'], borderWidth:0, hoverOffset:6 }]
+  },
+  options:{ cutout:'70%', plugins:{ legend:{display:false}, tooltip:{enabled:true} } }
+});
+
+// Productivity Trend Line Chart
+const pctx = document.getElementById('productivityChart').getContext('2d');
+const weeks = ['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8'];
+new Chart(pctx, {
+  type:'line',
+  data:{
+    labels: weeks,
+    datasets:[
+      { label:'KL Tower', data:[55,60,62,65,68,70,74,76], borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.08)', tension:0.4, fill:true, pointRadius:3 },
+      { label:'PJ Residential', data:[30,33,35,38,40,41,42,42], borderColor:'#f97316', backgroundColor:'rgba(249,115,22,0.06)', tension:0.4, fill:true, pointRadius:3 },
+      { label:'Penang Bridge', data:[60,65,70,75,78,81,83,85], borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,0.06)', tension:0.4, fill:true, pointRadius:3 },
+      { label:'Iskandar Hub', data:[10,14,18,22,24,26,28,29], borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.06)', tension:0.4, fill:true, pointRadius:3 },
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:true,
+    plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:12, padding:16 } } },
+    scales:{
+      x:{ grid:{ display:false }, ticks:{font:{size:11}} },
+      y:{ grid:{ color:'#f0f2f8' }, ticks:{font:{size:11}}, min:0, max:100 }
+    }
+  }
+});
+</script>
+
+
+<script>
+// ── Mobile sidebar toggle ──
+const sidebar        = document.getElementById('sidebar');
+const overlay        = document.getElementById('sidebar-overlay');
+const mobileMenuBtn  = document.getElementById('mobile-menu-btn');
+const sidebarCloseBtn= document.getElementById('sidebar-close-btn');
+
+function openSidebar() {
+  sidebar.classList.add('open');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+if (mobileMenuBtn)   mobileMenuBtn.addEventListener('click', openSidebar);
+if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
+if (overlay)         overlay.addEventListener('click', closeSidebar);
+
+// Close sidebar on nav click (mobile)
+document.querySelectorAll('.sidebar .nav-item').forEach(a => {
+  a.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+});
+</script>
+</body>
+</html>

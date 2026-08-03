@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Settings — AI Construction System</title>
+  <meta name="description" content="BuildSmart AI Construction Management System — real-time site overview, task management, and attendance tracking."/>
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#f97316"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="BuildSmart"/>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f97316'/><text y='22' x='7' font-size='18' font-weight='900' fill='white' font-family='Arial'>B</text></svg>"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar (desktop) ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">B</div>
+      <div class="logo-text">
+        <h1>BuildSmart</h1>
+        <p>AI Construction System</p>
+      </div>
+      <!-- Mobile close button -->
+      <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main Menu</div>
+
+      <a href="dashboard.html"    class="nav-item " id="nav-dashboard">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      <a href="projects.html"     class="nav-item " id="nav-projects">
+        <span class="nav-icon">🏗</span> Projects
+      </a>
+      <a href="tasks.html"        class="nav-item " id="nav-tasks">
+        <span class="nav-icon">✔</span> Tasks
+      </a>
+      <a href="attendance.html"   class="nav-item " id="nav-attendance">
+        <span class="nav-icon">📅</span> Attendance
+      </a>
+      <a href="workers.html"      class="nav-item " id="nav-workers">
+        <span class="nav-icon">👷</span> Workers
+      </a>
+      <a href="ai_assistant.html" class="nav-item " id="nav-ai">
+        <span class="nav-icon">🤖</span> AI Assignment
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Operations</div>
+
+      <a href="daily_report.html" class="nav-item " id="nav-daily-report">
+        <span class="nav-icon">📋</span> Daily Report
+      </a>
+      <a href="issues.html"       class="nav-item " id="nav-issues">
+        <span class="nav-icon">⚠</span> Issues
+      </a>
+      <a href="notifications.html" class="nav-item " id="nav-notifications" style="position:relative">
+        <span class="nav-icon">🔔</span> Notifications
+        
+        
+        <span style="margin-left:auto;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 6px;min-width:18px;text-align:center">2</span>
+        
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Settings</div>
+      <a href="settings.html"     class="nav-item active" id="nav-settings">
+        <span class="nav-icon">⚙</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">AR</div>
+        <div class="user-info">
+          <div class="name">Ahmad Razif</div>
+          <div class="role">Project Manager</div>
+        </div>
+        <a href="login.html" onclick="localStorage.removeItem('bs_token')" class="logout-btn tooltip" data-tip="Logout" id="logout-btn" title="Logout">⏻</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ── Main Content ── -->
+  <div class="main-content">
+
+    <!-- Top Nav -->
+    <header class="topnav">
+      <!-- Mobile menu button -->
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+
+      <div class="search-bar" style="position:relative;flex:1;max-width:380px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Search projects, workers, tasks..." autocomplete="off"/>
+        <!-- Search Results Dropdown -->
+        <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;max-height:340px;overflow-y:auto">
+        </div>
+      </div>
+      <div class="topnav-right">
+        <div class="project-selector" id="project-selector-btn">
+          <span class="project-dot"></span>
+          <span class="project-selector-text">KL Tower Block A</span>
+          <span>▾</span>
+        </div>
+
+        <!-- Notification Bell -->
+        <a href="notifications.html" id="notif-bell" style="position:relative;width:36px;height:36px;border-radius:50%;background:var(--bg-main);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;transition:var(--transition)" title="Notifications">
+          🔔
+          
+          
+          <span id="notif-badge" style="position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+          
+        </a>
+
+        <!-- Avatar with dropdown -->
+        <div style="position:relative">
+          <div class="topnav-avatar" id="topnav-avatar" style="cursor:pointer" title="Profile">AR</div>
+          <div id="avatar-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;min-width:220px;overflow:hidden">
+            <div style="padding:16px;border-bottom:1px solid var(--border);background:var(--bg-main)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="topnav-avatar" style="width:38px;height:38px;font-size:13px">AR</div>
+                <div>
+                  <div style="font-size:13px;font-weight:700">Ahmad Razif</div>
+                  <div style="font-size:11px;color:var(--text-secondary)">Project Manager</div>
+                  <div style="font-size:10px;color:var(--text-muted)">ahmad@buildsmart.my</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:8px">
+              <a href="settings.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>⚙</span> Settings
+              </a>
+              <a href="notifications.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>🔔</span> Notifications
+              </a>
+              <div style="border-top:1px solid var(--border);margin:6px 0"></div>
+              <a href="login.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:#dc2626;font-size:13px;font-weight:600;transition:var(--transition)" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'">
+                <span>⏻</span> Log Out
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Flash Messages -->
+    
+      
+    
+
+    <!-- Page Body -->
+    <main class="page-content fade-in">
+      
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>Settings</h2>
+    <p>Application configuration and preferences</p>
+  </div>
+  <button class="btn btn-primary" id="save-settings-btn">💾 Save Changes</button>
+</div>
+
+<div style="display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start">
+  <!-- Settings Nav -->
+  <div class="card" style="padding:10px">
+    <div class="settings-nav-item active" data-tab="general" onclick="switchTab(this,'general')">🏠 General</div>
+    <div class="settings-nav-item" data-tab="notifications" onclick="switchTab(this,'notifications')">🔔 Notifications</div>
+    <div class="settings-nav-item" data-tab="geofence" onclick="switchTab(this,'geofence')">📍 Geofence</div>
+    <div class="settings-nav-item" data-tab="users" onclick="switchTab(this,'users')">👥 Users & Roles</div>
+
+  </div>
+
+  <!-- Settings Panels -->
+  <div>
+    <!-- General -->
+    <div id="tab-general" class="settings-tab card" style="padding:24px">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)">General Settings</h3>
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Company Name</label><input class="form-input" id="s-company" value="BuildSmart Sdn Bhd"/></div>
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">System Language</label>
+            <select class="form-select" id="s-lang"><option selected>English</option><option >Bahasa Malaysia</option></select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Timezone</label>
+            <select class="form-select" id="s-tz"><option selected>Asia/Kuala_Lumpur (UTC+8)</option><option >UTC</option></select>
+          </div>
+          <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Date Format</label>
+            <select class="form-select" id="s-datefmt"><option selected>DD/MM/YYYY</option><option >MM/DD/YYYY</option><option >YYYY-MM-DD</option></select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Work Hours (Default)</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px">Start Time</label><input class="form-input" type="time" id="s-start" value="07:00"/></div>
+            <div><label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px">End Time</label><input class="form-input" type="time" id="s-end" value="17:00"/></div>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Late Threshold</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input class="form-input" type="time" id="s-late" value="15" style="width:140px"/>
+            <span style="font-size:12px;color:var(--text-secondary)">Workers checking in after this time are marked Late</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications -->
+    <div id="tab-notifications" class="settings-tab card" style="padding:24px;display:none">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)">Notification Preferences</h3>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Attendance Alerts</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Notify when workers are absent or late</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox" checked style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Task Overdue</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Alert when tasks pass their due date</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox" checked style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Budget Warnings</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Warn when project spending exceeds 80%</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox" checked style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Safety Incidents</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Immediate alert on safety events</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox" checked style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Daily Summary</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Send daily project summary report</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox"  style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;font-weight:600">Weekly Report</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">Send weekly analytics report</div>
+          </div>
+          <label style="position:relative;width:42px;height:22px;cursor:pointer">
+            <input type="checkbox"  style="opacity:0;width:0;height:0" class="toggle-input"/>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- Geofence -->
+    <div id="tab-geofence" class="settings-tab card" style="padding:24px;display:none">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)">Geofence Configuration</h3>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--accent)">
+          📍 GPS geofencing automatically records attendance when workers enter or exit designated site boundaries.
+        </div>
+        
+        <div style="padding:16px;background:var(--bg-main);border-radius:var(--radius-sm);display:flex;align-items:center;gap:16px">
+          <span style="font-size:20px">📍</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Kuala Lumpur Tower Block A</div>
+            <div style="font-size:11px;color:var(--text-secondary)">Geofence radius</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="form-input" type="number" value="200" style="width:80px;text-align:center"/>
+            <span style="font-size:12px;color:var(--text-muted)">meters</span>
+          </div>
+          <span class="live-badge">Active</span>
+        </div>
+        
+        <div style="padding:16px;background:var(--bg-main);border-radius:var(--radius-sm);display:flex;align-items:center;gap:16px">
+          <span style="font-size:20px">📍</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Petaling Jaya Residential Complex</div>
+            <div style="font-size:11px;color:var(--text-secondary)">Geofence radius</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="form-input" type="number" value="150" style="width:80px;text-align:center"/>
+            <span style="font-size:12px;color:var(--text-muted)">meters</span>
+          </div>
+          <span class="live-badge">Active</span>
+        </div>
+        
+        <div style="padding:16px;background:var(--bg-main);border-radius:var(--radius-sm);display:flex;align-items:center;gap:16px">
+          <span style="font-size:20px">📍</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Penang Bridge Maintenance</div>
+            <div style="font-size:11px;color:var(--text-secondary)">Geofence radius</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="form-input" type="number" value="100" style="width:80px;text-align:center"/>
+            <span style="font-size:12px;color:var(--text-muted)">meters</span>
+          </div>
+          <span class="live-badge">Active</span>
+        </div>
+        
+        <div style="padding:16px;background:var(--bg-main);border-radius:var(--radius-sm);display:flex;align-items:center;gap:16px">
+          <span style="font-size:20px">📍</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Iskandar Puteri Industrial Hub</div>
+            <div style="font-size:11px;color:var(--text-secondary)">Geofence radius</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="form-input" type="number" value="300" style="width:80px;text-align:center"/>
+            <span style="font-size:12px;color:var(--text-muted)">meters</span>
+          </div>
+          <span class="live-badge">Active</span>
+        </div>
+        
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div id="tab-users" class="settings-tab card" style="padding:24px;display:none">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)">Users &amp; Roles</h3>
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          
+          <tr>
+            <td style="font-weight:600">Ahmad Razif</td>
+            <td style="color:var(--text-secondary)">ahmad@buildsmart.my</td>
+            <td><span class="badge badge-blue">Project Manager</span></td>
+            <td><span class="badge badge-green">Active</span></td>
+            <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px">Edit</button></td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight:600">Lim Wei Keat</td>
+            <td style="color:var(--text-secondary)">lim@buildsmart.my</td>
+            <td><span class="badge badge-blue">Site Supervisor</span></td>
+            <td><span class="badge badge-green">Active</span></td>
+            <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px">Edit</button></td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight:600">Faizal Osman</td>
+            <td style="color:var(--text-secondary)">faizal@buildsmart.my</td>
+            <td><span class="badge badge-blue">Site Supervisor</span></td>
+            <td><span class="badge badge-green">Active</span></td>
+            <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px">Edit</button></td>
+          </tr>
+          
+          <tr>
+            <td style="font-weight:600">Rajesh Kumar</td>
+            <td style="color:var(--text-secondary)">rajesh@buildsmart.my</td>
+            <td><span class="badge badge-blue">Worker</span></td>
+            <td><span class="badge badge-green">Active</span></td>
+            <td><button class="btn btn-outline" style="padding:4px 10px;font-size:11px">Edit</button></td>
+          </tr>
+          
+        </tbody>
+      </table>
+      <button class="btn btn-primary" style="margin-top:14px">＋ Invite User</button>
+    </div>
+
+
+</div>
+
+    </main>
+  </div>
+
+  <!-- ── Mobile Bottom Navigation Bar ── -->
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <a href="dashboard.html"    class="mobile-nav-item ">
+      <span class="mobile-nav-icon">⊞</span>
+      <span class="mobile-nav-label">Home</span>
+    </a>
+    <a href="tasks.html"        class="mobile-nav-item ">
+      <span class="mobile-nav-icon">✔</span>
+      <span class="mobile-nav-label">Tasks</span>
+    </a>
+    <a href="attendance.html"   class="mobile-nav-item ">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">Attendance</span>
+    </a>
+    <a href="ai_assistant.html" class="mobile-nav-item ">
+      <span class="mobile-nav-icon">🤖</span>
+      <span class="mobile-nav-label">AI</span>
+    </a>
+    <a href="notifications.html" class="mobile-nav-item " style="position:relative">
+      <span class="mobile-nav-icon">🔔</span>
+      
+      
+      <span style="position:absolute;top:6px;right:calc(50% - 16px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+      
+      <span class="mobile-nav-label">Alerts</span>
+    </a>
+  </nav>
+</div>
+
+<script src="js/app.js"></script>
+
+<style>
+.settings-nav-item { padding:9px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:var(--transition);margin-bottom:2px; }
+.settings-nav-item:hover { background:var(--bg-main);color:var(--text-primary); }
+.settings-nav-item.active { background:var(--accent-light);color:var(--accent);font-weight:600; }
+.toggle-track { position:absolute;top:0;left:0;right:0;bottom:0;background:#e5e7eb;border-radius:99px;transition:.3s; }
+.toggle-track::before { content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;left:3px;top:3px;transition:.3s;box-shadow:0 1px 4px rgba(0,0,0,.2); }
+.toggle-input:checked + .toggle-track { background:var(--accent); }
+.toggle-input:checked + .toggle-track::before { transform:translateX(20px); }
+</style>
+<script>
+function switchTab(el, tab) {
+  document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(t => t.style.display = 'none');
+  el.classList.add('active');
+  document.getElementById('tab-' + tab).style.display = 'block';
+}
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('save-settings-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+  const body = {
+    company_name:   document.getElementById('s-company')?.value || '',
+    language:       document.getElementById('s-lang')?.value || 'English',
+    timezone:       document.getElementById('s-tz')?.value || 'Asia/Kuala_Lumpur (UTC+8)',
+    date_format:    document.getElementById('s-datefmt')?.value || 'DD/MM/YYYY',
+    work_start:     document.getElementById('s-start')?.value || '07:00',
+    work_end:       document.getElementById('s-end')?.value || '17:00',
+    late_threshold: document.getElementById('s-late')?.value || '07:30',
+    notif_attendance: document.querySelector('[data-notif="attendance"]')?.checked ?? true,
+    notif_overdue:    document.querySelector('[data-notif="overdue"]')?.checked ?? true,
+    notif_budget:     document.querySelector('[data-notif="budget"]')?.checked ?? true,
+    notif_safety:     document.querySelector('[data-notif="safety"]')?.checked ?? true,
+    notif_daily:      document.querySelector('[data-notif="daily"]')?.checked ?? false,
+    notif_weekly:     document.querySelector('[data-notif="weekly"]')?.checked ?? false,
+  };
+  const res  = await fetch('/api/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  btn.disabled = false;
+  btn.textContent = data.ok ? '✅ Saved!' : '❌ Error';
+  setTimeout(() => btn.textContent = '💾 Save Changes', 2000);
+});
+</script>
+
+
+<script>
+// ── Mobile sidebar toggle ──
+const sidebar        = document.getElementById('sidebar');
+const overlay        = document.getElementById('sidebar-overlay');
+const mobileMenuBtn  = document.getElementById('mobile-menu-btn');
+const sidebarCloseBtn= document.getElementById('sidebar-close-btn');
+
+function openSidebar() {
+  sidebar.classList.add('open');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+if (mobileMenuBtn)   mobileMenuBtn.addEventListener('click', openSidebar);
+if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
+if (overlay)         overlay.addEventListener('click', closeSidebar);
+
+// Close sidebar on nav click (mobile)
+document.querySelectorAll('.sidebar .nav-item').forEach(a => {
+  a.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+});
+</script>
+</body>
+</html>

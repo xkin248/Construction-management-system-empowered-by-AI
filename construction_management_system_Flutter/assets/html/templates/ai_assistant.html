@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>AI Task Assignment — AI Construction System</title>
+  <meta name="description" content="BuildSmart AI Construction Management System — real-time site overview, task management, and attendance tracking."/>
+
+  <!-- PWA Meta -->
+  <meta name="theme-color" content="#f97316"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="BuildSmart"/>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="../css/styles.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23f97316'/><text y='22' x='7' font-size='18' font-weight='900' fill='white' font-family='Arial'>B</text></svg>"/>
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- ── Sidebar (desktop) ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">B</div>
+      <div class="logo-text">
+        <h1>BuildSmart</h1>
+        <p>AI Construction System</p>
+      </div>
+      <!-- Mobile close button -->
+      <button class="sidebar-close-btn" id="sidebar-close-btn" aria-label="Close menu">✕</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Main Menu</div>
+
+      <a href="dashboard.html"    class="nav-item " id="nav-dashboard">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      <a href="projects.html"     class="nav-item " id="nav-projects">
+        <span class="nav-icon">🏗</span> Projects
+      </a>
+      <a href="tasks.html"        class="nav-item " id="nav-tasks">
+        <span class="nav-icon">✔</span> Tasks
+      </a>
+      <a href="attendance.html"   class="nav-item " id="nav-attendance">
+        <span class="nav-icon">📅</span> Attendance
+      </a>
+      <a href="workers.html"      class="nav-item " id="nav-workers">
+        <span class="nav-icon">👷</span> Workers
+      </a>
+      <a href="ai_assistant.html" class="nav-item active" id="nav-ai">
+        <span class="nav-icon">🤖</span> AI Assignment
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Operations</div>
+
+      <a href="daily_report.html" class="nav-item " id="nav-daily-report">
+        <span class="nav-icon">📋</span> Daily Report
+      </a>
+      <a href="issues.html"       class="nav-item " id="nav-issues">
+        <span class="nav-icon">⚠</span> Issues
+      </a>
+      <a href="notifications.html" class="nav-item " id="nav-notifications" style="position:relative">
+        <span class="nav-icon">🔔</span> Notifications
+        
+        
+        <span style="margin-left:auto;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:99px;padding:1px 6px;min-width:18px;text-align:center">2</span>
+        
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">Settings</div>
+      <a href="settings.html"     class="nav-item " id="nav-settings">
+        <span class="nav-icon">⚙</span> Settings
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-card">
+        <div class="user-avatar">AR</div>
+        <div class="user-info">
+          <div class="name">Ahmad Razif</div>
+          <div class="role">Project Manager</div>
+        </div>
+        <a href="login.html" onclick="localStorage.removeItem('bs_token')" class="logout-btn tooltip" data-tip="Logout" id="logout-btn" title="Logout">⏻</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ── Main Content ── -->
+  <div class="main-content">
+
+    <!-- Top Nav -->
+    <header class="topnav">
+      <!-- Mobile menu button -->
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Open menu">☰</button>
+
+      <div class="search-bar" style="position:relative;flex:1;max-width:380px">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Search projects, workers, tasks..." autocomplete="off"/>
+        <!-- Search Results Dropdown -->
+        <div id="search-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;max-height:340px;overflow-y:auto">
+        </div>
+      </div>
+      <div class="topnav-right">
+        <div class="project-selector" id="project-selector-btn">
+          <span class="project-dot"></span>
+          <span class="project-selector-text">KL Tower Block A</span>
+          <span>▾</span>
+        </div>
+
+        <!-- Notification Bell -->
+        <a href="notifications.html" id="notif-bell" style="position:relative;width:36px;height:36px;border-radius:50%;background:var(--bg-main);display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;transition:var(--transition)" title="Notifications">
+          🔔
+          
+          
+          <span id="notif-badge" style="position:absolute;top:-2px;right:-2px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+          
+        </a>
+
+        <!-- Avatar with dropdown -->
+        <div style="position:relative">
+          <div class="topnav-avatar" id="topnav-avatar" style="cursor:pointer" title="Profile">AR</div>
+          <div id="avatar-dropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);z-index:500;min-width:220px;overflow:hidden">
+            <div style="padding:16px;border-bottom:1px solid var(--border);background:var(--bg-main)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="topnav-avatar" style="width:38px;height:38px;font-size:13px">AR</div>
+                <div>
+                  <div style="font-size:13px;font-weight:700">Ahmad Razif</div>
+                  <div style="font-size:11px;color:var(--text-secondary)">Project Manager</div>
+                  <div style="font-size:10px;color:var(--text-muted)">ahmad@buildsmart.my</div>
+                </div>
+              </div>
+            </div>
+            <div style="padding:8px">
+              <a href="settings.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>⚙</span> Settings
+              </a>
+              <a href="notifications.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:var(--text-primary);font-size:13px;transition:var(--transition)" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+                <span>🔔</span> Notifications
+              </a>
+              <div style="border-top:1px solid var(--border);margin:6px 0"></div>
+              <a href="login.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-sm);text-decoration:none;color:#dc2626;font-size:13px;font-weight:600;transition:var(--transition)" onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='transparent'">
+                <span>⏻</span> Log Out
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Flash Messages -->
+    
+      
+    
+
+    <!-- Page Body -->
+    <main class="page-content fade-in">
+      
+<div class="page-header">
+  <div class="page-header-left">
+    <h2>🤖 AI Task Assignment Engine</h2>
+    <p><span class="live-dot"></span>Automatically matches workers to tasks based on occupation, skills &amp; availability</p>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button class="btn btn-outline" id="refresh-btn">🔄 Refresh</button>
+    <button class="btn btn-primary" id="assign-all-btn">⚡ Auto-Assign All Pending</button>
+  </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-grid" style="margin-bottom:18px">
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Pending Tasks</span>
+      <div class="stat-icon" style="background:#fee2e2;color:#dc2626">⏳</div>
+    </div>
+    <div class="stat-value" id="stat-pending">1</div>
+    <div class="stat-sub">awaiting assignment</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Workers Available</span>
+      <div class="stat-icon" style="background:#dcfce7;color:#16a34a">👷</div>
+    </div>
+    <div class="stat-value" style="color:var(--green)">4</div>
+    <div class="stat-sub">on-site today</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">AI Assignments</span>
+      <div class="stat-icon" style="background:#f3e8ff;color:#7c3aed">🤖</div>
+    </div>
+    <div class="stat-value" style="color:var(--purple)" id="stat-assigned">3</div>
+    <div class="stat-sub">auto-matched</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-card-header">
+      <span class="stat-label">Avg Match Score</span>
+      <div class="stat-icon" style="background:#dbeafe;color:#2563eb">📊</div>
+    </div>
+    
+    <div class="stat-value" style="color:var(--blue)">
+      85%
+    </div>
+    <div class="stat-sub">worker-task fit</div>
+  </div>
+</div>
+
+<!-- How It Works Banner -->
+<div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:var(--radius);padding:16px 20px;margin-bottom:18px;display:flex;align-items:center;gap:20px;color:#fff">
+  <div style="font-size:32px">🧠</div>
+  <div style="flex:1">
+    <div style="font-weight:700;font-size:14px;margin-bottom:4px">How AI Assignment Works</div>
+    <div style="font-size:12px;opacity:0.85;line-height:1.6">
+      The engine scores each worker against task requirements: <strong>Role match (+40pts)</strong>,
+      <strong>Skills overlap (+15pts each)</strong>, <strong>Performance rating (+20pts)</strong>,
+      and <strong>On-site availability (+5pts)</strong>. The highest scorer gets recommended first.
+    </div>
+  </div>
+  <div style="display:flex;gap:24px;flex-shrink:0">
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800">Role</div>
+      <div style="font-size:10px;opacity:0.7">+40 pts</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800">Skills</div>
+      <div style="font-size:10px;opacity:0.7">+15 pts each</div>
+    </div>
+    <div style="text-align:center">
+      <div style="font-size:20px;font-weight:800">Rating</div>
+      <div style="font-size:10px;opacity:0.7">+20 pts</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Grid: task list + candidate panel -->
+<div style="display:grid;grid-template-columns:1fr 360px;gap:16px;align-items:start">
+
+  <!-- Left: Tasks needing assignment -->
+  <div class="card" style="overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13px;font-weight:700">Tasks Requiring Worker Assignment</div>
+      <div style="display:flex;gap:8px">
+        <select id="proj-filter-ai" class="form-select" style="width:auto;font-size:12px">
+          <option value="">All Projects</option>
+          <option value="Kuala Lumpur Tower Block A">Kuala Lumpur Tower Block A</option><option value="Petaling Jaya Residential Complex">Petaling Jaya Residential Complex</option><option value="Penang Bridge Maintenance">Penang Bridge Maintenance</option><option value="Iskandar Puteri Industrial Hub">Iskandar Puteri Industrial Hub</option>
+        </select>
+      </div>
+    </div>
+    <div id="ai-task-list">
+      
+      <div class="ai-task-row ai-task-active"
+           data-id="1" data-project="Kuala Lumpur Tower Block A"
+           onclick="selectTask(1)"
+           style="padding:14px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:var(--transition);border-left:3px solid var(--accent)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Pour concrete for 12th floor slab <span style="color:var(--accent)">— Structural works</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">🏗 Kuala Lumpur Tower Block A</div>
+          </div>
+          <span class="badge badge-red">High</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Concreting</span>
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Rebar</span>
+          
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          
+          <span style="font-size:11px;color:var(--green);font-weight:600">✅ Rajesh Kumar</span>
+          
+          
+          <span style="font-size:11px;background:#f3e8ff;color:#7c3aed;border-radius:99px;padding:2px 8px;font-weight:700">🤖 92%</span>
+          
+        </div>
+      </div>
+      
+      <div class="ai-task-row "
+           data-id="2" data-project="Petaling Jaya Residential Complex"
+           onclick="selectTask(2)"
+           style="padding:14px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:var(--transition);border-left:3px solid transparent">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Install electrical panel Block B <span style="color:var(--accent)">— MEP works</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">🏗 Petaling Jaya Residential Complex</div>
+          </div>
+          <span class="badge badge-yellow">Medium</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Wiring</span>
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Panel Install</span>
+          
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          
+          <span style="font-size:11px;color:var(--text-muted)">⬜ Unassigned</span>
+          
+          
+        </div>
+      </div>
+      
+      <div class="ai-task-row "
+           data-id="3" data-project="Penang Bridge Maintenance"
+           onclick="selectTask(3)"
+           style="padding:14px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:var(--transition);border-left:3px solid transparent">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Bridge expansion joint inspection <span style="color:var(--accent)">— Safety & maintenance</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">🏗 Penang Bridge Maintenance</div>
+          </div>
+          <span class="badge badge-red">High</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Inspection</span>
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Safety</span>
+          
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          
+          <span style="font-size:11px;color:var(--green);font-weight:600">✅ Faizal Osman</span>
+          
+          
+          <span style="font-size:11px;background:#f3e8ff;color:#7c3aed;border-radius:99px;padding:2px 8px;font-weight:700">🤖 88%</span>
+          
+        </div>
+      </div>
+      
+      <div class="ai-task-row "
+           data-id="4" data-project="Iskandar Puteri Industrial Hub"
+           onclick="selectTask(4)"
+           style="padding:14px 16px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:var(--transition);border-left:3px solid transparent">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary)">Site drainage layout survey <span style="color:var(--accent)">— Civil works</span></div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">🏗 Iskandar Puteri Industrial Hub</div>
+          </div>
+          <span class="badge badge-green">Low</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Surveying</span>
+          
+          <span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px;font-weight:500">Piping</span>
+          
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          
+          <span style="font-size:11px;color:var(--green);font-weight:600">✅ Muthu Selvam</span>
+          
+          
+          <span style="font-size:11px;background:#f3e8ff;color:#7c3aed;border-radius:99px;padding:2px 8px;font-weight:700">🤖 75%</span>
+          
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Right: Worker candidates panel -->
+  <div id="candidates-panel" style="display:flex;flex-direction:column;gap:12px">
+    <!-- Populated by JS -->
+    <div class="card" style="padding:20px;text-align:center;color:var(--text-muted)">
+      <div style="font-size:32px;margin-bottom:10px">👆</div>
+      <div style="font-size:13px">Select a task to see AI-recommended workers</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast notification -->
+<div id="assign-toast" style="display:none;position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;border-radius:var(--radius);padding:14px 20px;font-size:13px;box-shadow:var(--shadow-lg);z-index:9999;min-width:280px;border-left:4px solid var(--green)">
+  <div id="toast-msg"></div>
+</div>
+
+    </main>
+  </div>
+
+  <!-- ── Mobile Bottom Navigation Bar ── -->
+  <nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+    <a href="dashboard.html"    class="mobile-nav-item ">
+      <span class="mobile-nav-icon">⊞</span>
+      <span class="mobile-nav-label">Home</span>
+    </a>
+    <a href="tasks.html"        class="mobile-nav-item ">
+      <span class="mobile-nav-icon">✔</span>
+      <span class="mobile-nav-label">Tasks</span>
+    </a>
+    <a href="attendance.html"   class="mobile-nav-item ">
+      <span class="mobile-nav-icon">📅</span>
+      <span class="mobile-nav-label">Attendance</span>
+    </a>
+    <a href="ai_assistant.html" class="mobile-nav-item active">
+      <span class="mobile-nav-icon">🤖</span>
+      <span class="mobile-nav-label">AI</span>
+    </a>
+    <a href="notifications.html" class="mobile-nav-item " style="position:relative">
+      <span class="mobile-nav-icon">🔔</span>
+      
+      
+      <span style="position:absolute;top:6px;right:calc(50% - 16px);background:#ef4444;color:#fff;font-size:9px;font-weight:700;border-radius:99px;padding:1px 5px;min-width:16px;text-align:center">2</span>
+      
+      <span class="mobile-nav-label">Alerts</span>
+    </a>
+  </nav>
+</div>
+
+<script src="../js/app.js"></script>
+
+<style>
+.ai-task-row:hover { background:var(--bg-main); }
+.ai-task-active { background:var(--accent-light)!important; border-left-color:var(--accent)!important; }
+.candidate-card { background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;transition:var(--transition); }
+.candidate-card:hover { box-shadow:var(--shadow); border-color:var(--accent); }
+.score-ring { width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0; }
+.assign-btn { background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:var(--transition);width:100%;margin-top:10px; }
+.assign-btn:hover { opacity:0.9; }
+.assign-btn.assigned { background:var(--green); }
+</style>
+<script>
+const ALL_TASKS   = [{"ai_match": 92, "assigned_rating": 4.6, "assigned_role": "Steel Fixer", "assigned_to": "Rajesh Kumar", "due": "2026-07-25", "estimated_hours": 40, "id": 1, "logged_hours": 24, "priority": "High", "progress": 60, "project": "Kuala Lumpur Tower Block A", "skills": ["Concreting", "Rebar"], "status": "In Progress", "subtitle": "Structural works", "title": "Pour concrete for 12th floor slab"}, {"ai_match": 0, "assigned_rating": 0, "assigned_role": "", "assigned_to": null, "due": "2026-07-30", "estimated_hours": 16, "id": 2, "logged_hours": 0, "priority": "Medium", "progress": 0, "project": "Petaling Jaya Residential Complex", "skills": ["Wiring", "Panel Install"], "status": "Pending", "subtitle": "MEP works", "title": "Install electrical panel Block B"}, {"ai_match": 88, "assigned_rating": 4.3, "assigned_role": "Electrician", "assigned_to": "Faizal Osman", "due": "2026-07-10", "estimated_hours": 8, "id": 3, "logged_hours": 8, "priority": "High", "progress": 100, "project": "Penang Bridge Maintenance", "skills": ["Inspection", "Safety"], "status": "Completed", "subtitle": "Safety \u0026 maintenance", "title": "Bridge expansion joint inspection"}, {"ai_match": 75, "assigned_rating": 4.1, "assigned_role": "Plumber", "assigned_to": "Muthu Selvam", "due": "2026-08-05", "estimated_hours": 20, "id": 4, "logged_hours": 7, "priority": "Low", "progress": 35, "project": "Iskandar Puteri Industrial Hub", "skills": ["Surveying", "Piping"], "status": "In Progress", "subtitle": "Civil works", "title": "Site drainage layout survey"}];
+const ALL_WORKERS = [{"avatar_color": "#f97316", "check_in": "07:02 AM", "check_out": "\u2014", "hours": 6.4, "id": 1, "initials": "RK", "name": "Rajesh Kumar", "project": "Kuala Lumpur Tower Block A", "rating": 4.6, "role": "Steel Fixer", "skills": ["Steel Fixing", "Rebar"], "status": "Present"}, {"avatar_color": "#3b82f6", "check_in": "06:58 AM", "check_out": "\u2014", "hours": 6.5, "id": 2, "initials": "LW", "name": "Lim Wei Keat", "project": "Petaling Jaya Residential Complex", "rating": 4.8, "role": "Site Supervisor", "skills": ["Supervision", "Safety"], "status": "Present"}, {"avatar_color": "#22c55e", "check_in": "08:15 AM", "check_out": "\u2014", "hours": 5.2, "id": 3, "initials": "FO", "name": "Faizal Osman", "project": "Penang Bridge Maintenance", "rating": 4.3, "role": "Electrician", "skills": ["Wiring", "Panel Install"], "status": "Late"}, {"avatar_color": "#8b5cf6", "check_in": "07:00 AM", "check_out": "\u2014", "hours": 6.4, "id": 4, "initials": "AR", "name": "Ahmad Razif", "project": "Kuala Lumpur Tower Block A", "rating": 4.9, "role": "Project Manager", "skills": ["Planning", "Coordination"], "status": "Present"}, {"avatar_color": "#ef4444", "check_in": "\u2014", "check_out": "\u2014", "hours": 0, "id": 5, "initials": "MS", "name": "Muthu Selvam", "project": "Iskandar Puteri Industrial Hub", "rating": 4.1, "role": "Plumber", "skills": ["Piping", "Plumbing"], "status": "Absent"}, {"avatar_color": "#06b6d4", "check_in": "07:10 AM", "check_out": "\u2014", "hours": 6.3, "id": 6, "initials": "CM", "name": "Chong Mei Ling", "project": "Petaling Jaya Residential Complex", "rating": 4.7, "role": "Quantity Surveyor", "skills": ["Costing", "Estimation"], "status": "Present"}];
+let selectedTaskId = ALL_TASKS.length ? ALL_TASKS[0].id : null;
+let assignmentsData = [];
+
+async function loadAssignments() {
+  const res  = await fetch('/api/ai-assign');
+  assignmentsData = await res.json();
+  if (selectedTaskId) renderCandidates(selectedTaskId);
+}
+
+function selectTask(taskId) {
+  selectedTaskId = taskId;
+  document.querySelectorAll('.ai-task-row').forEach(row => {
+    const active = parseInt(row.dataset.id) === taskId;
+    row.classList.toggle('ai-task-active', active);
+    row.style.borderLeftColor = active ? 'var(--accent)' : 'transparent';
+  });
+  renderCandidates(taskId);
+}
+
+function renderCandidates(taskId) {
+  const panel = document.getElementById('candidates-panel');
+  const entry = assignmentsData.find(e => e.task.id === taskId);
+  if (!entry) {
+    panel.innerHTML = `<div class="card" style="padding:20px;text-align:center;color:var(--text-muted)"><div style="font-size:28px;margin-bottom:8px">🔄</div><div style="font-size:13px">Loading recommendations...</div></div>`;
+    return;
+  }
+  const task = entry.task;
+  const cands = entry.candidates;
+
+  const scoreColor = s => s >= 80 ? '#16a34a' : s >= 60 ? '#f97316' : '#6b7280';
+  const scoreBg    = s => s >= 80 ? '#dcfce7' : s >= 60 ? '#fff3e8' : '#f3f4f6';
+
+  let html = `
+    <div class="card" style="padding:16px">
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Selected Task</div>
+      <div style="font-size:14px;font-weight:700">${task.title}${task.subtitle ? ' — '+task.subtitle : ''}</div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:3px">🏗 ${task.project}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:8px">
+        ${(task.skills||[]).map(s=>`<span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 7px;font-size:10px">${s}</span>`).join('')}
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--text-secondary);padding:4px 0">🤖 Top Matched Workers</div>`;
+
+  if (!cands || cands.length === 0) {
+    html += `<div class="card" style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px">No workers available</div>`;
+  } else {
+    cands.forEach((c, i) => {
+      const clr = scoreColor(c.match_score);
+      const bg  = scoreBg(c.match_score);
+      html += `
+        <div class="candidate-card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+            <div class="score-ring" style="background:${bg};color:${clr}">${c.match_score}%</div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="width:32px;height:32px;border-radius:50%;background:${c.worker_avatar_color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${c.worker_initials}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:700">${c.worker_name}${i===0?' <span style="background:#fef9c3;color:#854d0e;font-size:9px;border-radius:99px;padding:1px 6px;font-weight:600">BEST</span>':''}</div>
+                  <div style="font-size:11px;color:var(--text-secondary)">${c.worker_role}</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <span class="badge ${c.worker_status==='Present'?'badge-green':c.worker_status==='Late'?'badge-yellow':'badge-red'}" style="font-size:10px">${c.worker_status}</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">
+            ${c.worker_skills.map(s=>`<span style="background:var(--bg-main);border:1px solid var(--border);border-radius:99px;padding:2px 6px;font-size:10px">${s}</span>`).join('')}
+          </div>
+          <div style="font-size:11px;color:var(--yellow);margin-bottom:6px">★ ${c.worker_rating}</div>
+          <button class="assign-btn" id="btn-${task.id}-${c.worker_id}"
+                  onclick="assignWorker(${task.id}, ${c.worker_id}, '${c.worker_name}', '${c.worker_role}', this)">
+            Assign ${c.worker_name}
+          </button>
+        </div>`;
+    });
+  }
+  panel.innerHTML = html;
+}
+
+async function assignWorker(taskId, workerId, workerName, workerRole, btnEl) {
+  btnEl.disabled = true;
+  btnEl.textContent = 'Assigning...';
+  const res  = await fetch(`/api/ai-assign/${taskId}`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({worker_id: workerId})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    btnEl.textContent = '✅ Assigned!';
+    btnEl.classList.add('assigned');
+    // Update task row in list
+    const row = document.querySelector(`.ai-task-row[data-id="${taskId}"]`);
+    if (row) {
+      const badge = row.querySelector('.unassigned-badge');
+      if (badge) badge.textContent = '✅ ' + workerName;
+      const assignedSpan = row.querySelector('[data-assigned]');
+      if (assignedSpan) {
+        assignedSpan.textContent = '✅ ' + workerName;
+        assignedSpan.style.color = 'var(--green)';
+      }
+    }
+    showToast(`✅ ${workerName} assigned to task (AI Match: ${data.match_score}%)`);
+    // Update stat counter
+    const sc = document.getElementById('stat-assigned');
+    if (sc) sc.textContent = parseInt(sc.textContent||0)+1;
+    // Reload assignments
+    await loadAssignments();
+  } else {
+    btnEl.textContent = '❌ Failed';
+    btnEl.disabled = false;
+  }
+}
+
+document.getElementById('assign-all-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('assign-all-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Assigning...';
+  const res  = await fetch('/api/ai-assign/all', {method:'POST',headers:{'Content-Type':'application/json'}});
+  const data = await res.json();
+  if (data.ok) {
+    showToast(`⚡ Auto-assigned ${data.assigned} tasks to best-matched workers!`);
+    setTimeout(() => location.reload(), 1500);
+  }
+  btn.disabled = false;
+  btn.textContent = '⚡ Auto-Assign All Pending';
+});
+
+document.getElementById('refresh-btn').addEventListener('click', () => loadAssignments());
+
+document.getElementById('proj-filter-ai').addEventListener('change', function() {
+  const v = this.value;
+  document.querySelectorAll('.ai-task-row').forEach(row => {
+    row.style.display = (!v || row.dataset.project === v) ? '' : 'none';
+  });
+});
+
+function showToast(msg) {
+  const t = document.getElementById('assign-toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display='none', 3500);
+}
+
+// Initial load
+loadAssignments();
+if (selectedTaskId) selectTask(selectedTaskId);
+</script>
+
+
+<script>
+// ── Mobile sidebar toggle ──
+const sidebar        = document.getElementById('sidebar');
+const overlay        = document.getElementById('sidebar-overlay');
+const mobileMenuBtn  = document.getElementById('mobile-menu-btn');
+const sidebarCloseBtn= document.getElementById('sidebar-close-btn');
+
+function openSidebar() {
+  sidebar.classList.add('open');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+if (mobileMenuBtn)   mobileMenuBtn.addEventListener('click', openSidebar);
+if (sidebarCloseBtn) sidebarCloseBtn.addEventListener('click', closeSidebar);
+if (overlay)         overlay.addEventListener('click', closeSidebar);
+
+// Close sidebar on nav click (mobile)
+document.querySelectorAll('.sidebar .nav-item').forEach(a => {
+  a.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+});
+</script>
+</body>
+</html>

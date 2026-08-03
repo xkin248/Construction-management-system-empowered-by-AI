@@ -1,0 +1,114 @@
+name: 🏗️ Build & Release BuildSmart APK
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'   # Trigger on version tags like v1.0.0, v1.2.3
+  workflow_dispatch:   # Allow manual trigger from GitHub UI
+    inputs:
+      version_name:
+        description: 'Version name (e.g. 1.0.0)'
+        required: false
+        default: 'manual-build'
+
+jobs:
+  build-apk:
+    name: 📱 Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── Java Setup ────────────────────────────────────────────
+      - name: ☕ Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ── Flutter Setup ─────────────────────────────────────────
+      - name: 🐦 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.0'
+          channel: 'stable'
+          cache: true
+
+      # ── Dependencies ──────────────────────────────────────────
+      - name: 📦 Install Flutter Dependencies
+        working-directory: construction_management_system_Flutter
+        run: flutter pub get
+
+      # ── Build APK ─────────────────────────────────────────────
+      - name: 🔨 Build Release APK (Debug Signing)
+        working-directory: construction_management_system_Flutter
+        run: |
+          flutter build apk --release \
+            --dart-define=BASE_URL=${{ secrets.API_BASE_URL || 'http://localhost:8000' }}
+
+      # ── Rename APK ────────────────────────────────────────────
+      - name: 📝 Rename APK File
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [ -z "$VERSION" ] || [ "$VERSION" == "refs/heads/main" ]; then
+            VERSION="${{ github.event.inputs.version_name || 'manual' }}"
+          fi
+          mv construction_management_system_Flutter/build/app/outputs/flutter-apk/app-release.apk \
+             BuildSmart-${VERSION}.apk
+          echo "APK_NAME=BuildSmart-${VERSION}.apk" >> $GITHUB_ENV
+
+      # ── Upload Artifact ───────────────────────────────────────
+      - name: 📤 Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}
+          retention-days: 30
+
+      # ── Create GitHub Release ─────────────────────────────────
+      - name: 🚀 Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "BuildSmart ${{ github.ref_name }}"
+          body: |
+            ## 📱 BuildSmart ${{ github.ref_name }} - Android APK
+
+            ### 📥 安装方法 (How to Install)
+            1. 在 Android 手机上下载 `BuildSmart-${{ github.ref_name }}.apk`
+            2. 打开下载的 APK 文件
+            3. 如果提示"未知来源"，请在设置中允许安装
+            4. 安装完成后即可使用！
+
+            ---
+            ### 📥 Installation (English)
+            1. Download `BuildSmart-${{ github.ref_name }}.apk` on your Android phone
+            2. Open the downloaded APK file
+            3. If prompted about "Unknown sources", allow installation in Settings
+            4. Done! Open the app and enjoy.
+
+            ---
+            > ⚠️ **Note**: This app requires the backend server to be running to access data.
+          files: ${{ env.APK_NAME }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Optional: Build Summary ───────────────────────────────────
+  notify:
+    name: 📊 Build Summary
+    runs-on: ubuntu-latest
+    needs: build-apk
+    if: always()
+    steps:
+      - name: ✅ Build Status
+        run: |
+          if [ "${{ needs.build-apk.result }}" == "success" ]; then
+            echo "✅ APK built successfully!"
+          else
+            echo "❌ Build failed. Check the logs above."
+            exit 1
+          fi
