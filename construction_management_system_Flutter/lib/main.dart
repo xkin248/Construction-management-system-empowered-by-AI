@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
@@ -7,8 +8,71 @@ import 'screens/home_shell.dart';
 import 'screens/worker_home_shell.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (FlutterErrorDetails details) {
+      debugPrint('[FlutterError] ${details.exceptionAsString()}');
+      debugPrint('[FlutterError] ${details.stack}');
+      // Don't crash — log silently
+    };
+    runApp(const MyApp());
+  }, (error, stack) {
+    debugPrint('[ZoneError] $error');
+    debugPrint('[ZoneStack] $stack');
+    // Show error app so user can see what went wrong
+    runApp(ErrorApp(error: error.toString()));
+  });
+}
+
+/// Fallback app shown if something crashes before the main UI loads
+class ErrorApp extends StatelessWidget {
+  final String error;
+  const ErrorApp({super.key, required this.error});
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF10141C),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 56),
+                const SizedBox(height: 16),
+                const Text(
+                  'BuildSmart — Startup Error',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F2634),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    error,
+                    style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Please screenshot this and send to the developer.',
+                  style: TextStyle(color: Color(0xFF757E90), fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

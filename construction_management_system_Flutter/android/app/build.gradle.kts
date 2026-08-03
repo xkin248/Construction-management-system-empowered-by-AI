@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.buildsmart.app"
+    namespace = "com.example.construction_management_system"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.buildsmart.app"
+        applicationId = "com.example.construction_management_system"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
