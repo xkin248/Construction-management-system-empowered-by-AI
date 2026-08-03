@@ -41,33 +41,44 @@ class _SplashGateState extends State<SplashGate> {
   }
 
   Future<void> _boot() async {
-    final sp = await SharedPreferences.getInstance();
-    final token = sp.getString('token');
-    final userType = sp.getString('user_type');
-    final userRole = sp.getString('user_role');
-    ApiService().init(
-      token: token,
-      onUnauthorized: () async {
-        final sp2 = await SharedPreferences.getInstance();
-        await sp2.clear();
-        navigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
-      },
-    );
-    if (!mounted) return;
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final token = sp.getString('token');
+      final userType = sp.getString('user_type');
+      final userRole = sp.getString('user_role');
+      ApiService().init(
+        token: token,
+        onUnauthorized: () async {
+          final sp2 = await SharedPreferences.getInstance();
+          await sp2.clear();
+          navigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
+        },
+      );
+      if (!mounted) return;
 
-    Widget home;
-    final hasToken = token != null && token.isNotEmpty;
-    final isWorker = userType == 'worker' || userRole == 'worker';
-    if (hasToken) {
-      home = isWorker ? const WorkerHomeShell() : const HomeShell();
-    } else {
-      home = const LoginPage();
+      Widget home;
+      final hasToken = token != null && token.isNotEmpty;
+      final isWorker = userType == 'worker' || userRole == 'worker';
+      if (hasToken) {
+        home = isWorker ? const WorkerHomeShell() : const HomeShell();
+      } else {
+        home = const LoginPage();
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => home),
+      );
+    } catch (e, st) {
+      debugPrint('[Boot Error] $e\n$st');
+      // Always fallback to login — never crash
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      }
     }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => home),
-    );
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../config/env.dart';
 
 class ApiService {
   static final ApiService _i = ApiService._internal();
@@ -16,15 +17,7 @@ class ApiService {
     return _d!;
   }
 
-  String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:$port';
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        return 'http://10.0.2.2:$port';
-      default:
-        return 'http://localhost:$port';
-    }
-  }
+  String get baseUrl => Env.baseUrl;
 
   String get htmlRoot => '$baseUrl/html';
 
