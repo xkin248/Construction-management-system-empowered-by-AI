@@ -18,8 +18,18 @@ import 'profile_page.dart';
 class _NavItem {
   final String label;
   final IconData icon;
-  const _NavItem(this.label, this.icon);
+  final IconData activeIcon;
+  const _NavItem(this.label, this.icon, [IconData? active])
+      : activeIcon = active ?? icon;
 }
+
+const _bottomNavItems = [
+  _NavItem('Dashboard', Icons.grid_view_outlined, Icons.grid_view_rounded),
+  _NavItem('Projects', Icons.apartment_outlined, Icons.apartment_rounded),
+  _NavItem('Tasks', Icons.check_circle_outline_rounded, Icons.check_circle_rounded),
+  _NavItem('Attendance', Icons.calendar_month_outlined, Icons.calendar_month_rounded),
+  _NavItem('More', Icons.apps_outlined, Icons.apps_rounded),
+];
 
 const _mainMenu = [
   _NavItem('Dashboard', Icons.grid_view_rounded),
@@ -33,7 +43,6 @@ const _settingsMenu = [
   _NavItem('Settings', Icons.settings_outlined),
 ];
 
-// ⚠️ IMPORTANT: _pages must match index order of _mainMenu + _settingsMenu
 final _pages = <Widget>[
   const DashboardPage(),   // 0 Dashboard
   const ProjectsPage(),    // 1 Projects
@@ -58,7 +67,24 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int idx = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  String _currentProject = 'KL Tower Block A';
+  String _currentProject = '';
+  Map<String, dynamic> _user = {};
+  bool _userLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUser();
+  }
+
+  Future<void> _loadUser() async {
+    try {
+      final data = await ApiService().me();
+      if (mounted) setState(() { _user = data; _userLoaded = true; });
+    } catch (_) {
+      if (mounted) setState(() => _userLoaded = true);
+    }
+  }
 
   Future<void> _logout() async {
     final sp = await SharedPreferences.getInstance();
@@ -83,6 +109,7 @@ class _HomeShellState extends State<HomeShell> {
           return _WideLayout(
             idx: idx,
             currentProject: _currentProject,
+            user: _user,
             onNav: (i) => _go(i),
             onLogout: _logout,
             onProjectChanged: (p) => setState(() => _currentProject = p),
@@ -92,7 +119,9 @@ class _HomeShellState extends State<HomeShell> {
           scaffoldKey: _scaffoldKey,
           idx: idx,
           currentProject: _currentProject,
-          onNav: (i) => _go(i, fromDrawer: true),
+          user: _user,
+          userLoaded: _userLoaded,
+          onNav: (i) => _go(i),
           onLogout: _logout,
           onProjectChanged: (p) => setState(() => _currentProject = p),
         );
@@ -105,6 +134,7 @@ class _HomeShellState extends State<HomeShell> {
 class _WideLayout extends StatelessWidget {
   final int idx;
   final String currentProject;
+  final Map<String, dynamic> user;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
   final ValueChanged<String> onProjectChanged;
@@ -112,6 +142,7 @@ class _WideLayout extends StatelessWidget {
   const _WideLayout({
     required this.idx,
     required this.currentProject,
+    required this.user,
     required this.onNav,
     required this.onLogout,
     required this.onProjectChanged,
@@ -122,13 +153,14 @@ class _WideLayout extends StatelessWidget {
     return Scaffold(
       body: Row(
         children: [
-          _Sidebar(idx: idx, onNav: onNav, onLogout: onLogout),
+          _Sidebar(idx: idx, user: user, onNav: onNav, onLogout: onLogout),
           Expanded(
             child: Column(
               children: [
                 _TopBar(
                   title: _titles[idx],
                   currentProject: currentProject,
+                  user: user,
                   onProjectChanged: onProjectChanged,
                 ),
                 Expanded(child: IndexedStack(index: idx, children: _pages)),
@@ -141,11 +173,13 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-// ──────────────── Narrow (Drawer) Layout ────────────────
+// ──────────────── Narrow (Bottom Nav) Layout ─────────
 class _NarrowLayout extends StatelessWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final int idx;
   final String currentProject;
+  final Map<String, dynamic> user;
+  final bool userLoaded;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
   final ValueChanged<String> onProjectChanged;
@@ -154,47 +188,255 @@ class _NarrowLayout extends StatelessWidget {
     required this.scaffoldKey,
     required this.idx,
     required this.currentProject,
+    required this.user,
+    required this.userLoaded,
     required this.onNav,
     required this.onLogout,
     required this.onProjectChanged,
   });
 
+  // Map bottom nav index → page index
+  int _bottomToPageIdx(int bottomIdx) {
+    const map = [0, 1, 2, 3, 4]; // Dashboard, Projects, Tasks, Attendance, Workers
+    return map[bottomIdx];
+  }
+
+  int _pageToBottomIdx(int pageIdx) {
+    if (pageIdx <= 3) return pageIdx;
+    return 4; // all others map to "More"
+  }
+
+  void _showMoreSheet(BuildContext ctx, ValueChanged<int> onNav) {
+    showModalBottomSheet(
+      context: ctx,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _MoreSheet(currentIdx: idx, onNav: onNav, onLogout: onLogout, user: user),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final userName = (user['full_name'] as String?) ?? '';
+    final initStr = userName.isNotEmpty ? initials(userName) : '?';
+
     return Scaffold(
       key: scaffoldKey,
+      backgroundColor: AppColors.bgMain,
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
-          onPressed: () => scaffoldKey.currentState?.openDrawer(),
-        ),
-        title: Text(_titles[idx]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
-            onPressed: () {},
+        surfaceTintColor: Colors.transparent,
+        centerTitle: false,
+        title: Row(children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(7)),
+            child: const Center(child: Icon(Icons.construction_rounded, color: Colors.white, size: 15)),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.accent,
-                child: Text('AR', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
-              ),
+          const SizedBox(width: 8),
+          Text('BuildSmart',
+              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        ]),
+        actions: [
+          Stack(children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
+              onPressed: () {},
+            ),
+            Positioned(
+              right: 8, top: 8,
+              child: Container(width: 8, height: 8,
+                  decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
+            ),
+          ]),
+          GestureDetector(
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: userLoaded
+                  ? CircleAvatar(
+                      radius: 16,
+                      backgroundColor: avatarColor(userName.isNotEmpty ? userName : 'U'),
+                      child: Text(initStr,
+                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+                    )
+                  : const CircleAvatar(
+                      radius: 16,
+                      backgroundColor: AppColors.sidebarHover,
+                      child: SizedBox(width: 12, height: 12,
+                          child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.accent)),
+                    ),
             ),
           ),
         ],
       ),
-      drawer: Drawer(
-        backgroundColor: AppColors.sidebarBg,
-        width: AppColors.sidebarWidth,
-        child: _SidebarContent(idx: idx, onNav: onNav, onLogout: onLogout),
-      ),
       body: IndexedStack(index: idx, children: _pages),
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bgCard,
+          border: Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 64,
+            child: Row(
+              children: List.generate(_bottomNavItems.length, (i) {
+                final item = _bottomNavItems[i];
+                final isMore = i == 4;
+                final isSelected = isMore
+                    ? idx >= 4
+                    : _pageToBottomIdx(idx) == i;
+                return Expanded(
+                  child: _BottomNavBtn(
+                    item: item,
+                    selected: isSelected,
+                    onTap: () {
+                      if (isMore) {
+                        _showMoreSheet(context, onNav);
+                      } else {
+                        onNav(_bottomToPageIdx(i));
+                      }
+                    },
+                  ),
+                );
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ──────────────── Bottom Nav Button ──────────────────
+class _BottomNavBtn extends StatelessWidget {
+  final _NavItem item;
+  final bool selected;
+  final VoidCallback onTap;
+  const _BottomNavBtn({required this.item, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              selected ? item.activeIcon : item.icon,
+              key: ValueKey(selected),
+              size: 22,
+              color: selected ? AppColors.accent : AppColors.textMuted,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            item.label,
+            style: GoogleFonts.outfit(
+              fontSize: 10,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? AppColors.accent : AppColors.textMuted,
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ──────────────── More Bottom Sheet ──────────────────
+class _MoreSheet extends StatelessWidget {
+  final int currentIdx;
+  final ValueChanged<int> onNav;
+  final VoidCallback onLogout;
+  final Map<String, dynamic> user;
+  const _MoreSheet({required this.currentIdx, required this.onNav, required this.onLogout, required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final userName = (user['full_name'] as String?) ?? 'User';
+    final role = (user['role'] as String?) ?? '';
+    final moreItems = [
+      {'label': 'Workers', 'icon': Icons.badge_outlined, 'idx': 4},
+      {'label': 'Daily Reports', 'icon': Icons.description_outlined, 'idx': -1},
+      {'label': 'Issues', 'icon': Icons.warning_amber_outlined, 'idx': -1},
+      {'label': 'AI Assistant', 'icon': Icons.smart_toy_outlined, 'idx': 5},
+      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 6},
+    ];
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            width: 36, height: 4,
+            decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          // User info
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+            child: Row(children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: avatarColor(userName),
+                child: Text(initials(userName),
+                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(userName,
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary)),
+                Text(role.replaceAll('_', ' '),
+                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary)),
+              ])),
+            ]),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          // Menu items
+          ...moreItems.map((item) => ListTile(
+            leading: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                color: AppColors.bgMain,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(item['icon'] as IconData, size: 20, color: AppColors.textSecondary),
+            ),
+            title: Text(item['label'] as String,
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            onTap: () {
+              Navigator.pop(context);
+              final targetIdx = item['idx'] as int;
+              if (targetIdx >= 0) onNav(targetIdx);
+            },
+          )),
+          const Divider(height: 1, color: AppColors.border),
+          ListTile(
+            leading: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(color: AppColors.redLight, borderRadius: BorderRadius.circular(10)),
+              child: const Icon(Icons.logout_rounded, size: 20, color: AppColors.red),
+            ),
+            title: Text('Log Out',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.red)),
+            onTap: () {
+              Navigator.pop(context);
+              onLogout();
+            },
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
     );
   }
 }
@@ -202,10 +444,11 @@ class _NarrowLayout extends StatelessWidget {
 // ──────────────── Sidebar (permanent) ────────────────
 class _Sidebar extends StatelessWidget {
   final int idx;
+  final Map<String, dynamic> user;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
 
-  const _Sidebar({required this.idx, required this.onNav, required this.onLogout});
+  const _Sidebar({required this.idx, required this.user, required this.onNav, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +456,7 @@ class _Sidebar extends StatelessWidget {
       width: AppColors.sidebarWidth,
       child: Material(
         color: AppColors.sidebarBg,
-        child: _SidebarContent(idx: idx, onNav: onNav, onLogout: onLogout),
+        child: _SidebarContent(idx: idx, user: user, onNav: onNav, onLogout: onLogout),
       ),
     );
   }
@@ -221,13 +464,17 @@ class _Sidebar extends StatelessWidget {
 
 class _SidebarContent extends StatelessWidget {
   final int idx;
+  final Map<String, dynamic> user;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
 
-  const _SidebarContent({required this.idx, required this.onNav, required this.onLogout});
+  const _SidebarContent({required this.idx, required this.user, required this.onNav, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
+    final userName = (user['full_name'] as String?) ?? '...';
+    final role = (user['role'] as String?) ?? '';
+
     return SafeArea(
       child: Column(
         children: [
@@ -276,34 +523,27 @@ class _SidebarContent extends StatelessWidget {
           // User row
           Padding(
             padding: const EdgeInsets.all(14),
-            child: FutureBuilder<Map>(
-              future: ApiService().me(),
-              builder: (ctx, snap) {
-                final name = (snap.data?['full_name'] as String?) ?? '...';
-                final role = (snap.data?['role'] as String?) ?? '';
-                return Row(children: [
-                  initialsAvatar(name.isNotEmpty ? name : '?', radius: 16),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.outfit(
-                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
-                      Text(role.replaceAll('_', ' '),
-                          style: GoogleFonts.outfit(
-                              color: AppColors.textSidebarMuted, fontSize: 10.5)),
-                    ]),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
-                    tooltip: 'Log out',
-                    onPressed: onLogout,
-                  ),
-                ]);
-              },
-            ),
+            child: Row(children: [
+              initialsAvatar(userName.isNotEmpty ? userName : '?', radius: 16),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(userName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(
+                          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  Text(role.replaceAll('_', ' '),
+                      style: GoogleFonts.outfit(
+                          color: AppColors.textSidebarMuted, fontSize: 10.5)),
+                ]),
+              ),
+              IconButton(
+                icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
+                tooltip: 'Log out',
+                onPressed: onLogout,
+              ),
+            ]),
           ),
         ],
       ),
@@ -377,16 +617,21 @@ class _NavTile extends StatelessWidget {
 class _TopBar extends StatelessWidget {
   final String title;
   final String currentProject;
+  final Map<String, dynamic> user;
   final ValueChanged<String> onProjectChanged;
 
   const _TopBar({
     required this.title,
     required this.currentProject,
+    required this.user,
     required this.onProjectChanged,
   });
 
   @override
   Widget build(BuildContext context) {
+    final userName = (user['full_name'] as String?) ?? '';
+    final initStr = userName.isNotEmpty ? initials(userName) : '?';
+
     return Container(
       height: 62,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -395,16 +640,13 @@ class _TopBar extends StatelessWidget {
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(children: [
-        // Page title
         Expanded(
           child: Text(title,
               style: GoogleFonts.outfit(
                   fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
-        // Search bar
         SizedBox(
-          width: 220,
-          height: 38,
+          width: 220, height: 38,
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search projects, workers...',
@@ -426,35 +668,25 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        // Project selector chip
         _ProjectChip(currentProject: currentProject, onChanged: onProjectChanged),
         const SizedBox(width: 12),
-        // Notification bell
-        Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
-              onPressed: () {},
-            ),
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
-              ),
-            ),
-          ],
-        ),
-        // Avatar
+        Stack(children: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
+            onPressed: () {},
+          ),
+          Positioned(
+            right: 8, top: 8,
+            child: Container(width: 8, height: 8,
+                decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
+          ),
+        ]),
         GestureDetector(
-          onTap: () => Navigator.push(
-              context, MaterialPageRoute(builder: (_) => const ProfilePage())),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
           child: CircleAvatar(
             radius: 17,
-            backgroundColor: AppColors.accent,
-            child: Text('AR',
+            backgroundColor: userName.isNotEmpty ? avatarColor(userName) : AppColors.accent,
+            child: Text(initStr,
                 style: GoogleFonts.outfit(
                     color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
           ),
@@ -467,9 +699,7 @@ class _TopBar extends StatelessWidget {
 class _ProjectChip extends StatefulWidget {
   final String currentProject;
   final ValueChanged<String> onChanged;
-
   const _ProjectChip({required this.currentProject, required this.onChanged});
-
   @override
   State<_ProjectChip> createState() => _ProjectChipState();
 }
@@ -491,7 +721,7 @@ class _ProjectChipState extends State<_ProjectChip> {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
           const SizedBox(width: 5),
-          Text(widget.currentProject,
+          Text(widget.currentProject.isEmpty ? 'All Projects' : widget.currentProject,
               style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(width: 4),
           const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
@@ -510,17 +740,24 @@ class _AiAssistantPlaceholder extends StatelessWidget {
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), shape: BoxShape.circle),
-          child: const Icon(Icons.smart_toy_outlined, size: 36, color: AppColors.accent),
+          width: 80, height: 80,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.accent.withValues(alpha: 0.15), AppColors.blue.withValues(alpha: 0.15)],
+            ),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.smart_toy_outlined, size: 40, color: AppColors.accent),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
         Text('AI Assistant',
-            style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        const SizedBox(height: 6),
-        Text('Coming soon — Gemini-powered construction intelligence',
+            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        const SizedBox(height: 8),
+        Text('Gemini-powered construction intelligence',
             style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        const SizedBox(height: 4),
+        Text('Coming soon',
+            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
       ]),
     );
   }
