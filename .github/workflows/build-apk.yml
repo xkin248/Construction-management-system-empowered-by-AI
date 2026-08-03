@@ -11,6 +11,10 @@ on:
         required: false
         default: 'manual-build'
 
+# ── Grant write permission to create Releases ─────────────────
+permissions:
+  contents: write
+
 jobs:
   build-apk:
     name: 📱 Build Android APK
@@ -43,9 +47,7 @@ jobs:
       # ── Build APK ─────────────────────────────────────────────
       - name: 🔨 Build Release APK (Debug Signing)
         working-directory: construction_management_system_Flutter
-        run: |
-          flutter build apk --release \
-            --dart-define=BASE_URL=${{ secrets.API_BASE_URL || 'http://localhost:8000' }}
+        run: flutter build apk --release
 
       # ── Rename APK ────────────────────────────────────────────
       - name: 📝 Rename APK File
@@ -54,11 +56,12 @@ jobs:
           if [ -z "$VERSION" ] || [ "$VERSION" == "refs/heads/main" ]; then
             VERSION="${{ github.event.inputs.version_name || 'manual' }}"
           fi
-          mv construction_management_system_Flutter/build/app/outputs/flutter-apk/app-release.apk \
+          cp construction_management_system_Flutter/build/app/outputs/flutter-apk/app-release.apk \
              BuildSmart-${VERSION}.apk
           echo "APK_NAME=BuildSmart-${VERSION}.apk" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
-      # ── Upload Artifact ───────────────────────────────────────
+      # ── Upload Artifact (always available for download) ───────
       - name: 📤 Upload APK as Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -66,24 +69,25 @@ jobs:
           path: ${{ env.APK_NAME }}
           retention-days: 30
 
-      # ── Create GitHub Release ─────────────────────────────────
+      # ── Create GitHub Release (only on tags) ──────────────────
       - name: 🚀 Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           name: "BuildSmart ${{ github.ref_name }}"
           body: |
             ## 📱 BuildSmart ${{ github.ref_name }} - Android APK
 
             ### 📥 安装方法 (How to Install)
-            1. 在 Android 手机上下载 `BuildSmart-${{ github.ref_name }}.apk`
+            1. 在 Android 手机上下载下方的 `.apk` 文件
             2. 打开下载的 APK 文件
             3. 如果提示"未知来源"，请在设置中允许安装
             4. 安装完成后即可使用！
 
             ---
             ### 📥 Installation (English)
-            1. Download `BuildSmart-${{ github.ref_name }}.apk` on your Android phone
+            1. Download the `.apk` file below on your Android phone
             2. Open the downloaded APK file
             3. If prompted about "Unknown sources", allow installation in Settings
             4. Done! Open the app and enjoy.
@@ -93,10 +97,11 @@ jobs:
           files: ${{ env.APK_NAME }}
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Optional: Build Summary ───────────────────────────────────
+  # ── Build Summary ─────────────────────────────────────────────
   notify:
     name: 📊 Build Summary
     runs-on: ubuntu-latest
@@ -106,7 +111,7 @@ jobs:
       - name: ✅ Build Status
         run: |
           if [ "${{ needs.build-apk.result }}" == "success" ]; then
-            echo "✅ APK built successfully!"
+            echo "✅ APK built and released successfully!"
           else
             echo "❌ Build failed. Check the logs above."
             exit 1
