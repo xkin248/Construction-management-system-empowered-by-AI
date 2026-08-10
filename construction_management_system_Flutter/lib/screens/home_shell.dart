@@ -415,7 +415,17 @@ class _MoreSheet extends StatelessWidget {
             onTap: () {
               Navigator.pop(context);
               final targetIdx = item['idx'] as int;
-              if (targetIdx >= 0) onNav(targetIdx);
+              if (targetIdx >= 0) {
+                onNav(targetIdx);
+              } else {
+                // Feature coming soon
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('${item['label']} — Coming soon!'),
+                  backgroundColor: AppColors.bgCard,
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ));
+              }
             },
           )),
           const Divider(height: 1, color: AppColors.border),

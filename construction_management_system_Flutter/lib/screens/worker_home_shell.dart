@@ -67,7 +67,7 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
         return _NarrowLayout(
           scaffoldKey: _scaffoldKey,
           idx: idx,
-          onNav: (i) => _go(i, fromDrawer: true),
+          onNav: _go,
           onLogout: _logout,
         );
       },
@@ -125,14 +125,17 @@ class _NarrowLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       key: scaffoldKey,
+      backgroundColor: AppColors.bgMain,
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
           onPressed: () => scaffoldKey.currentState?.openDrawer(),
         ),
-        title: Text(_workerTitles[idx]),
+        title: Text(_workerTitles[idx],
+            style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
             icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red),
@@ -144,19 +147,36 @@ class _NarrowLayout extends StatelessWidget {
       drawer: Drawer(
         backgroundColor: AppColors.sidebarBg,
         width: AppColors.sidebarWidth,
-        child: _WorkerSidebarContent(idx: idx, onNav: onNav, onLogout: onLogout),
+        child: _WorkerSidebarContent(
+          idx: idx,
+          // Close the drawer then navigate
+          onNav: (i) {
+            scaffoldKey.currentState?.closeDrawer();
+            onNav(i);
+          },
+          onLogout: onLogout,
+        ),
       ),
       body: IndexedStack(index: idx, children: _workerPages),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
+          color: AppColors.bgCard,
           border: Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
         ),
-        child: BottomNavigationBar(
-          currentIndex: idx,
-          onTap: onNav,
-          items: _workerMenu
-              .map((e) => BottomNavigationBarItem(icon: Icon(e.icon), label: e.label))
-              .toList(),
+        child: SafeArea(
+          child: BottomNavigationBar(
+            currentIndex: idx.clamp(0, _workerPages.length - 1),
+            onTap: onNav,
+            backgroundColor: AppColors.bgCard,
+            selectedItemColor: AppColors.green,
+            unselectedItemColor: AppColors.textMuted,
+            type: BottomNavigationBarType.fixed,
+            elevation: 0,
+            items: _workerMenu
+                .map((e) => BottomNavigationBarItem(icon: Icon(e.icon), label: e.label))
+                .toList(),
+          ),
         ),
       ),
     );

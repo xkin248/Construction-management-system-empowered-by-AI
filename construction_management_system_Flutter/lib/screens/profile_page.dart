@@ -41,7 +41,13 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext c) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      backgroundColor: AppColors.bgMain,
+      appBar: AppBar(
+        backgroundColor: AppColors.bgCard,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('My Profile'),
+      ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(16), children: [
