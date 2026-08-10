@@ -37,6 +37,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String _lastUpdated = '';
   Timer? _syncTimer;
   bool _syncingNow = false;
+  bool _checkInError = false; // true when last check-in was rejected (outside fence)
 
   @override
   void initState() {
@@ -215,20 +216,23 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       );
       setState(() {
         _checkedIn = true;
+        _checkInError = false;
         _attendanceId = r['attendance_id'] as int?;
         final t = r['check_in_time']?.toString().substring(11, 16) ?? _fmtNow();
-        _statusMsg = '✅ Checked in successfully at $t';
+        _statusMsg = 'Checked in successfully at $t';
         _checkInLoading = false;
       });
-      toast('✅ Checked in! Device: $_deviceType');
+      toast('Checked in! Device: $_deviceType');
     } on DioException catch (e) {
       setState(() {
         _statusMsg = e.message ?? 'Check-in failed';
+        _checkInError = true;
         _checkInLoading = false;
       });
     } catch (e) {
       setState(() {
         _statusMsg = 'Error: $e';
+        _checkInError = true;
         _checkInLoading = false;
       });
     }
@@ -435,7 +439,29 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 ? null
                 : (v) => setState(() => _selectedProjectId = v),
           ),
-        if (_projects.isNotEmpty) const SizedBox(height: 14),
+        if (_projects.isNotEmpty) ...[  
+          const SizedBox(height: 14),
+          // Show fence radius for selected project
+          if (_selectedProjectId != null) Builder(builder: (ctx) {
+            final sel = _projects.firstWhere(
+              (p) => p['project_id'] == _selectedProjectId,
+              orElse: () => {},
+            );
+            final r = (sel['fence_radius'] as num?)?.toInt() ?? 0;
+            if (r == 0) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Row(children: [
+                const Icon(Icons.radar_rounded, size: 13, color: AppColors.green),
+                const SizedBox(width: 5),
+                Text(
+                  'You must be within ${r}m of the site to check in',
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.green, fontWeight: FontWeight.w600),
+                ),
+              ]),
+            );
+          }),
+        ],
 
         // Big circle status
         Center(
@@ -465,9 +491,16 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             const SizedBox(height: 14),
             SizedBox(
               width: 260,
-              child: Text(_statusMsg,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+              child: Text(
+                _statusMsg,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  color: _checkInError ? AppColors.red : AppColors.textSecondary,
+                  fontWeight: _checkInError ? FontWeight.w600 : FontWeight.normal,
+                  height: 1.4,
+                ),
+              ),
             ),
           ]),
         ),

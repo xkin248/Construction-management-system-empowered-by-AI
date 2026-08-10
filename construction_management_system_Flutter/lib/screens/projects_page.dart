@@ -1,9 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 
+// ─────────────────────────────────────────────
+//  GPS helper (same pattern as attendance_geo_helper.dart)
+// ─────────────────────────────────────────────
+Future<Map<String, double>?> _getSiteGps() async {
+  if (kIsWeb) return null;
+  try {
+    bool svc = await Geolocator.isLocationServiceEnabled();
+    if (!svc) return null;
+    LocationPermission perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return null;
+    final pos = await Geolocator.getCurrentPosition(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
+    );
+    return {'lat': pos.latitude, 'lng': pos.longitude};
+  } catch (_) {
+    return null;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Projects List Page
+// ─────────────────────────────────────────────
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
   @override
@@ -31,84 +58,44 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
-  void _openNewProject() {
-    final name = TextEditingController(), loc = TextEditingController(), budget = TextEditingController();
-    DateTime? start, due;
-    showDialog(
+  void _openProjectForm({Map? existing}) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
-        Future<void> pick(bool isStart) async {
-          final d = await showDatePicker(context: ctx, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2035));
-          if (d != null) setD(() => isStart ? start = d : due = d);
-        }
-
-        return AlertDialog(
-          title: const Text('New Project'),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Project Name', hintText: 'e.g. Penang Tower C')),
-              const SizedBox(height: 12),
-              TextField(controller: loc, decoration: const InputDecoration(labelText: 'Location', hintText: 'Address')),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => pick(true),
-                    child: Text(start == null ? 'Start Date' : '${start!.year}-${start!.month.toString().padLeft(2, '0')}-${start!.day.toString().padLeft(2, '0')}'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => pick(false),
-                    child: Text(due == null ? 'Due Date' : '${due!.year}-${due!.month.toString().padLeft(2, '0')}-${due!.day.toString().padLeft(2, '0')}'),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              TextField(controller: budget, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Budget (RM)', hintText: 'e.g. 4200000')),
-            ]),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (name.text.trim().isEmpty || loc.text.trim().isEmpty) {
-                  toast('Please fill in the project name and location');
-                  return;
-                }
-                try {
-                  await ApiService().createProject({
-                    'project_name': name.text.trim(), 'location_address': loc.text.trim(),
-                    'start_date': start?.toIso8601String().split('T').first,
-                    'end_date': due?.toIso8601String().split('T').first,
-                    'status': 'planning', 'progress': 0.0,
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  toast('✅ Project created');
-                  _load();
-                } on DioException catch (e) {
-                  toast(e.message ?? 'Failed to create project');
-                }
-              },
-              child: const Text('Create Project'),
-            ),
-          ],
-        );
-      }),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ProjectFormSheet(
+        existing: existing,
+        onSaved: () {
+          _load();
+        },
+      ),
     );
   }
 
   @override
   Widget build(BuildContext c) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(onPressed: _openNewProject, icon: const Icon(Icons.add), label: const Text('New Project')),
+      backgroundColor: AppColors.bgMain,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openProjectForm(),
+        icon: const Icon(Icons.add),
+        label: const Text('New Project'),
+        backgroundColor: AppColors.accent,
+      ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
               child: projects.isEmpty
-                  ? ListView(children: const [Padding(padding: EdgeInsets.all(40), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))])
+                  ? ListView(children: const [
+                      Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Center(
+                          child: Text('No projects yet',
+                              style: TextStyle(color: AppColors.textMuted)),
+                        ),
+                      )
+                    ])
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
                       itemCount: projects.length,
@@ -116,6 +103,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         final p = projects[i];
                         final progress = (p['progress'] as num? ?? 0).toDouble();
                         final workerCount = p['worker_count'] ?? p['tracked_workers'] ?? 0;
+                        final radius = (p['fence_radius'] as num? ?? 500).toInt();
                         return sectionCard(
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: EdgeInsets.zero,
@@ -132,7 +120,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                         style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15),
                                         overflow: TextOverflow.ellipsis),
                                   ),
-                                  statusPill(p['status'] ?? 'planning'),
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    statusPill(p['status'] ?? 'planning'),
+                                    const SizedBox(width: 6),
+                                    // Edit button
+                                    GestureDetector(
+                                      onTap: () => _openProjectForm(existing: Map<String, dynamic>.from(p)),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.bgMain,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
+                                      ),
+                                    ),
+                                  ]),
                                 ]),
                                 const SizedBox(height: 4),
                                 Row(children: [
@@ -143,7 +146,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                       overflow: TextOverflow.ellipsis)),
                                 ]),
                                 const SizedBox(height: 12),
-                                // Geofence + worker count
+                                // Geofence badge
                                 Row(children: [
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
@@ -151,7 +154,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                                       const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
                                       const SizedBox(width: 4),
-                                      Text('Geofence Active', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.green, fontWeight: FontWeight.w700)),
+                                      Text('Geofence: ${radius}m radius',
+                                          style: GoogleFonts.outfit(fontSize: 10, color: AppColors.green, fontWeight: FontWeight.w700)),
                                     ]),
                                   ),
                                   if (workerCount > 0) ...[
@@ -159,9 +163,6 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                     Text('$workerCount workers tracked',
                                         style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.accent, fontWeight: FontWeight.w600)),
                                   ],
-                                  const Spacer(),
-                                  Text('Radius: ${(p['fence_radius'] as num? ?? 200).toInt()}m',
-                                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
                                 ]),
                                 const SizedBox(height: 10),
                                 ClipRRect(
@@ -191,7 +192,328 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 }
 
+// ─────────────────────────────────────────────
+//  Project Create / Edit Bottom Sheet with Geofence Picker
+// ─────────────────────────────────────────────
+class _ProjectFormSheet extends StatefulWidget {
+  final Map? existing;
+  final VoidCallback onSaved;
+  const _ProjectFormSheet({this.existing, required this.onSaved});
+  @override
+  State<_ProjectFormSheet> createState() => _ProjectFormSheetState();
+}
 
+class _ProjectFormSheetState extends State<_ProjectFormSheet> {
+  final _name = TextEditingController();
+  final _loc  = TextEditingController();
+  DateTime? _start, _end;
+  double _lat = 3.1390, _lng = 101.6869; // default: KL
+  double _radius = 300.0; // meters
+  bool _hasGps = false;
+  bool _saving = false;
+  bool _gpsLoading = false;
+
+  bool get _isEdit => widget.existing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    if (e != null) {
+      _name.text = e['project_name'] ?? '';
+      _loc.text  = e['location_address'] ?? '';
+      _lat    = (e['center_lat'] as num?)?.toDouble() ?? 3.1390;
+      _lng    = (e['center_lng'] as num?)?.toDouble() ?? 101.6869;
+      _radius = (e['fence_radius'] as num?)?.toDouble() ?? 300.0;
+      _hasGps = true;
+      if (e['start_date'] != null) _start = DateTime.tryParse(e['start_date'].toString());
+      if (e['end_date']   != null) _end   = DateTime.tryParse(e['end_date'].toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _loc.dispose();
+    super.dispose();
+  }
+
+  Future<void> _getGps() async {
+    setState(() => _gpsLoading = true);
+    final pos = await _getSiteGps();
+    if (!mounted) return;
+    if (pos != null) {
+      setState(() {
+        _lat = pos['lat']!;
+        _lng = pos['lng']!;
+        _hasGps = true;
+        _gpsLoading = false;
+      });
+      toast('Site location captured!');
+    } else {
+      setState(() => _gpsLoading = false);
+      toast('Could not get GPS. Please allow location permission.');
+    }
+  }
+
+  Future<void> _pickDate(bool isStart) async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2035),
+    );
+    if (d != null && mounted) setState(() => isStart ? _start = d : _end = d);
+  }
+
+  Future<void> _save() async {
+    if (_name.text.trim().isEmpty) { toast('Project name is required'); return; }
+    if (_loc.text.trim().isEmpty)  { toast('Location address is required'); return; }
+    if (!_hasGps) { toast('Please capture the site GPS location first'); return; }
+
+    setState(() => _saving = true);
+    try {
+      final body = {
+        'project_name':     _name.text.trim(),
+        'location_address': _loc.text.trim(),
+        'center_lat':   _lat,
+        'center_lng':   _lng,
+        'fence_radius': _radius,
+        'start_date': _start?.toIso8601String().split('T').first,
+        'end_date':   _end?.toIso8601String().split('T').first,
+        'status':   widget.existing?['status'] ?? 'planning',
+        'progress': widget.existing?['progress'] ?? 0.0,
+      };
+
+      if (_isEdit) {
+        await ApiService().updateProject(widget.existing!['project_id'], body);
+      } else {
+        await ApiService().createProject(body);
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      toast(_isEdit ? 'Project updated!' : 'Project created!');
+      widget.onSaved();
+    } on DioException catch (e) {
+      toast(e.message ?? 'Failed to save project');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _fmtDate(DateTime? d) => d == null ? 'Not set'
+      : '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final pad = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+      decoration: const BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Text(_isEdit ? 'Edit Project' : 'New Project',
+              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          const SizedBox(height: 20),
+
+          // ── Project Name ──────────────────────────────
+          Text('Project Name', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _name,
+            decoration: InputDecoration(
+              hintText: 'e.g. Penang Tower Block C',
+              hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+              filled: true, fillColor: AppColors.bgMain,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Location Address ──────────────────────────
+          Text('Site Address', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _loc,
+            decoration: InputDecoration(
+              hintText: 'Full address of the construction site',
+              hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+              filled: true, fillColor: AppColors.bgMain,
+              prefixIcon: const Icon(Icons.place_outlined, color: AppColors.textMuted, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // ── GPS GEOFENCE SECTION ──────────────────────
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: _hasGps ? AppColors.greenLight : AppColors.bgMain,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _hasGps ? AppColors.green : AppColors.border),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(Icons.gps_fixed_rounded, size: 16, color: _hasGps ? AppColors.green : AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('Site Geofence',
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700,
+                          color: _hasGps ? AppColors.green : AppColors.textPrimary)),
+                ),
+                if (_hasGps)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(8)),
+                    child: Text('Set', style: GoogleFonts.outfit(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
+                  ),
+              ]),
+              const SizedBox(height: 10),
+
+              // GPS coordinates display
+              if (_hasGps)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    const Icon(Icons.location_on, size: 12, color: AppColors.green),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Lat: ${_lat.toStringAsFixed(5)},  Lng: ${_lng.toStringAsFixed(5)}',
+                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ]),
+                ),
+
+              // Get GPS button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _gpsLoading ? null : _getGps,
+                  icon: _gpsLoading
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.my_location_rounded, size: 16),
+                  label: Text(_hasGps ? 'Re-capture Site Location' : 'Capture Site Location (Go to site first)',
+                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _hasGps ? AppColors.green : AppColors.accent,
+                    side: BorderSide(color: _hasGps ? AppColors.green : AppColors.accent),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Radius slider
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('Check-in Radius', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                  child: Text('${_radius.toInt()} m',
+                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                ),
+              ]),
+              Slider(
+                value: _radius,
+                min: 50, max: 2000,
+                divisions: 79,
+                activeColor: AppColors.accent,
+                inactiveColor: AppColors.border,
+                onChanged: (v) => setState(() => _radius = v),
+              ),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('50m (tight)', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                Text('Workers must be within this distance to check in',
+                    style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                Text('2000m', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+              ]),
+            ]),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Dates ─────────────────────────────────────
+          Row(children: [
+            Expanded(
+              child: _DateButton(
+                label: 'Start Date',
+                value: _fmtDate(_start),
+                onTap: () => _pickDate(true),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _DateButton(
+                label: 'End Date',
+                value: _fmtDate(_end),
+                onTap: () => _pickDate(false),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 24),
+
+          // ── Save Button ───────────────────────────────
+          ElevatedButton(
+            onPressed: _saving ? null : _save,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _saving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Text(_isEdit ? 'Save Changes' : 'Create Project',
+                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final String label, value;
+  final VoidCallback onTap;
+  const _DateButton({required this.label, required this.value, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: AppColors.border),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+        const SizedBox(height: 2),
+        Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+      ]),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  Project Detail Page
+// ─────────────────────────────────────────────
 class ProjectDetailPage extends StatefulWidget {
   final int projectId;
   const ProjectDetailPage({super.key, required this.projectId});
@@ -225,66 +547,136 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   @override
   Widget build(BuildContext c) {
-    if (ld) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (project == null) return const Scaffold(body: Center(child: Text('Project not found')));
+    if (ld) return const Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
+    if (project == null) return const Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text('Project not found')));
     final p = project!;
     final completed = tasks.where((t) => t['status'] == 'completed').length;
+    final radius = (p['fence_radius'] as num?)?.toInt() ?? 500;
+    final lat = (p['center_lat'] as num?)?.toDouble() ?? 0.0;
+    final lng = (p['center_lng'] as num?)?.toDouble() ?? 0.0;
+
     return Scaffold(
-      appBar: AppBar(title: Text(p['project_name'] ?? 'Project')),
+      backgroundColor: AppColors.bgMain,
+      appBar: AppBar(
+        backgroundColor: AppColors.bgCard,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(p['project_name'] ?? 'Project',
+            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _ProjectFormSheet(
+                  existing: Map<String, dynamic>.from(p),
+                  onSaved: _load,
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit_outlined, size: 16),
+            label: const Text('Edit'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+          ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
+        // Header card
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(color: AppColors.sidebarBg, borderRadius: BorderRadius.circular(16)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Expanded(child: Text(p['project_name'] ?? '-', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
+              Expanded(child: Text(p['project_name'] ?? '-',
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
               statusPill(p['status'] ?? 'planning'),
             ]),
             const SizedBox(height: 6),
             Row(children: [
               const Icon(Icons.place_outlined, size: 13, color: AppColors.textSidebarMuted),
               const SizedBox(width: 4),
-              Expanded(child: Text(p['location_address'] ?? '-', style: const TextStyle(color: AppColors.textSidebarMuted, fontSize: 12.5))),
+              Expanded(child: Text(p['location_address'] ?? '-',
+                  style: const TextStyle(color: AppColors.textSidebarMuted, fontSize: 12.5))),
             ]),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 11.5)),
-              Text('${p['progress']?.toStringAsFixed(0) ?? 0}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              Text('${p['progress']?.toStringAsFixed(0) ?? 0}%',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ]),
             const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(value: ((p['progress'] ?? 0) as num) / 100, minHeight: 8, backgroundColor: AppColors.sidebarHover,
-                  valueColor: const AlwaysStoppedAnimation(AppColors.green)),
+              child: LinearProgressIndicator(
+                value: ((p['progress'] ?? 0) as num) / 100,
+                minHeight: 8, backgroundColor: AppColors.sidebarHover,
+                valueColor: const AlwaysStoppedAnimation(AppColors.green),
+              ),
             ),
           ]),
         ),
         const SizedBox(height: 16),
+
+        // ── Geofence Info Card ────────────────────────
+        sectionCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
+                child: const Icon(Icons.gps_fixed_rounded, size: 16, color: AppColors.green),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Site Geofence',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                  Text('Workers must be within $radius m to check in',
+                      style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                ]),
+              ),
+              statusPill('active'),
+            ]),
+            const SizedBox(height: 12),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: 12),
+            _infoRow(Icons.radar_rounded, 'Radius', '$radius meters'),
+            const SizedBox(height: 8),
+            _infoRow(Icons.my_location_rounded, 'Center GPS',
+                'Lat ${lat.toStringAsFixed(5)},  Lng ${lng.toStringAsFixed(5)}'),
+          ]),
+        ),
+        const SizedBox(height: 16),
+
+        // Dates
         Row(children: [
           Expanded(child: statCard(label: 'Start', value: p['start_date'] ?? '—')),
           const SizedBox(width: 10),
           Expanded(child: statCard(label: 'Due', value: p['end_date'] ?? '—')),
         ]),
         const SizedBox(height: 16),
-        const Text('Task Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+
+        // Tasks
+        Text('Task Summary',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: statCard(label: 'Total', value: '${tasks.length}')),
           const SizedBox(width: 10),
-          Expanded(child: statCard(label: 'Completed', value: '$completed', iconColor: AppColors.green)),
+          Expanded(child: statCard(label: 'Done', value: '$completed', iconColor: AppColors.green)),
           const SizedBox(width: 10),
-          Expanded(child: statCard(label: 'Remaining', value: '${tasks.length - completed}', iconColor: AppColors.accent)),
+          Expanded(child: statCard(label: 'Left', value: '${tasks.length - completed}', iconColor: AppColors.accent)),
         ]),
-        const SizedBox(height: 16),
-        sectionCard(
-          child: Row(children: [
-            const Icon(Icons.gps_fixed_rounded, size: 16, color: AppColors.accent),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Geofence Active · Radius ${p['fence_radius']?.toStringAsFixed(0) ?? 500}m', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
-            statusPill('active'),
-          ]),
-        ),
       ]),
     );
   }
+
+  Widget _infoRow(IconData icon, String label, String value) => Row(children: [
+        Icon(icon, size: 14, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Text('$label: ', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textPrimary))),
+      ]);
 }
