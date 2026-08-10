@@ -57,40 +57,64 @@ class _TasksPageState extends State<TasksPage> {
     final title = TextEditingController();
     String priority = 'medium';
     DateTime? due;
-    showDialog(
+
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
-        return AlertDialog(
-          title: Text('New Task', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              TextField(controller: title, decoration: const InputDecoration(labelText: 'Task Title', hintText: 'e.g. Foundation Pile Driving')),
-              const SizedBox(height: 14),
-              Row(children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: priority,
-                    decoration: const InputDecoration(labelText: 'Priority'),
-                    items: _priorities.map((p) => DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1)))).toList(),
-                    onChanged: (v) => setD(() => priority = v!),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      final d = await showDatePicker(context: ctx, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2035));
-                      if (d != null) setD(() => due = d);
-                    },
-                    child: Text(due == null ? 'Due Date' : DateFormat('yyyy-MM-dd').format(due!),
-                        style: GoogleFonts.outfit(fontSize: 13)),
-                  ),
-                ),
-              ]),
-            ]),
+        Future<void> pickDate() async {
+          final d = await showDatePicker(context: ctx, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2035));
+          if (d != null) setD(() => due = d);
+        }
+        final pad = MediaQuery.of(ctx).viewInsets.bottom;
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+          decoration: const BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 36, height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            Text('New Task', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 16),
+            Text('Task Title', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: title,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'e.g. Foundation Pile Driving',
+                hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: priority,
+                  decoration: const InputDecoration(labelText: 'Priority'),
+                  items: _priorities.map((p) => DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1)))).toList(),
+                  onChanged: (v) => setD(() => priority = v!),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: pickDate,
+                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
+                  label: Text(due == null ? 'Due Date' : DateFormat('dd/MM/yy').format(due!),
+                      style: GoogleFonts.outfit(fontSize: 13)),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
                 if (title.text.trim().isEmpty) { toast('Enter a task title'); return; }
@@ -100,15 +124,21 @@ class _TasksPageState extends State<TasksPage> {
                     'status': 'pending', 'due_date': due?.toIso8601String().split('T').first,
                   });
                   if (ctx.mounted) Navigator.pop(ctx);
-                  toast('✅ Task created');
+                  toast('Task created!');
                   _load();
                 } on DioException catch (e) {
                   toast(e.message ?? 'Failed to create task');
                 }
               },
-              child: const Text('Create Task'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text('Create Task', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
-          ],
+          ]),
         );
       }),
     );
@@ -132,43 +162,52 @@ class _TasksPageState extends State<TasksPage> {
     final completed = tasks.where((t) => t['status'] == 'completed').length;
     final pending = tasks.where((t) => t['status'] == 'pending').length;
 
-    return Column(children: [
-      // ── Summary Cards ──
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-        child: Row(children: [
-          Expanded(child: _summaryCard('In Progress', '$inProgress', AppColors.blue)),
-          const SizedBox(width: 12),
-          Expanded(child: _summaryCard('Completed', '$completed', AppColors.green)),
-          const SizedBox(width: 12),
-          Expanded(child: _summaryCard('Pending', '$pending', AppColors.yellow)),
-        ]),
+    return Scaffold(
+      backgroundColor: AppColors.bgMain,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _openNewTask,
+        icon: const Icon(Icons.add),
+        label: const Text('New Task'),
+        backgroundColor: AppColors.accent,
       ),
-      const SizedBox(height: 14),
+      body: Column(children: [
+        // ── Summary Cards ──
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Row(children: [
+            Expanded(child: _summaryCard('In Progress', '$inProgress', AppColors.blue)),
+            const SizedBox(width: 12),
+            Expanded(child: _summaryCard('Completed', '$completed', AppColors.green)),
+            const SizedBox(width: 12),
+            Expanded(child: _summaryCard('Pending', '$pending', AppColors.yellow)),
+          ]),
+        ),
+        const SizedBox(height: 14),
 
-      // ── Search + Filters ──
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _buildFilterRow(),
-      ),
-      const SizedBox(height: 12),
+        // ── Search + Filters ──
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _buildFilterRow(),
+        ),
+        const SizedBox(height: 12),
 
-      // ── Task List ──
-      Expanded(
-        child: ld
-            ? const Center(child: CircularProgressIndicator())
-            : _filtered.isEmpty
-                ? Center(child: Text('No tasks yet', style: GoogleFonts.outfit(color: AppColors.textMuted)))
-                : RefreshIndicator(
-                    onRefresh: _load,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                      itemCount: _filtered.length,
-                      itemBuilder: (ctx, i) => _TaskCard(task: _filtered[i]),
+        // ── Task List ──
+        Expanded(
+          child: ld
+              ? const Center(child: CircularProgressIndicator())
+              : _filtered.isEmpty
+                  ? Center(child: Text('No tasks yet', style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                        itemCount: _filtered.length,
+                        itemBuilder: (ctx, i) => _TaskCard(task: _filtered[i]),
+                      ),
                     ),
-                  ),
-      ),
-    ]);
+        ),
+      ]),
+    );
   }
 
   Widget _summaryCard(String label, String value, Color color) {
@@ -188,50 +227,49 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Widget _buildFilterRow() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        SizedBox(
-          height: 40,
-          width: 200,
-          child: TextField(
-            onChanged: (v) => setState(() => _searchQuery = v),
-            decoration: InputDecoration(
-              hintText: 'Search tasks...',
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
-              filled: true, fillColor: AppColors.bgCard,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent)),
-            ),
+    return Column(children: [
+      // Full-width search
+      SizedBox(
+        height: 44,
+        child: TextField(
+          onChanged: (v) => setState(() => _searchQuery = v),
+          decoration: InputDecoration(
+            hintText: 'Search tasks...',
+            hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            filled: true, fillColor: AppColors.bgCard,
+            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent)),
           ),
         ),
-        _dropdown(['All', 'In Progress', 'Completed', 'Pending'], _statusFilter, (v) => setState(() => _statusFilter = v!), 'Status'),
-        if (projects.length > 1)
-          _dropdown(projects.map<String>((p) => p['project_name'] as String).toList()..insert(0, 'All'),
+      ),
+      const SizedBox(height: 8),
+      // Filter chips row
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(children: [
+          _dropdown(['All', 'In Progress', 'Completed', 'Pending'], _statusFilter, (v) => setState(() => _statusFilter = v!), 'Status'),
+          const SizedBox(width: 8),
+          _dropdown(['All', 'Low', 'Medium', 'High'], _priorityFilter, (v) => setState(() => _priorityFilter = v!), 'Priority'),
+          if (projects.length > 1) ...[
+            const SizedBox(width: 8),
+            _dropdown(
+              projects.map<String>((p) => p['project_name'] as String).toList()..insert(0, 'All'),
               'All', (v) {
-            if (v == 'All') {
-              _switchProject(null);
-            } else {
-              final found = projects.firstWhere((p) => p['project_name'] == v, orElse: () => null);
-              if (found != null) _switchProject(found['project_id']);
-            }
-          }, 'Project'),
-        _dropdown(['All', 'Low', 'Medium', 'High'], _priorityFilter, (v) => setState(() => _priorityFilter = v!), 'Priority'),
-        ElevatedButton.icon(
-          onPressed: _openNewTask,
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('New Task'),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-      ],
-    );
+                if (v == 'All') {
+                  _switchProject(null);
+                } else {
+                  final found = projects.firstWhere((p) => p['project_name'] == v, orElse: () => null);
+                  if (found != null) _switchProject(found['project_id']);
+                }
+              }, 'Project',
+            ),
+          ],
+        ]),
+      ),
+    ]);
   }
 
   Widget _dropdown(List<String> items, String value, ValueChanged<String?> onChanged, String hint) {

@@ -144,14 +144,19 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   }
 
   Widget _buildKpiRow(int total, int present, int late, int absent) {
-    return Row(children: [
-      Expanded(child: _statMini('Total', '$total', sub: 'registered')),
-      const SizedBox(width: 10),
-      Expanded(child: _statMini('Present', '$present', sub: '${total > 0 ? (present / total * 100).toInt() : 0}% attendance', valueColor: AppColors.blue)),
-      const SizedBox(width: 10),
-      Expanded(child: _statMini('Late', '$late', sub: 'after 07:30', valueColor: AppColors.yellow)),
-      const SizedBox(width: 10),
-      Expanded(child: _statMini('Absent', '$absent', sub: 'not on site', valueColor: AppColors.red)),
+    final pct = total > 0 ? (present / total * 100).toInt() : 0;
+    return Column(children: [
+      Row(children: [
+        Expanded(child: _statMini('Total Workers', '$total', sub: 'registered')),
+        const SizedBox(width: 10),
+        Expanded(child: _statMini('Present', '$present', sub: '$pct% attendance', valueColor: AppColors.green)),
+      ]),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(child: _statMini('Late', '$late', sub: 'after check-in window', valueColor: AppColors.yellow)),
+        const SizedBox(width: 10),
+        Expanded(child: _statMini('Absent', '$absent', sub: 'not on site', valueColor: AppColors.red)),
+      ]),
     ]);
   }
 
@@ -212,37 +217,44 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
 
   Widget _buildFilterRow() {
-    return Row(children: [
-      Expanded(
-        child: SizedBox(
-          height: 40,
-          child: TextField(
-            onChanged: (v) => setState(() => _searchQuery = v),
-            decoration: InputDecoration(
-              hintText: 'Search worker...',
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
-              filled: true, fillColor: AppColors.bgCard,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
-            ),
+    return Column(children: [
+      // Search bar - full width
+      SizedBox(
+        height: 44,
+        child: TextField(
+          onChanged: (v) => setState(() => _searchQuery = v),
+          decoration: InputDecoration(
+            hintText: 'Search worker name...',
+            hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            filled: true, fillColor: AppColors.bgCard,
+            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
           ),
         ),
       ),
-      const SizedBox(width: 10),
-      _filterDropdown(['All', 'Present', 'Late', 'Absent'], _statusFilter, (v) => setState(() => _statusFilter = v!)),
-      const SizedBox(width: 10),
-      ElevatedButton.icon(
-        onPressed: () => toast('Export coming soon'),
-        icon: const Icon(Icons.download_outlined, size: 16),
-        label: const Text('Export'),
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      const SizedBox(height: 8),
+      // Filter row
+      Row(children: [
+        _filterDropdown(['All', 'Present', 'Late', 'Absent'], _statusFilter,
+            (v) => setState(() => _statusFilter = v!)),
+        const Spacer(),
+        // Export as icon button
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.download_outlined, size: 20, color: AppColors.textSecondary),
+            tooltip: 'Export',
+            onPressed: () => toast('Export coming soon'),
+          ),
         ),
-      ),
+      ]),
     ]);
   }
 
@@ -265,100 +277,116 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     );
   }
 
+  // ── Phone-friendly worker cards (replaces 7-column table) ──
   Widget _buildWorkerTable(List filtered) {
-    final headers = ['WORKER', 'PROJECT', 'STATUS', 'CHECK IN', 'CHECK OUT', 'HOURS', 'METHOD'];
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: const BoxDecoration(
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          child: Row(children: headers.map((h) => Expanded(
-            flex: h == 'WORKER' ? 2 : 1,
-            child: Text(h, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5)),
-          )).toList()),
+    if (filtered.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
         ),
-        if (filtered.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted))),
-          )
-        else
-          ...filtered.asMap().entries.map((e) => _WorkerRow(worker: e.value, isEven: e.key.isEven)),
-      ]),
+        child: Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted))),
+      );
+    }
+    return Column(
+      children: filtered.map((w) => _WorkerAttCard(worker: w)).toList(),
     );
   }
 }
 
-class _WorkerRow extends StatelessWidget {
+class _WorkerAttCard extends StatelessWidget {
   final Map worker;
-  final bool isEven;
-  const _WorkerRow({required this.worker, required this.isEven});
+  const _WorkerAttCard({required this.worker});
 
   String _fmtTime(String? iso) {
     if (iso == null) return '—';
     try {
       final d = DateTime.parse(iso).toLocal();
-      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return iso;
-    }
+      return '${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}';
+    } catch (_) { return iso; }
   }
 
   @override
   Widget build(BuildContext context) {
     final status = worker['status'] as String? ?? 'absent';
+    final name = worker['name'] as String? ?? '?';
+    final trade = worker['trade'] as String? ?? 'Worker';
+    final project = worker['project']?['project_name'] as String? ?? '—';
+    final checkIn = _fmtTime(worker['check_in_time'] as String?);
+    final checkOut = _fmtTime(worker['check_out_time'] as String?);
+    final hours = worker['hours_today'];
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isEven ? Colors.white : AppColors.bgMain.withValues(alpha: 0.4),
-        border: const Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(children: [
-        // Worker
-        Expanded(
-          flex: 2,
-          child: Row(children: [
-            initialsAvatar(worker['name'] ?? '?', radius: 17),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(worker['name'] ?? '-',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Row 1: avatar + name + status pill
+        Row(children: [
+          initialsAvatar(name, radius: 19),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(name,
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis),
-              Text(worker['trade'] ?? 'Worker',
-                  style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
-            ])),
+              Text(trade,
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+            ]),
+          ),
+          statusPill(status),
+        ]),
+        const SizedBox(height: 8),
+        // Row 2: project
+        Row(children: [
+          const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
+          const SizedBox(width: 4),
+          Expanded(child: Text(project,
+              style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary),
+              overflow: TextOverflow.ellipsis)),
+        ]),
+        const SizedBox(height: 8),
+        // Row 3: check-in / out / hours
+        Row(children: [
+          _timeChip(Icons.login_rounded, 'In', checkIn, AppColors.green),
+          const SizedBox(width: 8),
+          _timeChip(Icons.logout_rounded, 'Out', checkOut, AppColors.blue),
+          const Spacer(),
+          if (hours != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.accentLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('${hours}h',
+                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.accent)),
+            ),
+          const SizedBox(width: 6),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
+            const SizedBox(width: 3),
+            Text('GPS', style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted)),
           ]),
-        ),
-        // Project
-        Expanded(child: Text(worker['project']?['project_name'] ?? '—',
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary), overflow: TextOverflow.ellipsis)),
-        // Status
-        Expanded(child: statusPill(status)),
-        // Check in
-        Expanded(child: Text(_fmtTime(worker['check_in_time']),
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary))),
-        // Check out
-        Expanded(child: Text(_fmtTime(worker['check_out_time']),
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary))),
-        // Hours
-        Expanded(child: Text(worker['hours_today'] != null ? '${worker['hours_today']}h' : '—',
-            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-        // Method
-        Expanded(child: Row(children: [
-          const Icon(Icons.location_on_outlined, size: 13, color: AppColors.accent),
-          const SizedBox(width: 3),
-          Text('Geofence', style: GoogleFonts.outfit(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w600)),
-        ])),
+        ]),
       ]),
     );
+  }
+
+  Widget _timeChip(IconData icon, String label, String time, Color color) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 12, color: color),
+      const SizedBox(width: 3),
+      Text('$label $time',
+          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600,
+              color: time == '—' ? AppColors.textMuted : color)),
+    ]);
   }
 }
 

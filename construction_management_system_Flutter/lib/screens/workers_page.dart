@@ -44,51 +44,95 @@ class _WorkersPageState extends State<WorkersPage> {
       }).toList();
 
   void _openAddWorker() {
-    final name = TextEditingController(), role = TextEditingController(), phone = TextEditingController();
+    final name = TextEditingController();
+    final role = TextEditingController();
+    final phone = TextEditingController();
+    final email = TextEditingController();
+    final password = TextEditingController();
     int? pid = projects.isNotEmpty ? projects.first['project_id'] : null;
-    showDialog(
+
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
-        return AlertDialog(
-          title: Text('Add Worker', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
-          content: SingleChildScrollView(
+        final pad = MediaQuery.of(ctx).viewInsets.bottom;
+        return Container(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+          decoration: const BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Text('Add Worker', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              const SizedBox(height: 16),
               TextField(controller: name, decoration: const InputDecoration(labelText: 'Full Name', hintText: 'e.g. Ali Hassan')),
               const SizedBox(height: 12),
               TextField(controller: role, decoration: const InputDecoration(labelText: 'Trade / Role', hintText: 'e.g. Electrician')),
               const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: pid,
-                decoration: const InputDecoration(labelText: 'Assigned Project'),
-                items: projects.map<DropdownMenuItem<int>>((p) =>
-                    DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
-                onChanged: (v) => setD(() => pid = v),
-              ),
+              if (projects.isNotEmpty)
+                DropdownButtonFormField<int>(
+                  initialValue: pid,
+                  decoration: const InputDecoration(labelText: 'Assigned Project'),
+                  items: projects.map<DropdownMenuItem<int>>((p) =>
+                      DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
+                  onChanged: (v) => setD(() => pid = v),
+                ),
               const SizedBox(height: 12),
               TextField(controller: phone, keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Phone', hintText: '+60 12-345 6789')),
+              const SizedBox(height: 12),
+              TextField(controller: email, keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(labelText: 'Email (for login)', hintText: 'worker@example.com')),
+              const SizedBox(height: 12),
+              TextField(controller: password, obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Password', hintText: 'Min 8 chars')),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  if (name.text.trim().isEmpty) { toast("Enter the worker's name"); return; }
+                  try {
+                    if (email.text.trim().isNotEmpty && password.text.isNotEmpty) {
+                      // Register as authenticated worker
+                      await ApiService().registerWorker(
+                        name: name.text.trim(),
+                        email: email.text.trim().toLowerCase(),
+                        password: password.text,
+                        phone: phone.text.trim().isEmpty ? null : phone.text.trim(),
+                        trade: role.text.trim().isEmpty ? null : role.text.trim(),
+                        projectId: pid,
+                      );
+                    } else {
+                      await ApiService().createWorker({
+                        'name': name.text.trim(), 'trade': role.text.trim(),
+                        'project_id': pid, 'phone': phone.text.trim(),
+                      });
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    toast('Worker added!');
+                    _load();
+                  } on DioException catch (e) {
+                    toast(e.message ?? 'Failed to add worker');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text('Add Worker', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+              ),
             ]),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                if (name.text.trim().isEmpty) { toast("Enter the worker's name"); return; }
-                try {
-                  await ApiService().createWorker({
-                    'name': name.text.trim(), 'trade': role.text.trim(),
-                    'project_id': pid, 'phone': phone.text.trim(),
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  toast('✅ Worker added');
-                  _load();
-                } on DioException catch (e) {
-                  toast(e.message ?? 'Failed to add worker');
-                }
-              },
-              child: const Text('Add Worker'),
-            ),
-          ],
         );
       }),
     );
