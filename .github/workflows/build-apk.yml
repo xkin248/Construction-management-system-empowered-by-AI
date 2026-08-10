@@ -72,7 +72,7 @@ jobs:
       # ── Build ─────────────────────────────────────────────────
       - name: 🔨 Build Release APK
         working-directory: construction_management_system_Flutter
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=BASE_URL=https://construction-management-system-empowered.onrender.com
 
       # ── Rename APK ────────────────────────────────────────────
       - name: 📝 Rename APK File

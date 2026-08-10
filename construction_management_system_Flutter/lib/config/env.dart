@@ -5,7 +5,7 @@ class Env {
   // For production: https://your-backend.onrender.com
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
+    defaultValue: 'https://construction-management-system-empowered.onrender.com',
   );
 
   static const String apiVersion = '/api/v1';
