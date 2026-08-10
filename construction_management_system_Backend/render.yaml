@@ -5,6 +5,7 @@ services:
     region: singapore
     plan: free
     rootDir: construction_management_system_Backend
+    runtimeVersion: "3.11.9"
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
