@@ -1,4 +1,3 @@
-# Copy this file to .github/workflows/build-apk.yml
 name: 🏗️ Build & Release BuildSmart APK
 
 on:
@@ -21,29 +20,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ── Checkout ──────────────────────────────────────────────
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
 
+      # ── Java Setup ────────────────────────────────────────────
       - name: ☕ Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # jni_flutter is compiled against Android API 35. Hosted runners do
-      # not guarantee that every Android platform is preinstalled.
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v4
-
+      # ── Install Android API 35 ────────────────────────────────
+      # ubuntu-latest already ships with Android SDK; we just need platform 35
       - name: Install Android API 35
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            --sdk_root=$ANDROID_HOME
 
+      # ── Flutter Setup ─────────────────────────────────────────
       - name: 🐦 Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
+      # ── Caching ───────────────────────────────────────────────
       - name: Cache pub packages
         uses: actions/cache@v4
         with:
@@ -60,19 +64,21 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('construction_management_system_Flutter/android/**/build.gradle') }}
 
+      # ── Dependencies ──────────────────────────────────────────
       - name: 📦 Install Flutter Dependencies
         working-directory: construction_management_system_Flutter
         run: flutter pub get
 
-      - name: 🔨 Build Release APK (Debug Signing)
+      # ── Build ─────────────────────────────────────────────────
+      - name: 🔨 Build Release APK
         working-directory: construction_management_system_Flutter
         run: flutter build apk --release
 
-      - name: 📝 Rename APK File (safe)
+      # ── Rename APK ────────────────────────────────────────────
+      - name: 📝 Rename APK File
         id: rename_apk
         run: |
           set -euo pipefail
-          # Resolve VERSION: prefer tag name, then workflow input, then fallback
           VERSION="${{ github.ref_name }}"
           if [ -z "$VERSION" ] || [ "$VERSION" == "refs/heads/main" ]; then
             VERSION="${{ github.event.inputs.version_name }}"
@@ -82,13 +88,10 @@ jobs:
           fi
 
           APK_SRC="construction_management_system_Flutter/build/app/outputs/flutter-apk/app-release.apk"
-          echo "Looking for APK at $APK_SRC"
           if [ ! -f "$APK_SRC" ]; then
-            echo "APK not found at $APK_SRC"
+            echo "❌ APK not found at $APK_SRC"
             echo "APK_PRESENT=false" >> $GITHUB_ENV
             echo "APK_NAME=" >> $GITHUB_ENV
-            echo "VERSION=${VERSION}" >> $GITHUB_ENV
-            # print directories to help debugging
             ls -la construction_management_system_Flutter/build/app/outputs || true
           else
             TARGET="BuildSmart-${VERSION}.apk"
@@ -96,9 +99,11 @@ jobs:
             echo "APK_NAME=${TARGET}" >> $GITHUB_ENV
             echo "APK_PRESENT=true" >> $GITHUB_ENV
             echo "VERSION=${VERSION}" >> $GITHUB_ENV
+            echo "✅ APK ready: $TARGET"
           fi
 
-      - name: Debug: flutter doctor & outputs (always print for diagnosis)
+      # ── Debug (always run) ────────────────────────────────────
+      - name: 🔍 Debug Info
         if: always()
         working-directory: construction_management_system_Flutter
         run: |
@@ -107,7 +112,8 @@ jobs:
           echo "---- build outputs ----"
           ls -la build/app/outputs/flutter-apk || true
 
-      - name: 📤 Upload APK as Artifact
+      # ── Upload APK ────────────────────────────────────────────
+      - name: 📤 Upload APK Artifact
         if: env.APK_PRESENT == 'true'
         uses: actions/upload-artifact@v4
         with:
@@ -115,6 +121,7 @@ jobs:
           path: ${{ env.APK_NAME }}
           retention-days: 30
 
+      # ── GitHub Release (tag only) ─────────────────────────────
       - name: 🚀 Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && env.APK_PRESENT == 'true'
         uses: softprops/action-gh-release@v2
