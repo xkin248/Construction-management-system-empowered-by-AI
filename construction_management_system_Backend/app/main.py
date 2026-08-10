@@ -21,11 +21,14 @@ app.mount("/html", StaticFiles(directory=_STATIC, html=True), name="static_html"
 @app.get("/")
 def root():
     return {
-        "status": "✅ Backend started successfully",
-        "docs": "http://127.0.0.1:8000/docs",
-        "static_html": "http://127.0.0.1:8000/html/index.html",
-        "db": settings.DATABASE_URL,
+        "status": "✅ BuildSmart API is running",
+        "version": "1.0.0",
+        "docs": "/docs",
     }
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 # ✅ Register routers
 from app.routers.auth import router as ar;       app.include_router(ar, prefix="/api")
