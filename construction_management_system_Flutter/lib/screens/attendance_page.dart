@@ -504,7 +504,7 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
           sectionCard(
             margin: const EdgeInsets.only(bottom: 16),
             child: DropdownButtonFormField<int>(
-              value: _selectedProject,
+              initialValue: _selectedProject,
               decoration: const InputDecoration(labelText: 'Select Project'),
               items: _projects.map<DropdownMenuItem<int>>((p) =>
                   DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),

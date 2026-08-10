@@ -9,8 +9,6 @@ import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'attendance_page.dart';
 import 'workers_page.dart';
-import 'daily_report_page.dart';
-import 'issues_page.dart';
 import 'settings_page.dart';
 import 'profile_page.dart';
 
@@ -80,7 +78,7 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _loadUser() async {
     try {
       final data = await ApiService().me();
-      if (mounted) setState(() { _user = data; _userLoaded = true; });
+      if (mounted) setState(() { _user = Map<String, dynamic>.from(data); _userLoaded = true; });
     } catch (_) {
       if (mounted) setState(() => _userLoaded = true);
     }

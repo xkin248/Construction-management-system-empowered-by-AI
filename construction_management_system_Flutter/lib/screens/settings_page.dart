@@ -306,7 +306,7 @@ class _UsersTabState extends State<_UsersTab> {
               TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'Email')),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: role,
+                initialValue: role,
                 decoration: const InputDecoration(labelText: 'Role'),
                 items: _roles.map((r) => DropdownMenuItem(value: r, child: Text(r.replaceAll('_', ' ')))).toList(),
                 onChanged: (v) => setD(() => role = v!),

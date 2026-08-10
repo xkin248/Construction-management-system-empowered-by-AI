@@ -60,7 +60,7 @@ class _NewTaskFormState extends State<NewTaskForm> {
               const Text('Project', style: AppStyles.label),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _project,
+                initialValue: _project,
                 isExpanded: true,
                 decoration: AppStyles.inputDecoration(),
                 items: const [
@@ -82,7 +82,7 @@ class _NewTaskFormState extends State<NewTaskForm> {
                         const Text('Priority', style: AppStyles.label),
                         const SizedBox(height: 6),
                         DropdownButtonFormField<String>(
-                          value: _priority,
+                          initialValue: _priority,
                           decoration: AppStyles.inputDecoration(),
                           items: const ['High', 'Medium', 'Low']
                               .map((e) =>

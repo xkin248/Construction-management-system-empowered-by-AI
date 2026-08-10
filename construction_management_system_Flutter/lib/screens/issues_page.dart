@@ -84,7 +84,7 @@ class _IssuesPageState extends State<IssuesPage> {
             const SizedBox(height: 14),
             if (projects.length > 1) ...[
               DropdownButtonFormField<int>(
-                value: pid,
+                initialValue: pid,
                 decoration: const InputDecoration(labelText: 'Project'),
                 items: projects.map<DropdownMenuItem<int>>((p) => DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
                 onChanged: (v) => setState(() => pid = v),
@@ -96,7 +96,7 @@ class _IssuesPageState extends State<IssuesPage> {
             Row(children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: severity,
+                  initialValue: severity,
                   decoration: const InputDecoration(labelText: 'Severity'),
                   items: _severities.map((s) => DropdownMenuItem(value: s, child: Text(s[0].toUpperCase() + s.substring(1)))).toList(),
                   onChanged: (v) => setState(() => severity = v!),
@@ -105,7 +105,7 @@ class _IssuesPageState extends State<IssuesPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(labelText: 'Category'),
                   items: _categories.map((cat) => DropdownMenuItem(value: cat, child: Text(cat[0].toUpperCase() + cat.substring(1)))).toList(),
                   onChanged: (v) => setState(() => category = v!),

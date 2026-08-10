@@ -419,7 +419,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
         if (_projects.isNotEmpty)
           DropdownButtonFormField<int>(
-            value: _selectedProjectId,
+            initialValue: _selectedProjectId,
             decoration: InputDecoration(
               labelText: 'Select Your Project',
               prefixIcon: const Icon(Icons.apartment_rounded, size: 18),

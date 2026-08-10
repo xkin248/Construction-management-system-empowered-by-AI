@@ -77,7 +77,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
             const SizedBox(height: 14),
             if (projects.length > 1) ...[
               DropdownButtonFormField<int>(
-                value: pid,
+              initialValue: pid,
                 decoration: const InputDecoration(labelText: 'Project'),
                 items: projects.map<DropdownMenuItem<int>>((p) => DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
                 onChanged: (v) async { setState(() => pid = v); reports = await ApiService().getReports(v!); setState(() {}); },
@@ -85,7 +85,7 @@ class _DailyReportPageState extends State<DailyReportPage> {
               const SizedBox(height: 12),
             ],
             DropdownButtonFormField<String>(
-              value: weather,
+              initialValue: weather,
               decoration: const InputDecoration(labelText: 'Weather'),
               items: _weathers.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
               onChanged: (v) => setState(() => weather = v!),

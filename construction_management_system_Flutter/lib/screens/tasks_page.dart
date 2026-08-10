@@ -69,7 +69,7 @@ class _TasksPageState extends State<TasksPage> {
               Row(children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: priority,
+                    initialValue: priority,
                     decoration: const InputDecoration(labelText: 'Priority'),
                     items: _priorities.map((p) => DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1)))).toList(),
                     onChanged: (v) => setD(() => priority = v!),

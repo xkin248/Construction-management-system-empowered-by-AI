@@ -242,7 +242,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             _label('Trade / Skill'),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              value: _selectedTrade,
+                              initialValue: _selectedTrade,
                               decoration: const InputDecoration(hintText: 'Select your trade'),
                               items: _tradeOptions
                                   .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -255,7 +255,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             _label('Assigned Project (optional)'),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<int>(
-                              value: _selectedProjectId,
+                              initialValue: _selectedProjectId,
                               decoration: const InputDecoration(hintText: 'Project'),
                               items: _projects
                                   .map<DropdownMenuItem<int>>((p) => DropdownMenuItem(

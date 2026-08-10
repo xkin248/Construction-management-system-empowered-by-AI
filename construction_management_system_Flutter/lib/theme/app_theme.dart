@@ -28,6 +28,39 @@ class AppColors {
 
   // Sidebar width for adaptive layout
   static const double sidebarWidth = 240.0;
+
+  // ── Backward-compatibility aliases ──
+  static const Color primary = Color(0xFFE8490F);
+  static const Color primaryLight = Color(0xFFFB923C);
+  static const Color primaryDark = Color(0xFFCA3D0A);
+  static const Color accentOrange = Color(0xFFE8490F);
+  static const Color accentOrangeLight = Color(0xFFFB923C);
+  static const Color success = Color(0xFF22C55E);
+  static const Color successLight = Color(0xFFDCFCE7);
+  static const Color warning = Color(0xFFEAB308);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color info = Color(0xFF3B82F6);
+  static const Color bgColor = Color(0xFFF4F6FB);
+  static const Color cardColor = Color(0xFFFFFFFF);
+  static const Color sidebarColor = Color(0xFF10141C);
+  static const Color borderColor = Color(0xFFE8ECF4);
+  static const Color borderLight = Color(0xFFF0F4FB);
+
+  static const LinearGradient primaryGradient = LinearGradient(
+    colors: [Color(0xFFE8490F), Color(0xFFFB923C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient accentGradient = LinearGradient(
+    colors: [Color(0xFFE8490F), Color(0xFFFB923C)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient successGradient = LinearGradient(
+    colors: [Color(0xFF22C55E), Color(0xFF86EFAC)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 const primary = AppColors.accent;

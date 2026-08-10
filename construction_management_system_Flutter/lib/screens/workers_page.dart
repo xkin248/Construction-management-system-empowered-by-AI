@@ -58,7 +58,7 @@ class _WorkersPageState extends State<WorkersPage> {
               TextField(controller: role, decoration: const InputDecoration(labelText: 'Trade / Role', hintText: 'e.g. Electrician')),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
-                value: pid,
+                initialValue: pid,
                 decoration: const InputDecoration(labelText: 'Assigned Project'),
                 items: projects.map<DropdownMenuItem<int>>((p) =>
                     DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),

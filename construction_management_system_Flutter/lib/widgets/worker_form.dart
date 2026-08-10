@@ -65,7 +65,7 @@ class _AddWorkerFormState extends State<AddWorkerForm> {
               const Text('Assigned Project', style: AppStyles.label),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: _project,
+                initialValue: _project,
                 decoration: AppStyles.inputDecoration(),
                 items: const [
                   'Kuala Lumpur Tower Block A',
