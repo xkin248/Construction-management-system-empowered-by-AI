@@ -15,6 +15,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Map kpi = {};
   Map attSummary = {};
   List projects = [];
+  Map<int, Map> _predictions = {};
 
   @override
   void initState() {
@@ -33,6 +34,17 @@ class _DashboardPageState extends State<DashboardPage> {
       kpi = results[0] as Map;
       attSummary = results[1] as Map;
       projects = results[2] as List;
+
+      // Load AI predictions for each project
+      final api = ApiService();
+      final preds = <int, Map>{};
+      await Future.wait(projects.take(4).map((p) async {
+        try {
+          final pid = p['project_id'] as int;
+          preds[pid] = await api.getProjectProgressPrediction(pid);
+        } catch (_) {}
+      }));
+      _predictions = preds;
     } catch (e) {
       toast('Failed to load dashboard: $e');
     } finally {
@@ -102,6 +114,14 @@ class _DashboardPageState extends State<DashboardPage> {
             const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))
           else
             ...projects.take(4).map((p) => _projectProductivityRow(p)),
+          const SizedBox(height: 24),
+
+          // ── AI Site Progress Prediction ──
+          if (_predictions.isNotEmpty) ...[
+            _sectionHeader('AI Site Progress Prediction', sub: 'Gemini-powered forecast of project completion trajectories'),
+            const SizedBox(height: 12),
+            ...projects.take(4).where((p) => _predictions.containsKey(p['project_id'])).map((p) => _aiPredictionCard(p)),
+          ],
         ],
       ),
     );
@@ -294,5 +314,198 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ]),
     );
+  }
+
+  // ── AI Progress Prediction Card ──
+  Widget _aiPredictionCard(Map p) {
+    final pid = p['project_id'] as int;
+    final pred = _predictions[pid]!;
+    final trend = pred['trend'] as String? ?? 'on_track';
+    final confidence = (pred['confidence'] as num? ?? 70).toDouble();
+    final predictedDate = pred['predicted_completion_date'] as String? ?? '-';
+    final plannedEnd = pred['planned_end_date'] as String?;
+    final insights = pred['ai_insights'] as String? ?? '';
+    final milestones = (pred['milestones'] as List?) ?? [];
+    final currentProgress = (pred['current_progress'] as num? ?? 0).toDouble();
+
+    final trendColor = switch (trend) {
+      'ahead' => AppColors.green,
+      'on_track' => AppColors.blue,
+      'behind' => AppColors.accent,
+      'critical' => AppColors.red,
+      _ => AppColors.textMuted,
+    };
+    final trendLabel = switch (trend) {
+      'ahead' => 'Ahead of Schedule',
+      'on_track' => 'On Track',
+      'behind' => 'Behind Schedule',
+      'critical' => 'At Risk — Critical',
+      _ => trend,
+    };
+    final trendIcon = switch (trend) {
+      'ahead' => Icons.rocket_launch_rounded,
+      'on_track' => Icons.check_circle_rounded,
+      'behind' => Icons.warning_rounded,
+      'critical' => Icons.error_rounded,
+      _ => Icons.help_rounded,
+    };
+
+    // Find the 30-day milestone for the prediction bar
+    double predProgress = currentProgress;
+    for (final m in milestones) {
+      if (m['label'] == '30 days') {
+        predProgress = (m['predicted_progress'] as num).toDouble();
+        break;
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: trendColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Header row: project name + trend badge ──
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Expanded(
+            child: Text(p['project_name'] ?? '-',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: trendColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: trendColor.withValues(alpha: 0.3)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(trendIcon, size: 14, color: trendColor),
+              const SizedBox(width: 5),
+              Text(trendLabel,
+                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: trendColor)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 10),
+
+        // ── AI Insight ──
+        if (insights.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(insights,
+                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, height: 1.4)),
+          ),
+
+        // ── Current vs Predicted Progress Bar ──
+        Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Current', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+              const SizedBox(height: 2),
+              Text('${currentProgress.toStringAsFixed(1)}%',
+                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Predicted (30 days)', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+              const SizedBox(height: 2),
+              Text('${predProgress.toStringAsFixed(1)}%',
+                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: trendColor)),
+            ]),
+          ),
+          const SizedBox(width: 12),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text('AI Confidence', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+            const SizedBox(height: 2),
+            Text('${confidence.toStringAsFixed(0)}%',
+                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.green)),
+          ]),
+        ]),
+        const SizedBox(height: 10),
+
+        // ── Dual Progress Bar (current + predicted) ──
+        Stack(
+          children: [
+            // Predicted (dashed/background) — full width to predProgress
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: LinearProgressIndicator(
+                value: predProgress / 100,
+                minHeight: 14,
+                backgroundColor: AppColors.border,
+                valueColor: AlwaysStoppedAnimation(trendColor.withValues(alpha: 0.25)),
+              ),
+            ),
+            // Current (solid)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: LinearProgressIndicator(
+                value: currentProgress / 100,
+                minHeight: 14,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation(trendColor),
+              ),
+            ),
+            // Milestone markers
+            Positioned.fill(
+              child: Row(
+                children: milestones.take(3).map((m) {
+                  final pct = ((m['predicted_progress'] as num).toDouble()) / 100;
+                  return Expanded(
+                    flex: 1,
+                    child: Align(
+                      alignment: Alignment(pct * 2 - 1, 0),
+                      child: Container(
+                        width: 3,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.textPrimary.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // ── Date rows ──
+        Row(children: [
+          _dateChip('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
+          const SizedBox(width: 10),
+          _dateChip('AI Predicted', _fmtDate(predictedDate), trendColor),
+          const Spacer(),
+          if (confidence >= 80)
+            const Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
+          else if (confidence >= 60)
+            const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _dateChip(String label, String value, Color color) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+      Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+    ]);
+  }
+
+  String _fmtDate(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return iso;
+    }
   }
 }

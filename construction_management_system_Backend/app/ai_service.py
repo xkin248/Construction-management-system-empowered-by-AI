@@ -350,3 +350,443 @@ def auto_assign_tasks(
         "dry_run": dry_run,
         "assignments": assignments
     }
+
+
+# ──────────────────────────────────────────────────────────────
+#  Real-time AI Progress Dashboard
+# ──────────────────────────────────────────────────────────────
+
+def compute_project_progress(db, project_id: int) -> Dict[str, Any]:
+    """
+    Computes a real-time AI-powered project health score (0-100) with insights.
+    Factors: task completion, attendance rate, overdue tasks, worker workload balance.
+    Falls back gracefully if Gemini is unavailable.
+    """
+    today = date.today()
+    since_30 = datetime.combine(today - timedelta(days=30), datetime.min.time())
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        return {"error": "Project not found"}
+
+    # ── Task metrics ──
+    all_tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    total_tasks = len(all_tasks)
+    completed = sum(1 for t in all_tasks if t.status == "completed")
+    in_progress = sum(1 for t in all_tasks if t.status == "in_progress")
+    pending = sum(1 for t in all_tasks if t.status == "pending")
+    overdue = sum(1 for t in all_tasks if t.due_date and t.due_date < today and t.status != "completed")
+    unassigned = sum(1 for t in all_tasks if not t.assigned_worker_id and t.status != "completed")
+    task_completion_pct = round(completed / total_tasks * 100) if total_tasks > 0 else 0
+
+    # ── Attendance metrics ──
+    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    total_workers = len(workers)
+    today_att = db.query(AttendanceLog).filter(
+        AttendanceLog.project_id == project_id,
+        AttendanceLog.check_in_time >= datetime.combine(today, datetime.min.time()),
+        AttendanceLog.status.in_(("checked_in", "checked_out"))
+    ).count()
+    attendance_pct = round(today_att / total_workers * 100) if total_workers > 0 else 0
+
+    # ── Per-task details ──
+    task_details = []
+    for t in sorted(all_tasks, key=lambda x: (x.status != "in_progress", x.status != "pending", x.due_date is None)):
+        is_overdue = bool(t.due_date and t.due_date < today and t.status != "completed")
+        task_details.append({
+            "task_id": t.task_id,
+            "task_name": t.task_name,
+            "status": t.status or "pending",
+            "priority": t.priority or "medium",
+            "progress": float(t.progress or 0),
+            "due_date": t.due_date.isoformat() if t.due_date else None,
+            "is_overdue": is_overdue,
+            "assigned_worker": t.assigned_worker.name if t.assigned_worker else None,
+        })
+
+    # ── Worker performance ──
+    worker_metrics = []
+    for w in workers:
+        tasks_assigned = [t for t in all_tasks if t.assigned_worker_id == w.worker_id]
+        completed_tasks = sum(1 for t in tasks_assigned if t.status == "completed")
+        active_tasks = sum(1 for t in tasks_assigned if t.status in ("in_progress", "pending"))
+        att_30 = db.query(AttendanceLog).filter(
+            AttendanceLog.worker_id == w.worker_id,
+            AttendanceLog.check_in_time >= since_30,
+            AttendanceLog.status.in_(("checked_in", "checked_out"))
+        ).count()
+        worker_metrics.append({
+            "worker_id": w.worker_id,
+            "name": w.name,
+            "trade": w.trade or "General",
+            "completed_tasks": completed_tasks,
+            "active_tasks": active_tasks,
+            "attendance_days_30": att_30,
+        })
+    worker_metrics.sort(key=lambda x: x["completed_tasks"], reverse=True)
+
+    # ── AI scoring & insights ──
+    model = get_gemini_model()
+    ai_insights = ""
+    recommendations = []
+    risk_level = "low"
+    health_score = 0
+
+    # Rule-based base score (used as fallback and AI anchor)
+    base_score = 0
+    base_score += min(40, task_completion_pct * 0.4)   # up to 40pts
+    base_score += min(30, attendance_pct * 0.3)         # up to 30pts
+    overdue_penalty = min(20, overdue * 5)
+    base_score += max(0, 20 - overdue_penalty)           # up to 20pts
+    assigned_pct = ((total_tasks - unassigned) / total_tasks * 100) if total_tasks > 0 else 100
+    base_score += min(10, assigned_pct * 0.1)            # up to 10pts
+    base_score = round(min(100, base_score))
+
+    if model:
+        prompt_data = {
+            "project": project.project_name,
+            "total_tasks": total_tasks,
+            "completed": completed,
+            "in_progress": in_progress,
+            "pending": pending,
+            "overdue": overdue,
+            "unassigned": unassigned,
+            "task_completion_pct": task_completion_pct,
+            "total_workers": total_workers,
+            "workers_on_site_today": today_att,
+            "attendance_pct": attendance_pct,
+            "base_score": base_score,
+        }
+        prompt = f"""You are a construction project analyst. Analyse this project data and respond ONLY with valid JSON, no markdown fences.
+
+Input:
+{json.dumps(prompt_data, ensure_ascii=False)}
+
+Output format (strict JSON):
+{{
+  "health_score": <integer 0-100, refine from base_score>,
+  "risk_level": "<low|medium|high|critical>",
+  "ai_insights": "<2-3 sentence summary of project health in English>",
+  "recommendations": ["<action 1>", "<action 2>", "<action 3>"]
+}}"""
+        try:
+            resp = model.generate_content(prompt)
+            parsed = _extract_json(getattr(resp, "text", "") or "")
+            if isinstance(parsed, dict):
+                health_score = int(parsed.get("health_score", base_score))
+                risk_level = str(parsed.get("risk_level", "medium")).lower()
+                ai_insights = str(parsed.get("ai_insights", ""))
+                recommendations = list(parsed.get("recommendations", []))
+        except Exception:
+            pass
+
+    if not health_score:
+        health_score = base_score
+    if not ai_insights:
+        if overdue > 0:
+            ai_insights = f"Project has {overdue} overdue task(s). Task completion is at {task_completion_pct}% with {today_att}/{total_workers} workers on site today."
+        else:
+            ai_insights = f"Project is progressing well. Task completion at {task_completion_pct}%, attendance {attendance_pct}%."
+    if not recommendations:
+        if overdue > 0:
+            recommendations.append(f"Address {overdue} overdue task(s) immediately")
+        if unassigned > 0:
+            recommendations.append(f"Use AI Auto-Assign to fill {unassigned} unassigned task(s)")
+        if attendance_pct < 70:
+            recommendations.append("Low attendance today — check worker check-in status")
+
+    if not risk_level:
+        if health_score >= 80:
+            risk_level = "low"
+        elif health_score >= 60:
+            risk_level = "medium"
+        elif health_score >= 40:
+            risk_level = "high"
+        else:
+            risk_level = "critical"
+
+    return {
+        "project_id": project_id,
+        "project_name": project.project_name,
+        "generated_at": datetime.utcnow().isoformat(),
+        "health_score": health_score,
+        "risk_level": risk_level,
+        "ai_insights": ai_insights,
+        "recommendations": recommendations,
+        "metrics": {
+            "task_completion_pct": task_completion_pct,
+            "attendance_pct": attendance_pct,
+            "total_tasks": total_tasks,
+            "completed": completed,
+            "in_progress": in_progress,
+            "pending": pending,
+            "overdue": overdue,
+            "unassigned": unassigned,
+            "total_workers": total_workers,
+            "on_site_today": today_att,
+        },
+        "tasks": task_details[:20],      # top 20
+        "worker_metrics": worker_metrics[:10],  # top 10
+    }
+
+
+# ──────────────────────────────────────────────────────────────
+#  AI Site Progress Prediction
+# ──────────────────────────────────────────────────────────────
+
+def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
+    """
+    AI-powered site progress prediction.
+    Analyses historical task completion trends, attendance, overdue patterns
+    and uses Gemini to predict:
+      - Estimated completion date
+      - Predicted progress at 7/14/30/60/90-day milestones
+      - Trend: ahead / on_track / behind / critical
+      - Confidence level
+      - Risk factors & recommendations
+    Falls back to rule-based calculation if Gemini is unavailable.
+    """
+    today = date.today()
+    since_7 = datetime.combine(today - timedelta(days=7), datetime.min.time())
+    since_14 = datetime.combine(today - timedelta(days=14), datetime.min.time())
+    since_30 = datetime.combine(today - timedelta(days=30), datetime.min.time())
+
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        return {"error": "Project not found"}
+
+    # ── Core metrics ──
+    all_tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    total_tasks = len(all_tasks)
+    completed = sum(1 for t in all_tasks if t.status == "completed")
+    in_progress = sum(1 for t in all_tasks if t.status == "in_progress")
+    pending = sum(1 for t in all_tasks if t.status == "pending")
+    overdue = sum(1 for t in all_tasks if t.due_date and t.due_date < today and t.status != "completed")
+    unassigned = sum(1 for t in all_tasks if not t.assigned_worker_id and t.status != "completed")
+    current_progress = round(completed / total_tasks * 100, 1) if total_tasks > 0 else 0.0
+
+    # ── Velocity (tasks completed per week, last 4 weeks) ──
+    velocity_data = []
+    for weeks_ago in range(4, 0, -1):
+        week_start = today - timedelta(weeks=weeks_ago * 7)
+        week_end = week_start + timedelta(days=7)
+        # Heuristic: tasks marked completed between week_start and week_end
+        # Since we don't have completion timestamps, we approximate:
+        #   if today - start_date of tasks suggests recent completion
+        # For now we use a fallback: divide completed by project lifetime in weeks
+        pass
+
+    # Simplified weekly velocity: estimate based on project duration
+    if project.start_date:
+        project_age_days = max((today - project.start_date).days, 1)
+        project_age_weeks = max(project_age_days / 7, 1)
+        weekly_velocity = completed / project_age_weeks
+    else:
+        weekly_velocity = max(completed / 4, 0.5) if completed > 0 else 0.5
+
+    remaining_tasks = total_tasks - completed
+    estimated_weeks_remaining = (remaining_tasks / weekly_velocity) if weekly_velocity > 0 else 999
+    rule_based_completion_date = today + timedelta(weeks=estimated_weeks_remaining)
+
+    # ── Attendance trend ──
+    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    total_workers = len(workers)
+
+    att_7 = db.query(AttendanceLog).filter(
+        AttendanceLog.project_id == project_id,
+        AttendanceLog.check_in_time >= since_7,
+        AttendanceLog.status.in_(("checked_in", "checked_out"))
+    ).count()
+    att_14 = db.query(AttendanceLog).filter(
+        AttendanceLog.project_id == project_id,
+        AttendanceLog.check_in_time >= since_14,
+        AttendanceLog.status.in_(("checked_in", "checked_out"))
+    ).count()
+    att_30 = db.query(AttendanceLog).filter(
+        AttendanceLog.project_id == project_id,
+        AttendanceLog.check_in_time >= since_30,
+        AttendanceLog.status.in_(("checked_in", "checked_out"))
+    ).count()
+
+    avg_daily_att_7 = round(att_7 / 7, 1) if att_7 > 0 else 0
+    avg_daily_att_14 = round(att_14 / 14, 1) if att_14 > 0 else 0
+    avg_daily_att_30 = round(att_30 / 30, 1) if att_30 > 0 else 0
+
+    # ── Issue trend ──
+    open_issues = db.query(Issue).filter(
+        Issue.project_id == project_id,
+        Issue.status.in_(["open", "in_progress"])
+    ).count()
+    total_issues = db.query(Issue).filter(Issue.project_id == project_id).count()
+
+    # ── Trend detection ──
+    overdue_ratio = overdue / total_tasks if total_tasks > 0 else 0
+    attendance_declining = avg_daily_att_7 < avg_daily_att_30 * 0.85 if avg_daily_att_30 > 0 else False
+
+    # ── Rule-based trend & predictions ──
+    if overdue_ratio > 0.3 or (attendance_declining and current_progress < 30):
+        rule_trend = "critical"
+    elif overdue_ratio > 0.15:
+        rule_trend = "behind"
+    elif current_progress > 70 and overdue == 0:
+        rule_trend = "ahead"
+    else:
+        rule_trend = "on_track"
+
+    # Predict progress at future milestones (rule-based)
+    daily_velocity_pct = (weekly_velocity / 7 / total_tasks * 100) if total_tasks > 0 else 1.0
+    pred_7d = min(100, round(current_progress + daily_velocity_pct * 7, 1))
+    pred_14d = min(100, round(current_progress + daily_velocity_pct * 14, 1))
+    pred_30d = min(100, round(current_progress + daily_velocity_pct * 30, 1))
+    pred_60d = min(100, round(current_progress + daily_velocity_pct * 60, 1))
+    pred_90d = min(100, round(current_progress + daily_velocity_pct * 90, 1))
+
+    rule_risk_factors = []
+    if overdue > 0:
+        rule_risk_factors.append(f"{overdue} overdue task(s) — risk of cascading delays")
+    if unassigned > 0:
+        rule_risk_factors.append(f"{unassigned} unassigned task(s) — idle resources")
+    if attendance_declining:
+        rule_risk_factors.append("Declining attendance trend — reduced workforce on site")
+    if open_issues > 0:
+        rule_risk_factors.append(f"{open_issues} unresolved issues blocking progress")
+    if project.end_date and rule_based_completion_date > project.end_date:
+        days_late = (rule_based_completion_date - project.end_date).days
+        rule_risk_factors.append(f"Predicted {days_late} days past deadline based on current velocity")
+
+    rule_recommendations = []
+    if overdue > 0:
+        rule_recommendations.append(f"Prioritise {overdue} overdue tasks immediately")
+    if unassigned > 0:
+        rule_recommendations.append(f"Use AI Auto-Assign to allocate {unassigned} unassigned tasks")
+    if attendance_declining:
+        rule_recommendations.append("Review attendance policy — workforce declining")
+    if daily_velocity_pct < 1.0 and total_tasks > 0:
+        rule_recommendations.append("Consider adding shifts or subcontractors to increase velocity")
+    if project.end_date and rule_based_completion_date > project.end_date:
+        rule_recommendations.append(f"Re-negotiate deadline or fast-track critical-path tasks")
+
+    # ── AI-powered refinement ──
+    model = get_gemini_model()
+    ai_trend = rule_trend
+    ai_confidence = 70.0
+    ai_insights = ""
+    ai_predicted_date = rule_based_completion_date
+    ai_risk_factors = list(rule_risk_factors)
+    ai_recommendations = list(rule_recommendations)
+    ai_milestones = [
+        {"label": "7 days", "predicted_progress": pred_7d},
+        {"label": "14 days", "predicted_progress": pred_14d},
+        {"label": "30 days", "predicted_progress": pred_30d},
+        {"label": "60 days", "predicted_progress": pred_60d},
+        {"label": "90 days", "predicted_progress": pred_90d},
+    ]
+
+    if model:
+        prompt_data = {
+            "project_name": project.project_name,
+            "current_progress_pct": current_progress,
+            "total_tasks": total_tasks,
+            "completed": completed,
+            "in_progress": in_progress,
+            "pending": pending,
+            "overdue": overdue,
+            "unassigned": unassigned,
+            "weekly_velocity_tasks": round(weekly_velocity, 2),
+            "remaining_tasks": remaining_tasks,
+            "total_workers": total_workers,
+            "avg_daily_attendance_7d": avg_daily_att_7,
+            "avg_daily_attendance_14d": avg_daily_att_14,
+            "avg_daily_attendance_30d": avg_daily_att_30,
+            "open_issues": open_issues,
+            "planned_start_date": project.start_date.isoformat() if project.start_date else None,
+            "planned_end_date": project.end_date.isoformat() if project.end_date else None,
+            "rule_based_completion_date": rule_based_completion_date.isoformat(),
+            "rule_trend": rule_trend,
+        }
+        prompt = f"""You are a construction project analyst. Based on the following project data, predict the site progress trajectory. Respond ONLY with valid JSON, no markdown fences.
+
+Project Data:
+{json.dumps(prompt_data, ensure_ascii=False)}
+
+Output format (strict JSON):
+{{
+  "trend": "<ahead|on_track|behind|critical>",
+  "confidence": <integer 50-100, how confident the AI is in this prediction>,
+  "predicted_completion_date": "<YYYY-MM-DD>",
+  "ai_insights": "<2-3 sentence analysis of project trajectory in English>",
+  "risk_factors": ["<risk 1>", "<risk 2>", "<risk 3>"],
+  "recommendations": ["<action 1>", "<action 2>", "<action 3>"],
+  "milestones": [
+    {{"label": "7 days", "predicted_progress": <float 0-100>}},
+    {{"label": "14 days", "predicted_progress": <float 0-100>}},
+    {{"label": "30 days", "predicted_progress": <float 0-100>}},
+    {{"label": "60 days", "predicted_progress": <float 0-100>}},
+    {{"label": "90 days", "predicted_progress": <float 0-100>}}
+  ]
+}}"""
+        try:
+            resp = model.generate_content(prompt)
+            parsed = _extract_json(getattr(resp, "text", "") or "")
+            if isinstance(parsed, dict):
+                ai_trend = str(parsed.get("trend", rule_trend)).lower()
+                ai_confidence = float(parsed.get("confidence", 70))
+                ai_insights = str(parsed.get("ai_insights", ""))
+                predicted_date_str = parsed.get("predicted_completion_date")
+                if predicted_date_str:
+                    try:
+                        ai_predicted_date = date.fromisoformat(str(predicted_date_str))
+                    except Exception:
+                        pass
+                if parsed.get("risk_factors"):
+                    ai_risk_factors = [str(r) for r in parsed["risk_factors"]]
+                if parsed.get("recommendations"):
+                    ai_recommendations = [str(r) for r in parsed["recommendations"]]
+                if parsed.get("milestones"):
+                    ai_milestones = parsed["milestones"]
+        except Exception:
+            pass
+
+    if not ai_insights:
+        trend_labels = {
+            "ahead": f"Project is ahead of schedule at {current_progress}% completion.",
+            "on_track": f"Project is progressing steadily at {current_progress}% completion.",
+            "behind": f"Project is behind schedule — {overdue} overdue tasks and {current_progress}% completion.",
+            "critical": f"Project is at critical risk — {overdue} overdue tasks, only {current_progress}% complete.",
+        }
+        ai_insights = trend_labels.get(ai_trend, f"Project at {current_progress}% completion.")
+        if project.end_date:
+            ai_insights += f" Planned end date: {project.end_date.isoformat()}."
+
+    return {
+        "project_id": project_id,
+        "project_name": project.project_name,
+        "generated_at": datetime.utcnow().isoformat(),
+        "current_progress": current_progress,
+        "planned_start_date": project.start_date.isoformat() if project.start_date else None,
+        "planned_end_date": project.end_date.isoformat() if project.end_date else None,
+        "predicted_completion_date": ai_predicted_date.isoformat(),
+        "trend": ai_trend,
+        "confidence": round(ai_confidence, 1),
+        "ai_insights": ai_insights,
+        "ai_used": bool(model),
+        "velocity": {
+            "weekly_tasks_completed": round(weekly_velocity, 2),
+            "remaining_tasks": remaining_tasks,
+            "estimated_weeks_remaining": round(estimated_weeks_remaining, 1),
+        },
+        "attendance_trend": {
+            "avg_daily_7d": avg_daily_att_7,
+            "avg_daily_14d": avg_daily_att_14,
+            "avg_daily_30d": avg_daily_att_30,
+            "declining": attendance_declining,
+            "total_workers": total_workers,
+        },
+        "issues": {
+            "open": open_issues,
+            "total": total_issues,
+        },
+        "risk_factors": ai_risk_factors,
+        "recommendations": ai_recommendations,
+        "milestones": ai_milestones,
+    }

@@ -312,4 +312,8 @@ class ApiService {
         'gps_lat': lat,
         'gps_lng': lng,
       })).data);
+
+  // ───────── AI Site Progress Prediction ─────────
+  Future<Map> getProjectProgressPrediction(int projectId) async =>
+      Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
 }

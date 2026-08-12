@@ -385,3 +385,46 @@ class NotificationSettingOut(NotificationSettingBase):
 
 class UnreadCountResponse(BaseModel):
     count: int
+
+
+# ──────────────────────────────────────────────────────────────
+#  16. AI Site Progress Prediction
+# ──────────────────────────────────────────────────────────────
+class ProgressMilestone(BaseModel):
+    label: str
+    predicted_progress: float
+
+class VelocityInfo(BaseModel):
+    weekly_tasks_completed: float
+    remaining_tasks: int
+    estimated_weeks_remaining: float
+
+class AttendanceTrendInfo(BaseModel):
+    avg_daily_7d: float
+    avg_daily_14d: float
+    avg_daily_30d: float
+    declining: bool
+    total_workers: int
+
+class IssueSummary(BaseModel):
+    open: int
+    total: int
+
+class SiteProgressPrediction(BaseModel):
+    project_id: int
+    project_name: str
+    generated_at: str
+    current_progress: float
+    planned_start_date: Optional[str] = None
+    planned_end_date: Optional[str] = None
+    predicted_completion_date: str
+    trend: str  # ahead / on_track / behind / critical
+    confidence: float
+    ai_insights: str
+    ai_used: bool
+    velocity: VelocityInfo
+    attendance_trend: AttendanceTrendInfo
+    issues: IssueSummary
+    risk_factors: List[str] = []
+    recommendations: List[str] = []
+    milestones: List[ProgressMilestone] = []

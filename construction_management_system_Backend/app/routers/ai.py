@@ -12,12 +12,13 @@ from app.schemas import (
     AIChatSessionOut, AIChatMessageOut,
     AIChatRequest, AITaskAnalysisRequest, AITaskAnalysisResponse,
     AIDailyReportRequest, AISafetyAnalysisRequest,
-    AIAutoAssignRequest, AIAutoAssignResponse
+    AIAutoAssignRequest, AIAutoAssignResponse,
+    SiteProgressPrediction
 )
 from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
     chat_with_ai, analyze_task, generate_daily_report, analyze_safety_risk,
-    auto_assign_tasks
+    auto_assign_tasks, compute_project_progress, predict_site_progress
 )
 
 router = APIRouter(tags=["🤖 AI Services"])
@@ -184,3 +185,21 @@ def ai_auto_assign_tasks(
         dry_run=request.dry_run,
         top_k=request.top_k
     )
+
+
+@router.get("/ai/projects/{pid}/progress-prediction", response_model=SiteProgressPrediction)
+def get_progress_prediction(
+    pid: int,
+    db: Session = Depends(get_db),
+    current_user: Supervisor = Depends(cu)
+):
+    """
+    AI-powered site progress prediction for a specific project.
+    Analyses historical task completion velocity, attendance trends, overdue patterns
+    and uses Gemini AI to predict completion date, future progress milestones,
+    risk factors and recommendations.
+    """
+    result = predict_site_progress(db, pid)
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+    return result

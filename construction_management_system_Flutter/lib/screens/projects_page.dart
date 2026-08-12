@@ -525,6 +525,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool ld = true;
   Map? project;
   List tasks = [];
+  Map? _prediction;
 
   @override
   void initState() {
@@ -538,6 +539,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       final all = await ApiService().getProjects();
       project = all.firstWhere((p) => p['project_id'] == widget.projectId, orElse: () => null);
       tasks = await ApiService().getTasks(widget.projectId);
+
+      // Load AI progress prediction
+      try {
+        _prediction = await ApiService().getProjectProgressPrediction(widget.projectId);
+      } catch (_) {
+        _prediction = null;
+      }
     } catch (e) {
       toast('Failed to load project: $e');
     } finally {
@@ -619,6 +627,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
         const SizedBox(height: 16),
 
+        // ── AI Progress Prediction Card ──
+        if (_prediction != null) ...[
+          _buildAiPredictionCard(),
+          const SizedBox(height: 16),
+        ],
+
         // ── Geofence Info Card ────────────────────────
         sectionCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -679,4 +693,231 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         Text('$label: ', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
         Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textPrimary))),
       ]);
+
+  // ── AI Progress Prediction Card ──
+  Widget _buildAiPredictionCard() {
+    final pred = _prediction!;
+    final trend = pred['trend'] as String? ?? 'on_track';
+    final confidence = (pred['confidence'] as num? ?? 70).toDouble();
+    final predictedDate = pred['predicted_completion_date'] as String? ?? '-';
+    final plannedEnd = pred['planned_end_date'] as String?;
+    final insights = pred['ai_insights'] as String? ?? '';
+    final milestones = (pred['milestones'] as List?) ?? [];
+    final currentProgress = (pred['current_progress'] as num? ?? 0).toDouble();
+    final riskFactors = (pred['risk_factors'] as List?)?.cast<String>() ?? [];
+    final recommendations = (pred['recommendations'] as List?)?.cast<String>() ?? [];
+    final velocity = pred['velocity'] as Map? ?? {};
+    final attTrend = pred['attendance_trend'] as Map? ?? {};
+    final aiUsed = pred['ai_used'] as bool? ?? false;
+
+    final trendColor = switch (trend) {
+      'ahead' => AppColors.green,
+      'on_track' => AppColors.blue,
+      'behind' => AppColors.accent,
+      'critical' => AppColors.red,
+      _ => AppColors.textMuted,
+    };
+    final trendLabel = switch (trend) {
+      'ahead' => 'Ahead of Schedule',
+      'on_track' => 'On Track',
+      'behind' => 'Behind Schedule',
+      'critical' => 'At Risk — Critical',
+      _ => trend,
+    };
+    final trendIcon = switch (trend) {
+      'ahead' => Icons.rocket_launch_rounded,
+      'on_track' => Icons.check_circle_rounded,
+      'behind' => Icons.warning_rounded,
+      'critical' => Icons.error_rounded,
+      _ => Icons.help_rounded,
+    };
+
+    double predProgress30d = currentProgress;
+    for (final m in milestones) {
+      if (m['label'] == '30 days') {
+        predProgress30d = (m['predicted_progress'] as num).toDouble();
+        break;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: trendColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Header ──
+        Row(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: trendColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(trendIcon, size: 16, color: trendColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('AI Progress Prediction',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+              Row(children: [
+                Text(aiUsed ? 'Gemini AI • ' : 'Rule-based • ',
+                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted)),
+                Text('${confidence.toStringAsFixed(0)}% confidence',
+                    style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.green)),
+              ]),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: trendColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(trendLabel,
+                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: trendColor)),
+          ),
+        ]),
+        const SizedBox(height: 14),
+
+        // ── AI Insight ──
+        if (insights.isNotEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 14),
+            decoration: BoxDecoration(
+              color: trendColor.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(insights,
+                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, height: 1.45)),
+          ),
+
+        // ── Progress Bars ──
+        Row(children: [
+          _miniStat('Current', '${currentProgress.toStringAsFixed(1)}%', AppColors.textPrimary),
+          const SizedBox(width: 8),
+          _miniStat('30-Day Pred.', '${predProgress30d.toStringAsFixed(1)}%', trendColor),
+          const SizedBox(width: 8),
+          _miniStat('Velocity', '${(velocity['weekly_tasks_completed'] ?? 0).toStringAsFixed(1)} /wk', AppColors.textSecondary),
+        ]),
+        const SizedBox(height: 8),
+        Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: LinearProgressIndicator(
+                value: predProgress30d / 100,
+                minHeight: 12,
+                backgroundColor: AppColors.border,
+                valueColor: AlwaysStoppedAnimation(trendColor.withValues(alpha: 0.2)),
+              ),
+            ),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(7),
+              child: LinearProgressIndicator(
+                value: currentProgress / 100,
+                minHeight: 12,
+                backgroundColor: Colors.transparent,
+                valueColor: AlwaysStoppedAnimation(trendColor),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        // ── Date comparison ──
+        Row(children: [
+          _datePill('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.textMuted)),
+          _datePill('Predicted', _fmtDateStr(predictedDate), trendColor),
+        ]),
+
+        // ── Risk factors ──
+        if (riskFactors.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 12),
+          Text('Risk Factors', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.red)),
+          const SizedBox(height: 6),
+          ...riskFactors.take(3).map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.error_outline, size: 14, color: AppColors.red),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary))),
+                ]),
+              )),
+        ],
+
+        // ── Recommendations ──
+        if (recommendations.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('AI Recommendations', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.blue)),
+          const SizedBox(height: 6),
+          ...recommendations.take(3).map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.lightbulb_outline, size: 14, color: AppColors.blue),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary))),
+                ]),
+              )),
+        ],
+
+        // ── Milestone chips ──
+        if (milestones.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 10),
+          Text('Predicted Progress Milestones', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: milestones.map((m) {
+            final pct = (m['predicted_progress'] as num).toDouble();
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.bgMain,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(m['label'] ?? '', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                Text('${pct.toStringAsFixed(0)}%',
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: pct >= currentProgress ? AppColors.green : AppColors.red)),
+              ]),
+            );
+          }).toList()),
+        ],
+      ]),
+    );
+  }
+
+  Widget _miniStat(String label, String value, Color color) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+          Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+        ]),
+      );
+
+  Widget _datePill(String label, String value, Color color) => Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: GoogleFonts.outfit(fontSize: 9, color: AppColors.textMuted)),
+          Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ]),
+      );
+
+  String _fmtDateStr(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
 }
