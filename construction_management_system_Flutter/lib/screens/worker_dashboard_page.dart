@@ -375,7 +375,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                   style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
               Text('BuildSmart Worker Portal',
-                  style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5)),
+                  style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
               const SizedBox(height: 10),
               Wrap(spacing: 6, runSpacing: 4, children: [
                 _welcomeChip(Icons.badge_rounded, 'Worker Portal'),
@@ -388,7 +388,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             Text(_fmtNow(),
                 style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
             Text(DateTime.now().toString().substring(0, 10),
-                style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 11.5)),
+                style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
           ]),
         ],
       ),
@@ -402,7 +402,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 11, color: fg ?? Colors.white),
         const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.outfit(color: fg ?? Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        Text(label, style: GoogleFonts.outfit(color: fg ?? Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
       ]),
     );
   }
@@ -456,7 +456,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 const SizedBox(width: 5),
                 Text(
                   'You must be within ${r}m of the site to check in',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.green, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w600),
                 ),
               ]),
             );
@@ -507,16 +507,16 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         const SizedBox(height: 6),
         if (_hoursToday > 0)
           Text('Hours worked today: ${_hoursToday.toStringAsFixed(1)}h',
-              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
         const SizedBox(height: 18),
 
         Row(children: [
           const SizedBox(width: 4),
           Text('Check-in: $_checkInWindow',
-              style: GoogleFonts.outfit(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
           const Spacer(),
           Text('Check-out: $_checkOutWindow',
-              style: GoogleFonts.outfit(fontSize: 11, color: AppColors.blue, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
         ]),
         const SizedBox(height: 16),
@@ -555,7 +555,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         const SizedBox(height: 10),
         Text(
           'Device: $_deviceType • $_deviceInfo',
-          style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted),
+          style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
         ),
       ]),
     );
@@ -581,7 +581,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           child: Text(
             alert != null && alert.isNotEmpty ? '⚠ Alert: $alert' : (_taskBoard?['summary']?.toString() ?? '🤖 AI analyzing your tasks...'),
             style: GoogleFonts.outfit(
-              fontSize: 12.5,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: alert != null && alert.isNotEmpty ? const Color(0xFF92400E) : const Color(0xFF5B21B6),
               height: 1.35,
@@ -600,7 +600,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           SizedBox(height: 18),
           Center(child: CircularProgressIndicator()),
           SizedBox(height: 12),
-          Center(child: Text('Loading AI task board...', style: TextStyle(color: AppColors.textMuted, fontSize: 12.5))),
+          Center(child: Text('Loading AI task board...', style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
           SizedBox(height: 18),
         ]),
       );
@@ -617,7 +617,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             const Spacer(),
             if (_lastUpdated.isNotEmpty)
               Text(_lastUpdated.substring(11, 16),
-                  style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
             IconButton(
               icon: const Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
               tooltip: 'Refresh tasks',
@@ -640,7 +640,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               const SizedBox(height: 4),
               Text('Your supervisor or AI will assign tasks to your account.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
             ]),
           )
         else
@@ -698,7 +698,7 @@ class _TaskTile extends StatelessWidget {
                 const Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
                 const SizedBox(width: 4),
                 Text(part,
-                    style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 10.5, fontWeight: FontWeight.w800)),
+                    style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
               ]),
             ),
             const SizedBox(width: 8),
@@ -713,7 +713,7 @@ class _TaskTile extends StatelessWidget {
               child: Text(priority.toUpperCase(),
                   style: GoogleFonts.outfit(
                     color: _priorityColor(priority),
-                    fontSize: 9.5,
+                    fontSize: 13,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 0.3,
                   )),
@@ -725,7 +725,7 @@ class _TaskTile extends StatelessWidget {
           if (task['description']?.toString().isNotEmpty ?? false) ...[
             const SizedBox(height: 4),
             Text(task['description'].toString(),
-                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, height: 1.4)),
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
           ],
           const SizedBox(height: 8),
           Wrap(
@@ -758,7 +758,7 @@ class _TaskTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(instructions,
-                      style: GoogleFonts.outfit(fontSize: 11.5, color: Color(0xFF1E40AF), height: 1.4, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.outfit(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4, fontWeight: FontWeight.w600)),
                 ),
               ]),
             ),
@@ -775,7 +775,7 @@ class _TaskTile extends StatelessWidget {
           Icon(icon, size: 10.5, color: color),
           const SizedBox(width: 3.5),
           Text(label,
-              style: GoogleFonts.outfit(color: color, fontSize: 10, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.outfit(color: color, fontSize: 14, fontWeight: FontWeight.w700)),
         ]),
       );
 }

@@ -316,4 +316,67 @@ class ApiService {
   // ───────── AI Site Progress Prediction ─────────
   Future<Map> getProjectProgressPrediction(int projectId) async =>
       Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
+
+  // ───────── File Management ─────────
+  Future<List> getFiles({int? pid, String? category}) async {
+    final params = <String, dynamic>{};
+    if (pid != null && pid > 0) params['project_id'] = pid;
+    if (category != null && category != 'all') params['file_category'] = category;
+    return (await dio.get('/files', queryParameters: params)).data as List;
+  }
+
+  Future<Map> uploadFile(String filePath, {int? pid, String? category}) async {
+    final fileName = filePath.split(RegExp(r'[/\\]')).last;
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      if (pid != null && pid > 0) 'project_id': pid,
+      if (category != null && category != 'all') 'file_category': category,
+    });
+    return Map.from((await dio.post('/files/upload', data: formData)).data);
+  }
+
+  Future<void> deleteFile(int fileId) async {
+    await dio.delete('/files/$fileId');
+  }
+
+  String downloadUrl(int fileId) => '$baseUrl/api/files/$fileId/download';
+
+  String thumbnailUrl(String? path) =>
+      path != null && path.isNotEmpty ? '$baseUrl/$path' : '';
+
+  // ───────── AI Chat ─────────
+  Future<Map> sendAiChat(int projectId, String message,
+          {int? sessionId}) async =>
+      Map.from((await dio.post('/ai/chat', data: {
+        'project_id': projectId,
+        'message': message,
+        if (sessionId != null) 'session_id': sessionId,
+      })).data);
+
+  Future<List> getAiSessions() async =>
+      (await dio.get('/ai/sessions')).data as List;
+
+  Future<List> getAiMessages(int sessionId) async =>
+      (await dio.get('/ai/messages/$sessionId')).data as List;
+
+  // ───────── Notifications ─────────
+  Future<List> getNotifications() async =>
+      (await dio.get('/notifications')).data as List;
+
+  Future<void> markNotificationRead(int id) async =>
+      await dio.put('/notifications/$id/read');
+
+  Future<void> markAllNotificationsRead() async =>
+      await dio.put('/notifications/read-all');
+
+  Future<int> getUnreadCount() async {
+    final resp = await dio.get('/notifications/unread-count');
+    return resp.data is int ? resp.data : (resp.data['count'] ?? 0) as int;
+  }
+
+  Future<Map> getNotificationSettings() async =>
+      Map<String, dynamic>.from((await dio.get('/notifications/settings')).data as Map);
+
+  Future<void> updateNotificationSettings(Map data) async =>
+      await dio.put('/notifications/settings', data: data);
 }

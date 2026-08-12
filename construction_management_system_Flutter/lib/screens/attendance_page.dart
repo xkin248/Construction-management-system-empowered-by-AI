@@ -169,10 +169,10 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+        Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
-        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -210,7 +210,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   Widget _legend(Color color, String label) => Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 5),
-        Text(label, style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
       ]);
 
   Widget _sectionLabel(String s) => Text(s,
@@ -269,8 +269,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       child: DropdownButton<String>(
         value: value,
         underline: const SizedBox(),
-        isDense: true,
-        style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
         onChanged: onChanged,
       ),
@@ -337,7 +336,7 @@ class _WorkerAttCard extends StatelessWidget {
                   style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis),
               Text(trade,
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
             ]),
           ),
           statusPill(status),
@@ -348,7 +347,7 @@ class _WorkerAttCard extends StatelessWidget {
           const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
           const SizedBox(width: 4),
           Expanded(child: Text(project,
-              style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary),
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
               overflow: TextOverflow.ellipsis)),
         ]),
         const SizedBox(height: 8),
@@ -366,13 +365,13 @@ class _WorkerAttCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text('${hours}h',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
             ),
           const SizedBox(width: 6),
           Row(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
             const SizedBox(width: 3),
-            Text('GPS', style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted)),
+            Text('GPS', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
           ]),
         ]),
       ]),
@@ -384,7 +383,7 @@ class _WorkerAttCard extends StatelessWidget {
       Icon(icon, size: 12, color: color),
       const SizedBox(width: 3),
       Text('$label $time',
-          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600,
+          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600,
               color: time == '—' ? AppColors.textMuted : color)),
     ]);
   }
@@ -416,15 +415,15 @@ class _ProjectGeofenceCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(8)),
-            child: Text('Active', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.green, fontWeight: FontWeight.w700)),
+            child: Text('Active', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 8),
-        Text(name, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
-        Text(_shortLoc(location), style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(name, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(_shortLoc(location), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 6),
         Text('$workerCount workers tracked', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
-        Text('Radius: ${radius}m', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+        Text('Radius: ${radius}m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -568,7 +567,7 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
                   const Icon(Icons.info_outline, color: AppColors.yellow, size: 18),
                   const SizedBox(width: 8),
                   Expanded(child: Text('GPS check-in requires the mobile app',
-                      style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.yellow, fontWeight: FontWeight.w600))),
+                      style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w600))),
                 ]),
               )
             else

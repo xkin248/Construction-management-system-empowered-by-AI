@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import 'login_page.dart';
 import 'worker_dashboard_page.dart';
 import 'profile_page.dart';
+import 'notifications_page.dart';
 
 // ──────────────── Nav model ────────────────
 class _NavItem {
@@ -17,12 +18,14 @@ class _NavItem {
 const _workerMenu = [
   _NavItem('My Dashboard', Icons.grid_view_rounded),
   _NavItem('My Attendance', Icons.calendar_month_rounded),
+  _NavItem('Notifications', Icons.notifications_outlined),
   _NavItem('Profile', Icons.person_outline_rounded),
 ];
 
 final _workerPages = <Widget>[
   const WorkerDashboardPage(),
   const _WorkerAttendanceTab(),
+  const NotificationsPage(),
   const ProfilePage(),
 ];
 
@@ -229,7 +232,7 @@ class _WorkerSidebarContent extends StatelessWidget {
                   Text('BuildSmart',
                       style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
                   Text('Worker Portal',
-                      style: GoogleFonts.outfit(color: AppColors.textSidebarMuted, fontSize: 10.5)),
+                      style: GoogleFonts.outfit(color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),
               ),
             ]),
@@ -244,7 +247,7 @@ class _WorkerSidebarContent extends StatelessWidget {
                   child: Text('WORKER MENU',
                       style: GoogleFonts.outfit(
                           color: AppColors.textSidebarMuted,
-                          fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
+                          fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.8)),
                 ),
                 ..._workerMenu.asMap().entries.map((e) => _WorkerNavTile(
                       item: e.value,
@@ -270,10 +273,10 @@ class _WorkerSidebarContent extends StatelessWidget {
                       Text(name,
                           maxLines: 1, overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.outfit(
-                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
                       Text(role.replaceAll('_', ' '),
                           style: GoogleFonts.outfit(
-                              color: AppColors.textSidebarMuted, fontSize: 10.5)),
+                              color: AppColors.textSidebarMuted, fontSize: 14)),
                     ]),
                   ),
                   IconButton(
@@ -425,7 +428,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
               const SizedBox(height: 12),
               if (attRec == null)
                 const Text('No attendance record for today yet. Check in from the Dashboard.',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 12.5))
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 14))
               else ...[
                 _row('Check In', attRec['check_in_time']?.toString().substring(11, 16) ?? '—',
                     attRec['check_in_time'] != null ? AppColors.green : AppColors.textMuted),
@@ -464,7 +467,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   }
 
   Widget _row(String label, String value, Color color) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-        Text(value, style: TextStyle(fontSize: 12.5, color: color, fontWeight: FontWeight.w700)),
+        Text(label, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Text(value, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
       ]);
 }

@@ -186,7 +186,7 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Expanded(
             child: Text(label,
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                 overflow: TextOverflow.ellipsis),
           ),
           Container(
@@ -200,7 +200,7 @@ class _DashboardPageState extends State<DashboardPage> {
             style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
         if (sub != null) ...[
           const SizedBox(height: 3),
-          Text(sub, style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
+          Text(sub, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
         ],
       ]),
     );
@@ -221,12 +221,12 @@ class _DashboardPageState extends State<DashboardPage> {
             Text('Weekly Attendance',
                 style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             Text('All projects combined',
-                style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
           ]),
           TextButton(
             onPressed: () {},
             child: Text('View All →',
-                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 16),
@@ -248,7 +248,7 @@ class _DashboardPageState extends State<DashboardPage> {
         Text('Task Distribution',
             style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         Text('All active projects',
-            style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+            style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
         const SizedBox(height: 16),
         Center(
           child: SimpleDonutChart(
@@ -273,13 +273,13 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _legendRow(String label, String pct, Color color) => Row(children: [
         Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary))),
-        Text(pct, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary))),
+        Text(pct, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ]);
 
   Widget _sectionHeader(String title, {String? sub}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
       ]);
 
   Widget _projectProductivityRow(Map p) {
@@ -385,7 +385,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Icon(trendIcon, size: 14, color: trendColor),
               const SizedBox(width: 5),
               Text(trendLabel,
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: trendColor)),
+                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: trendColor)),
             ]),
           ),
         ]),
@@ -396,14 +396,14 @@ class _DashboardPageState extends State<DashboardPage> {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(insights,
-                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, height: 1.4)),
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
           ),
 
         // ── Current vs Predicted Progress Bar ──
         Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Current', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+              Text('Current', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 2),
               Text('${currentProgress.toStringAsFixed(1)}%',
                   style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
@@ -412,7 +412,7 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Predicted (30 days)', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+              Text('Predicted (30 days)', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 2),
               Text('${predProgress.toStringAsFixed(1)}%',
                   style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: trendColor)),
@@ -420,7 +420,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(width: 12),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('AI Confidence', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+            Text('AI Confidence', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
             const SizedBox(height: 2),
             Text('${confidence.toStringAsFixed(0)}%',
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.green)),
@@ -494,8 +494,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _dateChip(String label, String value, Color color) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
-      Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+      Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
     ]);
   }
 

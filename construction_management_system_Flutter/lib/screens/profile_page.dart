@@ -57,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 12),
                   Text(user?['full_name'] ?? '-', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
-                  Text(user?['email'] ?? '', style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
+                  Text(user?['email'] ?? '', style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
                   const SizedBox(height: 8),
                   statusPill(user?['role'] ?? 'site_supervisor', label: (user?['role'] ?? '').toString().replaceAll('_', ' ')),
                 ]),

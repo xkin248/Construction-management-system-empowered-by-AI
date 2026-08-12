@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
-
-const _priorities = ['low', 'medium', 'high'];
+import '../widgets/task_form.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -97,96 +95,13 @@ class _TasksPageState extends State<TasksPage> {
     }
   }
 
-  void _openNewTask() {
+  void _openNewTask() async {
     if (pid == null) { toast('Create a project first'); return; }
-    final title = TextEditingController();
-    String priority = 'medium';
-    DateTime? due;
-
-    showModalBottomSheet(
+    final created = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
-        Future<void> pickDate() async {
-          final d = await showDatePicker(context: ctx, initialDate: DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime(2035));
-          if (d != null) setD(() => due = d);
-        }
-        final pad = MediaQuery.of(ctx).viewInsets.bottom;
-        return Container(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
-          decoration: const BoxDecoration(
-            color: AppColors.bgCard,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            Text('New Task', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const SizedBox(height: 16),
-            Text('Task Title', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-            const SizedBox(height: 6),
-            TextField(
-              controller: title,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'e.g. Foundation Pile Driving',
-                hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: priority,
-                  decoration: const InputDecoration(labelText: 'Priority'),
-                  items: _priorities.map((p) => DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1)))).toList(),
-                  onChanged: (v) => setD(() => priority = v!),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: pickDate,
-                  icon: const Icon(Icons.calendar_today_outlined, size: 16),
-                  label: Text(due == null ? 'Due Date' : DateFormat('dd/MM/yy').format(due!),
-                      style: GoogleFonts.outfit(fontSize: 13)),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                if (title.text.trim().isEmpty) { toast('Enter a task title'); return; }
-                try {
-                  await ApiService().createTask({
-                    'task_name': title.text.trim(), 'project_id': pid, 'priority': priority,
-                    'status': 'pending', 'due_date': due?.toIso8601String().split('T').first,
-                  });
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  toast('Task created!');
-                  _load();
-                } on DioException catch (e) {
-                  toast(e.message ?? 'Failed to create task');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: Text('Create Task', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
-            ),
-          ]),
-        );
-      }),
+      builder: (_) => TaskForm(initialProjectId: pid),
     );
+    if (created == true) _load();
   }
 
   List get _filtered {
@@ -288,7 +203,7 @@ class _TasksPageState extends State<TasksPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(value, style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w800, color: color)),
         const SizedBox(height: 2),
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+        Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -343,7 +258,7 @@ class _TasksPageState extends State<TasksPage> {
     final v = items.contains(value) ? value : items.first;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      height: 40,
+      height: 48,
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(10),
@@ -352,8 +267,8 @@ class _TasksPageState extends State<TasksPage> {
       child: DropdownButton<String>(
         value: v,
         underline: const SizedBox(),
-        isDense: true,
-        style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        isExpanded: true,
+        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         items: items.map((s) => DropdownMenuItem(value: s, child: Text('$hint: $s'))).toList(),
         onChanged: onChanged,
       ),
@@ -362,28 +277,121 @@ class _TasksPageState extends State<TasksPage> {
 }
 
 // ──────────────── Task Card ────────────────
-class _TaskCard extends StatelessWidget {
+class _TaskCard extends StatefulWidget {
   final Map task;
   const _TaskCard({required this.task});
 
   @override
+  State<_TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<_TaskCard> {
+  late String _status;
+  late String? _dueDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = widget.task['status'] as String? ?? 'pending';
+    _dueDate = widget.task['due_date'] as String?;
+  }
+
+  Color _dueColor() {
+    if (_dueDate == null || _dueDate!.isEmpty) return AppColors.textMuted;
+    final d = DateTime.tryParse(_dueDate!);
+    if (d == null) return AppColors.textMuted;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(d.year, d.month, d.day);
+    if (dueDay.isBefore(today)) return AppColors.red;
+    if (dueDay.isAtSameMomentAs(today)) return AppColors.primaryLight;
+    return AppColors.green;
+  }
+
+  Widget _dueLabel() {
+    if (_dueDate == null || _dueDate!.isEmpty) {
+      return Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.calendar_today_outlined,
+            size: 12, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Text('No due date',
+            style:
+                GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+      ]);
+    }
+    final parsed = DateTime.tryParse(_dueDate!);
+    final display =
+        parsed != null ? DateFormat('dd/MM/yy').format(parsed) : _dueDate!;
+    final color = _dueColor();
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(Icons.calendar_today_outlined, size: 12, color: color),
+      const SizedBox(width: 4),
+      Text(display,
+          style: GoogleFonts.outfit(
+              fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+    ]);
+  }
+
+  Future<void> _editDueDate() async {
+    final init =
+        _dueDate != null ? DateTime.tryParse(_dueDate!) : null;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: init ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    final newDate = picked.toIso8601String().split('T').first;
+    try {
+      await ApiService()
+          .updateTask(widget.task['task_id'], {'due_date': newDate});
+      setState(() => _dueDate = newDate);
+      widget.task['due_date'] = newDate;
+      toast('Due date updated');
+    } catch (e) {
+      toast('Failed to update due date');
+    }
+  }
+
+  Future<void> _setStatus(String newStatus) async {
+    if (newStatus == _status) return;
+    try {
+      await ApiService()
+          .updateTask(widget.task['task_id'], {'status': newStatus});
+      setState(() => _status = newStatus);
+      widget.task['status'] = newStatus;
+      toast('Status: ${newStatus.replaceAll('_', ' ')}');
+    } catch (e) {
+      toast('Failed to update status');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final status = task['status'] as String? ?? 'pending';
-    final priority = task['priority'] as String? ?? 'medium';
-    final worker = task['assigned_worker'] as Map?;
-    final progress = (task['progress'] as num? ?? 0).toDouble();
-    final isInProgress = status == 'in_progress';
-    final isCompleted = status == 'completed';
+    final priority = widget.task['priority'] as String? ?? 'medium';
+    final worker = widget.task['assigned_worker'] as Map?;
+    final progress = (widget.task['progress'] as num? ?? 0).toDouble();
+    final isInProgress = _status == 'in_progress';
+    final isCompleted = _status == 'completed';
 
-    // Leading icon
     final leadIcon = isCompleted
-        ? const _SpinningOrIcon(icon: Icons.check_circle_rounded, color: AppColors.green, spin: false)
+        ? const _SpinningOrIcon(
+            icon: Icons.check_circle_rounded,
+            color: AppColors.green,
+            spin: false)
         : isInProgress
-            ? const _SpinningOrIcon(icon: Icons.settings_rounded, color: AppColors.blue, spin: true)
-            : const _SpinningOrIcon(icon: Icons.radio_button_unchecked_rounded, color: AppColors.textMuted, spin: false);
+            ? const _SpinningOrIcon(
+                icon: Icons.settings_rounded,
+                color: AppColors.blue,
+                spin: true)
+            : const _SpinningOrIcon(
+                icon: Icons.radio_button_unchecked_rounded,
+                color: AppColors.textMuted,
+                spin: false);
 
-    // Progress bar color
-    final barColor = isCompleted ? AppColors.green : isInProgress ? AppColors.blue : AppColors.yellow;
+    final barColor =
+        isCompleted ? AppColors.green : isInProgress ? AppColors.blue : AppColors.yellow;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -393,38 +401,49 @@ class _TaskCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => TaskDetailPage(task: task))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Title row
-          Row(children: [
-            leadIcon,
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(task['task_name'] ?? '-',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-                  overflow: TextOverflow.ellipsis),
-            ),
-            _PriorityBadge(priority: priority),
-            const SizedBox(width: 8),
-            Text('${progress.toStringAsFixed(0)}%',
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-          ]),
-          if (task['project_name'] != null || (task['project'] != null)) ...[
-            const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.only(left: 28),
-              child: Text(task['project_name'] ?? task['project']?['project_name'] ?? '',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
-            ),
-          ],
-          const SizedBox(height: 10),
-          // Progress bar
-          Padding(
-            padding: const EdgeInsets.only(left: 0),
-            child: ClipRRect(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Navigable section (header + progress + worker/due) ──
+        InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => TaskDetailPage(task: widget.task))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Title row
+            Row(children: [
+              leadIcon,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(widget.task['task_name'] ?? '-',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary),
+                    overflow: TextOverflow.ellipsis),
+              ),
+              _PriorityBadge(priority: priority),
+              const SizedBox(width: 8),
+              Text('${progress.toStringAsFixed(0)}%',
+                  style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary)),
+            ]),
+            if (widget.task['project_name'] != null ||
+                (widget.task['project'] != null)) ...[
+              const SizedBox(height: 2),
+              Padding(
+                padding: const EdgeInsets.only(left: 28),
+                child: Text(
+                    widget.task['project_name'] ??
+                        widget.task['project']?['project_name'] ??
+                        '',
+                    style: GoogleFonts.outfit(
+                        fontSize: 13, color: AppColors.textMuted)),
+              ),
+            ],
+            const SizedBox(height: 10),
+            // Progress bar
+            ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                 value: progress / 100,
@@ -433,26 +452,85 @@ class _TaskCard extends StatelessWidget {
                 valueColor: AlwaysStoppedAnimation(barColor),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          // Worker + due date row
-          Row(children: [
-            if (worker != null) ...[
-              initialsAvatar(worker['name'] ?? '?', radius: 11),
-              const SizedBox(width: 6),
-              Text(worker['name'] ?? '',
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
-            ] else
-              Text('Unassigned', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-            const Spacer(),
-            if (task['due_date'] != null) ...[
-              const Icon(Icons.calendar_today_outlined, size: 12, color: AppColors.textMuted),
-              const SizedBox(width: 4),
-              Text(task['due_date'],
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
-            ],
+            const SizedBox(height: 10),
+            // Worker + due date row
+            Row(children: [
+              if (worker != null) ...[
+                initialsAvatar(worker['name'] ?? '?', radius: 11),
+                const SizedBox(width: 6),
+                Text(worker['name'] ?? '',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w600)),
+              ] else
+                Text('Unassigned',
+                    style:
+                        GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              const Spacer(),
+              // Tap due date to quickly edit
+              GestureDetector(
+                onTap: _editDueDate,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: _dueLabel(),
+                ),
+              ),
+            ]),
           ]),
+        ),
+        const SizedBox(height: 10),
+        // ── Status quick-toggle (does not navigate) ──
+        Row(children: [
+          _statusBtn('Pending', 'pending'),
+          const SizedBox(width: 6),
+          _statusBtn('In Progress', 'in_progress'),
+          const SizedBox(width: 6),
+          _statusBtn('Completed', 'completed'),
         ]),
+      ]),
+    );
+  }
+
+  Widget _statusBtn(String label, String statusValue) {
+    final active = _status == statusValue;
+    Color bg;
+    Color fg;
+    switch (statusValue) {
+      case 'completed':
+        bg = active
+            ? AppColors.green
+            : AppColors.greenLight.withValues(alpha: 0.4);
+        fg = active ? Colors.white : AppColors.green;
+        break;
+      case 'in_progress':
+        bg = active
+            ? AppColors.blue
+            : AppColors.blueLight.withValues(alpha: 0.4);
+        fg = active ? Colors.white : AppColors.blue;
+        break;
+      default:
+        bg = active ? AppColors.textMuted : AppColors.border;
+        fg = active ? Colors.white : AppColors.textMuted;
+    }
+    return Expanded(
+      child: SizedBox(
+        height: 32,
+        child: ElevatedButton(
+          onPressed: () => _setStatus(statusValue),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bg,
+            foregroundColor: fg,
+            padding: EdgeInsets.zero,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(label,
+              style: GoogleFonts.outfit(
+                  fontSize: 13, fontWeight: FontWeight.w700)),
+        ),
       ),
     );
   }
@@ -478,7 +556,7 @@ class _PriorityBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(priority[0].toUpperCase() + priority.substring(1),
-          style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: fg)),
+          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 }
@@ -610,7 +688,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Assign Worker', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
-                    Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]),
                 ),
                 // AI section
@@ -631,7 +709,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text('AI Recommendations', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                          Text('Gemini matches workers by trade, attendance & performance', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 11)),
+                          Text('Gemini matches workers by trade, attendance & performance', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13)),
                         ]),
                       ),
                       if (_loadingAI)
@@ -640,7 +718,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         TextButton(
                           onPressed: () async { await _loadAI(); setS(() {}); },
                           style: TextButton.styleFrom(foregroundColor: Colors.white, backgroundColor: Colors.white24, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text('Analyse', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700)),
+                          child: Text('Analyse', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
                         ),
                     ]),
                   ),
@@ -650,7 +728,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 if (_aiWorkers.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                    child: Text('Top AI Picks', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                    child: Text('Top AI Picks', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.purple)),
                   ),
                   ..._aiWorkers.take(3).map((w) => _WorkerTile(
                     worker: w,
@@ -664,7 +742,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 // All workers
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Text('All Workers', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                  child: Text('All Workers', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                 ),
                 Expanded(
                   child: ListView.builder(
@@ -753,7 +831,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Due Date', style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text('Due Date', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
               Text(t['due_date'], style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
             ]),
           ])),
@@ -763,7 +841,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           Row(children: [
             const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 6),
-            Text('Assigned Worker', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            Text('Assigned Worker', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
           ]),
           const SizedBox(height: 12),
           if (_assignedWorker != null) ...[
@@ -772,7 +850,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(_assignedWorker!['name'] ?? '-', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15)),
-                Text(_assignedWorker!['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 12)),
+                Text(_assignedWorker!['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
               ])),
               const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
             ]),
@@ -851,10 +929,10 @@ class _WorkerTile extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(color: AppColors.purple, borderRadius: BorderRadius.circular(8)),
-                  child: Text('${pct.toInt()}% match', style: GoogleFonts.outfit(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
+                  child: Text('${pct.toInt()}% match', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
                 ),
             ]),
-            Text(trade, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+            Text(trade, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
           ])),
           const SizedBox(width: 8),
           ElevatedButton(
@@ -866,7 +944,7 @@ class _WorkerTile extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               minimumSize: const Size(70, 36),
             ),
-            child: Text('Assign', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700)),
+            child: Text('Assign', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ]),
         // AI reason chips
@@ -879,7 +957,7 @@ class _WorkerTile extends StatelessWidget {
               children: reasons!.map((r) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.purple.withValues(alpha: 0.3))),
-                child: Text(r, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.purple)),
+                child: Text(r, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.purple)),
               )).toList(),
             ),
           ),

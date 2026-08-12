@@ -112,7 +112,7 @@ class Sidebar extends StatelessWidget {
                         'Project Manager',
                         style: TextStyle(
                           color: AppColors.textSecondary,
-                          fontSize: 11,
+                          fontSize: 13,
                         ),
                       ),
                     ],
@@ -138,7 +138,7 @@ class Sidebar extends StatelessWidget {
         title,
         style: const TextStyle(
           color: AppColors.textSecondary,
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),

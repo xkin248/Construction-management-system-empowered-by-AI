@@ -9,6 +9,9 @@ import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'attendance_page.dart';
 import 'workers_page.dart';
+import 'files_page.dart';
+import 'ai_chat_page.dart';
+import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'profile_page.dart';
 
@@ -35,6 +38,8 @@ const _mainMenu = [
   _NavItem('Tasks', Icons.check_circle_outline_rounded),
   _NavItem('Attendance', Icons.calendar_month_rounded),
   _NavItem('Workers', Icons.badge_outlined),
+  _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
+  _NavItem('Notifications', Icons.notifications_outlined, Icons.notifications_rounded),
   _NavItem('AI Assistant', Icons.smart_toy_outlined),
 ];
 const _settingsMenu = [
@@ -47,8 +52,10 @@ final _pages = <Widget>[
   const TasksPage(),       // 2 Tasks
   const AttendancePage(),  // 3 Attendance
   const WorkersPage(),     // 4 Workers
-  const _AiAssistantPlaceholder(), // 5 AI Assistant
-  const SettingsPage(),    // 6 Settings
+  const FilesPage(),       // 5 Files
+  const NotificationsPage(), // 6 Notifications
+  const AiChatPage(),      // 7 AI Assistant
+  const SettingsPage(),    // 8 Settings
 ];
 
 final _titles = [
@@ -239,7 +246,7 @@ class _NarrowLayout extends StatelessWidget {
           Stack(children: [
             IconButton(
               icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
-              onPressed: () {},
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
             ),
             Positioned(
               right: 8, top: 8,
@@ -256,7 +263,7 @@ class _NarrowLayout extends StatelessWidget {
                       radius: 16,
                       backgroundColor: avatarColor(userName.isNotEmpty ? userName : 'U'),
                       child: Text(initStr,
-                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
                     )
                   : const CircleAvatar(
                       radius: 16,
@@ -335,7 +342,7 @@ class _BottomNavBtn extends StatelessWidget {
           Text(
             item.label,
             style: GoogleFonts.outfit(
-              fontSize: 10,
+              fontSize: 14,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               color: selected ? AppColors.accent : AppColors.textMuted,
             ),
@@ -360,10 +367,12 @@ class _MoreSheet extends StatelessWidget {
     final role = (user['role'] as String?) ?? '';
     final moreItems = [
       {'label': 'Workers', 'icon': Icons.badge_outlined, 'idx': 4},
+      {'label': 'Files', 'icon': Icons.folder_outlined, 'idx': 5},
+      {'label': 'Notifications', 'icon': Icons.notifications_outlined, 'idx': 6},
       {'label': 'Daily Reports', 'icon': Icons.description_outlined, 'idx': -1},
       {'label': 'Issues', 'icon': Icons.warning_amber_outlined, 'idx': -1},
-      {'label': 'AI Assistant', 'icon': Icons.smart_toy_outlined, 'idx': 5},
-      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 6},
+      {'label': 'AI Assistant', 'icon': Icons.smart_toy_outlined, 'idx': 7},
+      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 8},
     ];
 
     return Container(
@@ -394,7 +403,7 @@ class _MoreSheet extends StatelessWidget {
                 Text(userName,
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary)),
                 Text(role.replaceAll('_', ' '),
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary)),
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary)),
               ])),
             ]),
           ),
@@ -501,7 +510,7 @@ class _SidebarContent extends StatelessWidget {
                   Text('BuildSmart',
                       style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
                   Text('AI Construction System',
-                      style: GoogleFonts.outfit(color: AppColors.textSidebarMuted, fontSize: 10)),
+                      style: GoogleFonts.outfit(color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),
               ),
             ]),
@@ -517,6 +526,7 @@ class _SidebarContent extends StatelessWidget {
                       selected: e.key == idx,
                       onTap: () => onNav(e.key),
                       showAiBadge: e.value.label == 'AI Assistant',
+                      showNotificationBadge: e.value.label == 'Notifications',
                     )),
                 _sectionLabel('SETTINGS'),
                 ..._settingsMenu.asMap().entries.map((e) => _NavTile(
@@ -540,10 +550,10 @@ class _SidebarContent extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
-                          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
+                          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
                   Text(role.replaceAll('_', ' '),
                       style: GoogleFonts.outfit(
-                          color: AppColors.textSidebarMuted, fontSize: 10.5)),
+                          color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),
               ),
               IconButton(
@@ -563,7 +573,7 @@ class _SidebarContent extends StatelessWidget {
         child: Text(s,
             style: GoogleFonts.outfit(
                 color: AppColors.textSidebarMuted,
-                fontSize: 10,
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8)),
       );
@@ -574,12 +584,14 @@ class _NavTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final bool showAiBadge;
+  final bool showNotificationBadge;
 
   const _NavTile({
     required this.item,
     required this.selected,
     required this.onTap,
     this.showAiBadge = false,
+    this.showNotificationBadge = false,
   });
 
   @override
@@ -611,7 +623,13 @@ class _NavTile extends StatelessWidget {
                   decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
                   child: Text('AI',
                       style: GoogleFonts.outfit(
-                          color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800)),
+                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+                ),
+              if (showNotificationBadge)
+                Container(
+                  width: 8, height: 8,
+                  margin: const EdgeInsets.only(left: 2),
+                  decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
                 ),
             ]),
           ),
@@ -658,7 +676,7 @@ class _TopBar extends StatelessWidget {
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search projects, workers...',
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textMuted),
+              hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
               prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
               filled: true,
               fillColor: AppColors.bgMain,
@@ -681,7 +699,7 @@ class _TopBar extends StatelessWidget {
         Stack(children: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
-            onPressed: () {},
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
           ),
           Positioned(
             right: 8, top: 8,
@@ -696,7 +714,7 @@ class _TopBar extends StatelessWidget {
             backgroundColor: userName.isNotEmpty ? avatarColor(userName) : AppColors.accent,
             child: Text(initStr,
                 style: GoogleFonts.outfit(
-                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11)),
+                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
           ),
         ),
       ]),
@@ -730,43 +748,11 @@ class _ProjectChipState extends State<_ProjectChip> {
           const Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
           const SizedBox(width: 5),
           Text(widget.currentProject.isEmpty ? 'All Projects' : widget.currentProject,
-              style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(width: 4),
           const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
         ]),
       ),
-    );
-  }
-}
-
-// ──────────────── AI Assistant Placeholder ────────────────
-class _AiAssistantPlaceholder extends StatelessWidget {
-  const _AiAssistantPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 80, height: 80,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.accent.withValues(alpha: 0.15), AppColors.blue.withValues(alpha: 0.15)],
-            ),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.smart_toy_outlined, size: 40, color: AppColors.accent),
-        ),
-        const SizedBox(height: 18),
-        Text('AI Assistant',
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        const SizedBox(height: 8),
-        Text('Gemini-powered construction intelligence',
-            style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 4),
-        Text('Coming soon',
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w600)),
-      ]),
     );
   }
 }

@@ -127,7 +127,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             style: GoogleFonts.outfit(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white)),
                         const SizedBox(height: 4),
                         Text('AI Construction Management System',
-                            style: GoogleFonts.outfit(fontSize: 12.5, color: const Color(0xFF757E90), letterSpacing: 0.3)),
+                            style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90), letterSpacing: 0.3)),
                         const SizedBox(height: 32),
 
                         // Card
@@ -152,7 +152,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                                   ),
                                   child: Text('🔐  Worker & Site Supervisor Login',
-                                      style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                                      style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
                                 ),
                               ),
                               const SizedBox(height: 24),
@@ -252,7 +252,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           child: RichText(
                             textAlign: TextAlign.center,
                             text: TextSpan(
-                              style: GoogleFonts.outfit(fontSize: 12.5, color: const Color(0xFF757E90)),
+                              style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90)),
                               children: [
                                 const TextSpan(text: "Don't have a Worker account?  "),
                                 TextSpan(
@@ -266,7 +266,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         const SizedBox(height: 8),
                         Text('Powered by Google Gemini AI  •  CIDB Construction 4.0',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(fontSize: 10.5, color: const Color(0xFF3D4A5C))),
+                            style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF3D4A5C))),
                       ],
                     ),
                   ),

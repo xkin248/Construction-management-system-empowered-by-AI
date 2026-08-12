@@ -121,10 +121,10 @@ class _DailyReportPageState extends State<DailyReportPage> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('${r['report_date']} · ${r['weather'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                       const SizedBox(height: 2),
-                      Text(r['work_progress'] ?? 'No content', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      Text(r['work_progress'] ?? 'No content', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
                     ]),
                   ),
-                  Text('${r['manpower_count'] ?? 0}\nworkers', textAlign: TextAlign.center, style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                  Text('${r['manpower_count'] ?? 0}\nworkers', textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.textMuted)),
                 ]),
               )),
       ]),

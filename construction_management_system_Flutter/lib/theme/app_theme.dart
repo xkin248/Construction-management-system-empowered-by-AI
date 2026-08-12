@@ -10,8 +10,8 @@ class AppColors {
   static const bgMain = Color(0xFFF4F6FB);
   static const bgCard = Color(0xFFFFFFFF);
   static const textPrimary = Color(0xFF1A1F2E);
-  static const textSecondary = Color(0xFF6B7280);
-  static const textMuted = Color(0xFF9CA3AF);
+  static const textSecondary = Color(0xFF4B5563);
+  static const textMuted = Color(0xFF6B7280);
   static const textSidebar = Color(0xFFC8CDD8);
   static const textSidebarMuted = Color(0xFF757E90);
   static const border = Color(0xFFE8ECF4);
@@ -148,7 +148,7 @@ Widget statusPill(String status, {String? label}) {
       (label ?? status).replaceAll('_', ' ').toUpperCase(),
       style: TextStyle(
         color: statusFg(s),
-        fontSize: 9.5,
+        fontSize: 11,
         fontWeight: FontWeight.w800,
         letterSpacing: 0.3,
       ),
@@ -163,7 +163,7 @@ Widget sectionCard({
 }) =>
     Container(
       margin: margin,
-      padding: padding ?? const EdgeInsets.all(14),
+      padding: padding ?? const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(14),
@@ -203,7 +203,7 @@ Widget statCard({
               label,
               style: const TextStyle(
                 color: AppColors.textSecondary,
-                fontSize: 11.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -229,7 +229,7 @@ Widget statCard({
         ),
         if (sub != null) ...[
           const SizedBox(height: 2),
-          Text(sub, style: const TextStyle(color: AppColors.textMuted, fontSize: 11)),
+          Text(sub, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
         ],
       ],
     ),
@@ -240,16 +240,16 @@ TextTheme _buildTextTheme(TextTheme base) {
   return GoogleFonts.outfitTextTheme(base).copyWith(
     displayLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
     displayMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-    headlineLarge: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-    headlineMedium: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    headlineSmall: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    titleLarge: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    titleMedium: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-    bodyLarge: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary),
-    bodyMedium: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
-    bodySmall: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted),
-    labelLarge: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w700),
-    labelSmall: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+    headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+    headlineMedium: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+    headlineSmall: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+    titleLarge: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+    titleMedium: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+    bodyLarge: GoogleFonts.outfit(fontSize: 15, color: AppColors.textPrimary),
+    bodyMedium: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary),
+    bodySmall: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+    labelLarge: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
+    labelSmall: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.4),
   );
 }
 
@@ -269,7 +269,7 @@ ThemeData buildAppTheme() => ThemeData(
         surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.outfit(
           color: AppColors.textPrimary,
-          fontSize: 18,
+          fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
@@ -290,14 +290,14 @@ ThemeData buildAppTheme() => ThemeData(
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w700),
+          textStyle: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.border),
-          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
@@ -310,7 +310,7 @@ ThemeData buildAppTheme() => ThemeData(
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.bgMain,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.border),
@@ -323,8 +323,8 @@ ThemeData buildAppTheme() => ThemeData(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.accent, width: 1.6),
         ),
-        labelStyle: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
-        hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+        labelStyle: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 14),
+        hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgCard,
@@ -351,6 +351,6 @@ ThemeData buildAppTheme() => ThemeData(
         labelColor: AppColors.accent,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
-        labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+        labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
       ),
     );

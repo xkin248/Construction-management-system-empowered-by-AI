@@ -142,7 +142,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   const Icon(Icons.place_outlined, size: 13, color: AppColors.textMuted),
                                   const SizedBox(width: 3),
                                   Expanded(child: Text(p['location_address'] ?? '-',
-                                      style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 12),
+                                      style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14),
                                       overflow: TextOverflow.ellipsis)),
                                 ]),
                                 const SizedBox(height: 12),
@@ -155,13 +155,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                       const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
                                       const SizedBox(width: 4),
                                       Text('Geofence: ${radius}m radius',
-                                          style: GoogleFonts.outfit(fontSize: 10, color: AppColors.green, fontWeight: FontWeight.w700)),
+                                          style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
                                     ]),
                                   ),
                                   if (workerCount > 0) ...[
                                     const SizedBox(width: 10),
                                     Text('$workerCount workers tracked',
-                                        style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.accent, fontWeight: FontWeight.w600)),
+                                        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w600)),
                                   ],
                                 ]),
                                 const SizedBox(height: 10),
@@ -176,10 +176,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                 const SizedBox(height: 8),
                                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                                   Text('${progress.toStringAsFixed(0)}% complete',
-                                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
+                                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                                   if (p['end_date'] != null)
                                     Text('Due ${p['end_date']}',
-                                        style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
+                                        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                                 ]),
                               ]),
                             ),
@@ -329,7 +329,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
           const SizedBox(height: 20),
 
           // ── Project Name ──────────────────────────────
-          Text('Project Name', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          Text('Project Name', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           TextField(
             controller: _name,
@@ -345,7 +345,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
           const SizedBox(height: 14),
 
           // ── Location Address ──────────────────────────
-          Text('Site Address', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          Text('Site Address', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           TextField(
             controller: _loc,
@@ -382,7 +382,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(8)),
-                    child: Text('Set', style: GoogleFonts.outfit(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
+                    child: Text('Set', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
               ]),
               const SizedBox(height: 10),
@@ -396,7 +396,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                     const SizedBox(width: 4),
                     Text(
                       'Lat: ${_lat.toStringAsFixed(5)},  Lng: ${_lng.toStringAsFixed(5)}',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textSecondary),
+                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ]),
                 ),
@@ -410,7 +410,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.my_location_rounded, size: 16),
                   label: Text(_hasGps ? 'Re-capture Site Location' : 'Capture Site Location (Go to site first)',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _hasGps ? AppColors.green : AppColors.accent,
                     side: BorderSide(color: _hasGps ? AppColors.green : AppColors.accent),
@@ -422,7 +422,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
 
               // Radius slider
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Check-in Radius', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                Text('Check-in Radius', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
@@ -439,10 +439,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 onChanged: (v) => setState(() => _radius = v),
               ),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('50m (tight)', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                Text('50m (tight)', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
                 Text('Workers must be within this distance to check in',
-                    style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
-                Text('2000m', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                Text('2000m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               ]),
             ]),
           ),
@@ -503,9 +503,9 @@ class _DateButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+        Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
         const SizedBox(height: 2),
-        Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       ]),
     );
   }
@@ -606,11 +606,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               const Icon(Icons.place_outlined, size: 13, color: AppColors.textSidebarMuted),
               const SizedBox(width: 4),
               Expanded(child: Text(p['location_address'] ?? '-',
-                  style: const TextStyle(color: AppColors.textSidebarMuted, fontSize: 12.5))),
+                  style: const TextStyle(color: AppColors.textSidebarMuted, fontSize: 14))),
             ]),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 11.5)),
+              const Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
               Text('${p['progress']?.toStringAsFixed(0) ?? 0}%',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ]),
@@ -648,7 +648,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   Text('Site Geofence',
                       style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
                   Text('Workers must be within $radius m to check in',
-                      style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                 ]),
               ),
               statusPill('active'),
@@ -690,8 +690,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Widget _infoRow(IconData icon, String label, String value) => Row(children: [
         Icon(icon, size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 8),
-        Text('$label: ', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-        Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textPrimary))),
+        Text('$label: ', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary))),
       ]);
 
   // ── AI Progress Prediction Card ──
@@ -707,7 +707,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     final riskFactors = (pred['risk_factors'] as List?)?.cast<String>() ?? [];
     final recommendations = (pred['recommendations'] as List?)?.cast<String>() ?? [];
     final velocity = pred['velocity'] as Map? ?? {};
-    final attTrend = pred['attendance_trend'] as Map? ?? {};
     final aiUsed = pred['ai_used'] as bool? ?? false;
 
     final trendColor = switch (trend) {
@@ -765,9 +764,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
               Row(children: [
                 Text(aiUsed ? 'Gemini AI • ' : 'Rule-based • ',
-                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.textMuted)),
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
                 Text('${confidence.toStringAsFixed(0)}% confidence',
-                    style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.green)),
+                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.green)),
               ]),
             ]),
           ),
@@ -778,7 +777,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(trendLabel,
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: trendColor)),
+                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: trendColor)),
           ),
         ]),
         const SizedBox(height: 14),
@@ -794,7 +793,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(insights,
-                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary, height: 1.45)),
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.45)),
           ),
 
         // ── Progress Bars ──
@@ -842,14 +841,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(height: 14),
           const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 12),
-          Text('Risk Factors', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.red)),
+          Text('Risk Factors', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.red)),
           const SizedBox(height: 6),
           ...riskFactors.take(3).map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Icon(Icons.error_outline, size: 14, color: AppColors.red),
                   const SizedBox(width: 6),
-                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary))),
+                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
                 ]),
               )),
         ],
@@ -857,14 +856,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         // ── Recommendations ──
         if (recommendations.isNotEmpty) ...[
           const SizedBox(height: 12),
-          Text('AI Recommendations', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.blue)),
+          Text('AI Recommendations', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.blue)),
           const SizedBox(height: 6),
           ...recommendations.take(3).map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Icon(Icons.lightbulb_outline, size: 14, color: AppColors.blue),
                   const SizedBox(width: 6),
-                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textSecondary))),
+                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
                 ]),
               )),
         ],
@@ -874,7 +873,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(height: 12),
           const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
-          Text('Predicted Progress Milestones', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+          Text('Predicted Progress Milestones', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: milestones.map((m) {
             final pct = (m['predicted_progress'] as num).toDouble();
@@ -886,7 +885,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 border: Border.all(color: AppColors.border),
               ),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(m['label'] ?? '', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+                Text(m['label'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
                 Text('${pct.toStringAsFixed(0)}%',
                     style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: pct >= currentProgress ? AppColors.green : AppColors.red)),
               ]),
@@ -899,15 +898,15 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   Widget _miniStat(String label, String value, Color color) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 10, color: AppColors.textMuted)),
+          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
           Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
         ]),
       );
 
   Widget _datePill(String label, String value, Color color) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 9, color: AppColors.textMuted)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+          Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
         ]),
       );
 

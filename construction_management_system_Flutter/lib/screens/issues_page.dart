@@ -136,7 +136,7 @@ class _IssuesPageState extends State<IssuesPage> {
                     statusPill(iss['priority'] ?? 'low'),
                   ]),
                   const SizedBox(height: 4),
-                  Text(iss['description'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  Text(iss['description'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
                   const SizedBox(height: 8),
                   Row(children: [
                     statusPill(iss['incident_type'] ?? 'general'),

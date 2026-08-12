@@ -146,14 +146,14 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                         const SizedBox(height: 4),
                         Text('Create your Worker account',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary, letterSpacing: 0.2)),
+                            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, letterSpacing: 0.2)),
                         const SizedBox(height: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(10)),
                           child: Center(
                             child: Text('🔒 Only Worker role can register on this portal',
-                                style: GoogleFonts.outfit(fontSize: 11, color: AppColors.green, fontWeight: FontWeight.w700)),
+                                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
                           ),
                         ),
                         const SizedBox(height: 22),
@@ -296,7 +296,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                 context, MaterialPageRoute(builder: (_) => const LoginPage())),
                             child: RichText(
                               text: TextSpan(
-                                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary),
+                                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary),
                                 children: [
                                   const TextSpan(text: 'Already have an account?  '),
                                   TextSpan(text: '← Back to Login', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
@@ -318,5 +318,5 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   }
 
   Widget _label(String s) => Text(s,
-      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary));
+      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary));
 }
