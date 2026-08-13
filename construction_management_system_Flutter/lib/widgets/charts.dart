@@ -65,7 +65,8 @@ class LabeledBarChart extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: ySteps.reversed.map((y) => Text('$y',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted))).toList(),
+                maxLines: 1,
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted))).toList(),
           ),
           const SizedBox(width: 8),
           // Bars
@@ -99,8 +100,11 @@ class LabeledBarChart extends StatelessWidget {
         Expanded(
           child: Row(
             children: labels.map((l) => Expanded(
-              child: Text(l, textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(l, textAlign: TextAlign.center, maxLines: 1,
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              ),
             )).toList(),
           ),
         ),

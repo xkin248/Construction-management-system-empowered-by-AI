@@ -72,8 +72,6 @@ def _validate_worker(db: Session, project_id: int, worker_id: Optional[int]) -> 
     worker = db.get(Worker, int(worker_id))
     if not worker:
         raise HTTPException(404, "Worker does not exist")
-    if worker.project_id != project_id:
-        raise HTTPException(400, "Worker does not belong to the selected project")
     return worker
 
 
@@ -173,7 +171,7 @@ def _attendance_map(db: Session, project_id: int) -> Dict[int, AttendanceLog]:
 
 
 def _task_candidates(task: Task, db: Session) -> List[Dict[str, Any]]:
-    workers = db.query(Worker).filter(Worker.project_id == task.project_id).order_by(Worker.worker_id.asc()).all()
+    workers = db.query(Worker).order_by(Worker.worker_id.asc()).all()
     attendance_by_worker = _attendance_map(db, task.project_id)
     candidates = [
         _candidate_payload(task, worker, attendance_by_worker.get(worker.worker_id), idx)
@@ -275,9 +273,9 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
 
 @router.post("/ai/tasks/match", response_model=List[AIMatchResult])
 def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)):
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = db.query(Worker).all()
     if not workers:
-        raise HTTPException(404, "This project has no workers yet")
+        raise HTTPException(404, "No workers found")
 
     trade = required_trade.strip().lower()
     results = []

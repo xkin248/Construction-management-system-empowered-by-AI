@@ -65,7 +65,7 @@ def chat_with_ai(messages: List[Dict[str, str]]) -> Tuple[str, int]:
 
 
 def analyze_task(db, task_info: Dict[str, Any], project_id: int) -> Dict[str, Any]:
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = db.query(Worker).all()
     project = db.query(Project).filter(Project.project_id == project_id).first()
 
     task_name = task_info.get("task_name", "")
@@ -258,7 +258,7 @@ def _extract_json(text: str) -> Optional[Any]:
 
 
 def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5) -> Dict[str, Any]:
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = db.query(Worker).all()
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
 
@@ -315,7 +315,7 @@ def auto_assign_tasks(
     q = q.filter(Task.status != "completed")
     tasks = q.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.task_id.asc()).all()
 
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = db.query(Worker).all()
     worker_ids = {w.worker_id for w in workers}
 
     assignments = []

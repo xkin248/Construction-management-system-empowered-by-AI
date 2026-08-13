@@ -339,12 +339,16 @@ class _BottomNavBtn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 3),
-          Text(
-            item.label,
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppColors.accent : AppColors.textMuted,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              item.label,
+              maxLines: 1,
+              style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? AppColors.accent : AppColors.textMuted,
+              ),
             ),
           ),
         ]),

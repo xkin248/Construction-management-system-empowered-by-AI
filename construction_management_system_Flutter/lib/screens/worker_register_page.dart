@@ -19,18 +19,15 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   final _pwd2 = TextEditingController();
   final _phone = TextEditingController();
   final _ic = TextEditingController();
-  final _trade = TextEditingController();
-  String? _selectedTrade;
+  String? _selectedSkill;
   bool ld = false, obscure = true, obscure2 = true;
-  List _projects = [];
-  int? _selectedProjectId;
 
   late final AnimationController _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
   late final Animation<double> _fade = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero)
       .animate(CurvedAnimation(parent: _anim, curve: Curves.easeOut));
 
-  static const List<String> _tradeOptions = [
+  static const List<String> _skillOptions = [
     'General', 'Carpenter', 'Electrical', 'Plumbing', 'Masonry',
     'Steel', 'Painter', 'Welder', 'Tiler', 'Roofer'
   ];
@@ -39,7 +36,6 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   void initState() {
     super.initState();
     _anim.forward();
-    _loadProjects();
   }
 
   @override
@@ -50,15 +46,8 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
     _pwd2.dispose();
     _phone.dispose();
     _ic.dispose();
-    _trade.dispose();
     _anim.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadProjects() async {
-    try {
-      _projects = await ApiService().getProjects();
-    } catch (_) {}
   }
 
   Future<void> _register() async {
@@ -87,8 +76,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
         password: _pwd.text,
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         icNumber: _ic.text.trim().isEmpty ? null : _ic.text.trim(),
-        trade: _selectedTrade ?? (_trade.text.trim().isEmpty ? null : _trade.text.trim()),
-        projectId: _selectedProjectId,
+        trade: _selectedSkill,
       );
       toast('✅ Worker account registered! You can now log in.');
       if (!mounted) return;
@@ -146,14 +134,14 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                         const SizedBox(height: 4),
                         Text('Create your Worker account',
                             textAlign: TextAlign.center,
-                            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, letterSpacing: 0.2)),
+                            style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textSecondary, letterSpacing: 0.2)),
                         const SizedBox(height: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(10)),
                           child: Center(
                             child: Text('🔒 Only Worker role can register on this portal',
-                                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
+                                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
                           ),
                         ),
                         const SizedBox(height: 22),
@@ -162,7 +150,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                         const SizedBox(height: 6),
                         TextField(
                           controller: _name,
-                          style: GoogleFonts.outfit(fontSize: 14),
+                          style: GoogleFonts.outfit(fontSize: 15),
                           decoration: const InputDecoration(hintText: 'e.g. Ahmad Bin Osman'),
                         ),
                         const SizedBox(height: 14),
@@ -172,7 +160,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                         TextField(
                           controller: _email,
                           keyboardType: TextInputType.emailAddress,
-                          style: GoogleFonts.outfit(fontSize: 14),
+                          style: GoogleFonts.outfit(fontSize: 15),
                           decoration: const InputDecoration(hintText: 'you@buildsmart.my'),
                         ),
                         const SizedBox(height: 14),
@@ -184,7 +172,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             TextField(
                               controller: _pwd,
                               obscureText: obscure,
-                              style: GoogleFonts.outfit(fontSize: 14),
+                              style: GoogleFonts.outfit(fontSize: 15),
                               decoration: InputDecoration(
                                 hintText: 'Min 6 characters',
                                 suffixIcon: IconButton(
@@ -201,7 +189,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             TextField(
                               controller: _pwd2,
                               obscureText: obscure2,
-                              style: GoogleFonts.outfit(fontSize: 14),
+                              style: GoogleFonts.outfit(fontSize: 15),
                               decoration: InputDecoration(
                                 hintText: 'Repeat password',
                                 suffixIcon: IconButton(
@@ -220,7 +208,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             const SizedBox(height: 6),
                             TextField(
                               controller: _phone,
-                              style: GoogleFonts.outfit(fontSize: 14),
+                              style: GoogleFonts.outfit(fontSize: 15),
                               decoration: const InputDecoration(hintText: '+60 1X-XXX XXXX'),
                             ),
                           ])),
@@ -230,7 +218,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             const SizedBox(height: 6),
                             TextField(
                               controller: _ic,
-                              style: GoogleFonts.outfit(fontSize: 14),
+                              style: GoogleFonts.outfit(fontSize: 15),
                               decoration: const InputDecoration(hintText: 'XXXXXX-XX-XXXX'),
                             ),
                           ])),
@@ -239,34 +227,17 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
 
                         Row(children: [
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            _label('Trade / Skill'),
+                            _label('Skill'),
                             const SizedBox(height: 6),
                             DropdownButtonFormField<String>(
-                              initialValue: _selectedTrade,
-                              decoration: const InputDecoration(hintText: 'Select your trade'),
-                              items: _tradeOptions
-                                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                              initialValue: _selectedSkill,
+                              isExpanded: true,
+                              decoration: const InputDecoration(hintText: 'Select your skill'),
+                              style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+                              items: _skillOptions
+                                  .map((t) => DropdownMenuItem(value: t, child: Text(t, style: GoogleFonts.outfit(fontSize: 15))))
                                   .toList(),
-                              onChanged: (v) => setState(() => _selectedTrade = v),
-                            ),
-                          ])),
-                          const SizedBox(width: 12),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            _label('Assigned Project (optional)'),
-                            const SizedBox(height: 6),
-                            DropdownButtonFormField<int>(
-                              initialValue: _selectedProjectId,
-                              decoration: const InputDecoration(hintText: 'Project'),
-                              items: _projects
-                                  .map<DropdownMenuItem<int>>((p) => DropdownMenuItem(
-                                        value: p['project_id'] as int,
-                                        child: Text(
-                                          p['project_name']?.toString() ?? 'Project ${p['project_id']}',
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) => setState(() => _selectedProjectId = v),
+                              onChanged: (v) => setState(() => _selectedSkill = v),
                             ),
                           ])),
                         ]),
@@ -296,7 +267,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                 context, MaterialPageRoute(builder: (_) => const LoginPage())),
                             child: RichText(
                               text: TextSpan(
-                                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary),
+                                style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textSecondary),
                                 children: [
                                   const TextSpan(text: 'Already have an account?  '),
                                   TextSpan(text: '← Back to Login', style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700)),
@@ -318,5 +289,5 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   }
 
   Widget _label(String s) => Text(s,
-      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary));
+      style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary));
 }

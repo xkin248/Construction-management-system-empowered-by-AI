@@ -610,10 +610,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   }
 
   Future<void> _loadWorkers() async {
-    final projectId = _task['project_id'] as int?;
-    if (projectId == null) return;
     try {
-      _projectWorkers = await ApiService().getWorkers(pid: projectId);
+      _projectWorkers = await ApiService().getWorkers();
     } catch (_) {}
   }
 

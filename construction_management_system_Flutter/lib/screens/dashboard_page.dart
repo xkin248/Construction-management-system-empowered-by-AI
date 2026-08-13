@@ -167,9 +167,9 @@ class _DashboardPageState extends State<DashboardPage> {
         return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 14)]).toList()..removeLast());
       }
       return Column(children: [
-        Row(children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
+        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
         const SizedBox(height: 12),
-        Row(children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
+        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
       ]);
     });
   }
@@ -186,8 +186,8 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Expanded(
             child: Text(label,
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-                overflow: TextOverflow.ellipsis),
+                maxLines: 2,
+                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           ),
           Container(
             padding: const EdgeInsets.all(7),
