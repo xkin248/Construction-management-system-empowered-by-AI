@@ -13,6 +13,7 @@ except ImportError:
 
 from app.database import get_db
 from app.models import Worker, Task, AttendanceLog, Project, DailyReport, Issue
+from app.worker_pool import get_project_workers
 
 load_dotenv()
 
@@ -64,8 +65,16 @@ def chat_with_ai(messages: List[Dict[str, str]]) -> Tuple[str, int]:
         return f"抱歉，发生了错误：{str(e)}", 0
 
 
-def analyze_task(db, task_info: Dict[str, Any], project_id: int) -> Dict[str, Any]:
-    workers = db.query(Worker).all()
+def analyze_task(
+    db,
+    task_info: Dict[str, Any],
+    project_id: int,
+    same_project_only: bool = False,
+) -> Dict[str, Any]:
+    if same_project_only:
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).all()
     project = db.query(Project).filter(Project.project_id == project_id).first()
 
     task_name = task_info.get("task_name", "")
@@ -133,7 +142,7 @@ def generate_daily_report(db, project_id: int, report_date: date) -> str:
     if not project:
         return "项目不存在"
 
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = get_project_workers(db, project_id)
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
     issues = db.query(Issue).filter(Issue.project_id == project_id, Issue.status != "resolved").all()
     attendance = db.query(AttendanceLog).filter(
@@ -380,7 +389,7 @@ def compute_project_progress(db, project_id: int) -> Dict[str, Any]:
     task_completion_pct = round(completed / total_tasks * 100) if total_tasks > 0 else 0
 
     # ── Attendance metrics ──
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = get_project_workers(db, project_id)
     total_workers = len(workers)
     today_att = db.query(AttendanceLog).filter(
         AttendanceLog.project_id == project_id,
@@ -589,7 +598,7 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
     rule_based_completion_date = today + timedelta(weeks=estimated_weeks_remaining)
 
     # ── Attendance trend ──
-    workers = db.query(Worker).filter(Worker.project_id == project_id).all()
+    workers = get_project_workers(db, project_id)
     total_workers = len(workers)
 
     att_7 = db.query(AttendanceLog).filter(

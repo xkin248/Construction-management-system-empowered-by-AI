@@ -148,7 +148,10 @@ def task_analysis(
         task_info["task_name"] = request.task_name or ""
         task_info["description"] = request.description or ""
 
-    result = analyze_task(db, task_info, request.project_id)
+    result = analyze_task(
+        db, task_info, request.project_id,
+        same_project_only=request.same_project_only,
+    )
     return AITaskAnalysisResponse(**result)
 
 

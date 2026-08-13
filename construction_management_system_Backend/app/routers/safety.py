@@ -6,6 +6,7 @@ from datetime import datetime, date
 
 from app.database import get_db
 from app.models import Issue, Worker, Project, DailyReport
+from app.worker_pool import get_project_workers
 from app.schemas import IssueCreate, IssueOut
 
 router = APIRouter(tags=["🚨 Safety Incidents"])
@@ -34,11 +35,11 @@ def report(
         is_safety_incident=is_safe, gps_lat=gps_lat, gps_lng=gps_lng,
     )
     db.add(issue); db.flush()
-    # Auto-assign to the nearest safety officer
-    officers = db.query(Worker).filter(
-        Worker.project_id==project_id,
-        (Worker.is_safety_officer==True)|(Worker.has_safety_training==True)
-    ).all()
+    # Auto-assign to the nearest safety officer (project pool = bound or attended)
+    officers = [
+        w for w in get_project_workers(db, project_id)
+        if w.is_safety_officer or w.has_safety_training
+    ]
     if officers:
         officers.sort(key=lambda o: _dist(p.center_lat,p.center_lng,gps_lat,gps_lng))
         issue.handled_by = officers[0].worker_id

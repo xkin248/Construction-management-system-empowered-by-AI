@@ -309,6 +309,7 @@ class AITaskAnalysisRequest(BaseModel):
     task_name: Optional[str] = None
     description: Optional[str] = None
     project_id: int
+    same_project_only: bool = False
 
 class AITaskAnalysisResponse(BaseModel):
     suggested_workers: List[Dict[str, Any]]

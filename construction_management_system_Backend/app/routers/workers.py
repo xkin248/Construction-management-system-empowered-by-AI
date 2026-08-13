@@ -5,6 +5,7 @@ from datetime import date, datetime
 
 from app.database import get_db
 from app.models import Worker, AttendanceLog, Project
+from app.worker_pool import get_project_workers
 from app.schemas import WorkerCreate, WorkerOut, WorkerWithStatus
 
 router = APIRouter(tags=["👷 Workers"])
@@ -41,10 +42,11 @@ def _with_status(w: Worker, db: Session) -> WorkerWithStatus:
 
 @router.get("/workers", response_model=List[WorkerWithStatus])
 def list_workers(project_id: Optional[int] = None, db: Session = Depends(get_db)):
-    q = db.query(Worker)
     if project_id:
-        q = q.filter(Worker.project_id == project_id)
-    return [_with_status(w, db) for w in q.order_by(Worker.worker_id.desc()).all()]
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).order_by(Worker.worker_id.desc()).all()
+    return [_with_status(w, db) for w in workers]
 
 
 @router.post("/workers", response_model=WorkerOut)

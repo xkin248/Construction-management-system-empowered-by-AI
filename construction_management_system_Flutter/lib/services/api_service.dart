@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../config/env.dart';
@@ -247,11 +248,13 @@ class ApiService {
       Map.from((await dio.post('/tasks', data: d)).data);
   Future<Map> updateTask(int taskId, Map d) async =>
       Map.from((await dio.put('/tasks/$taskId', data: d)).data);
-  Future<Map> aiAnalyzeTask(Map taskInfo, int projectId) async =>
+  Future<Map> aiAnalyzeTask(Map taskInfo, int projectId,
+          {bool sameProjectOnly = false}) async =>
       Map.from((await dio.post('/ai/tasks/analyze', data: {
         'task_name': taskInfo['task_name'] ?? '',
         'description': taskInfo['description'] ?? '',
         'project_id': projectId,
+        'same_project_only': sameProjectOnly,
       })).data);
   Future<Map> aiAutoAssign(int projectId, {List<int>? taskIds, bool dryRun = false}) async =>
       Map.from((await dio.post('/ai/tasks/auto-assign', data: {
@@ -297,6 +300,19 @@ class ApiService {
       (await dio.get('/projects/$pid/reports')).data as List;
   Future<Map> submitReport(Map d) async =>
       Map.from((await dio.post('/daily-reports', data: d)).data);
+
+  /// Downloads the project export (.xlsx) and returns the local file path.
+  Future<String> exportReport(int projectId, String type) async {
+    final dir = Directory('${Directory.systemTemp.path}/buildsmart');
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    final savePath = '${dir.path}/${type}_$projectId.xlsx';
+    await dio.download(
+      '/reports/export/$projectId?type=$type',
+      savePath,
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return savePath;
+  }
 
   Future<Map> reportSafety({
     required String t,

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -47,6 +48,19 @@ class _TasksPageState extends State<TasksPage> {
       tasks = newPid == null ? [] : await ApiService().getTasks(newPid);
     } finally {
       if (mounted) setState(() => ld = false);
+    }
+  }
+
+  Future<void> _exportTasks() async {
+    if (pid == null) { toast('Select a project first'); return; }
+    try {
+      final path = await ApiService().exportReport(pid!, 'tasks');
+      toast('Tasks exported to $path');
+      if (Platform.isWindows) {
+        await Process.run('start', [path], runInShell: true);
+      }
+    } catch (e) {
+      toast('Export failed: $e');
     }
   }
 
@@ -131,6 +145,11 @@ class _TasksPageState extends State<TasksPage> {
         titleSpacing: 16,
         title: Text('Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
         actions: [
+          IconButton(
+            onPressed: _exportTasks,
+            icon: const Icon(Icons.download_rounded, size: 20),
+            tooltip: 'Export',
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
@@ -599,6 +618,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   List _aiWorkers = [];          // AI-suggested workers
   Map? _assignedWorker;          // currently-assigned worker (mutable)
   List _projectWorkers = [];     // all workers in the project
+  bool _sameProjectOnly = false; // restrict AI to same-project workers
   late Map _task;
 
   @override
@@ -620,7 +640,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     if (projectId == null) return;
     setState(() => _loadingAI = true);
     try {
-      final result = await ApiService().aiAnalyzeTask(_task, projectId);
+      final result = await ApiService().aiAnalyzeTask(_task, projectId,
+          sameProjectOnly: _sameProjectOnly);
       final suggestions = (result['suggested_workers'] as List?) ?? [];
       setState(() { _aiWorkers = suggestions; });
     } catch (e) {
@@ -688,6 +709,22 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     Text('Assign Worker', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
                     Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]),
+                ),
+                // Same-project-only toggle
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SwitchListTile(
+                    value: _sameProjectOnly,
+                    onChanged: (v) {
+                      setState(() => _sameProjectOnly = v);
+                      setS(() {});
+                      if (_aiWorkers.isNotEmpty) _loadAI();
+                    },
+                    activeThumbColor: AppColors.purple,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    title: Text('仅限同项目', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                    subtitle: Text('AI 仅推荐绑定到当前项目的工人', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                  ),
                 ),
                 // AI section
                 Padding(

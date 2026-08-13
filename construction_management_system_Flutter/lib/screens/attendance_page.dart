@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
@@ -81,6 +82,21 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       toast('Failed to load attendance: $e');
     } finally {
       if (mounted) setState(() => ld = false);
+    }
+  }
+
+  Future<void> _export() async {
+    if (projects.isEmpty) { toast('No project available to export'); return; }
+    final projectId = projects.first['project_id'] as int?;
+    if (projectId == null) { toast('Invalid project'); return; }
+    try {
+      final path = await ApiService().exportReport(projectId, 'attendance');
+      toast('Attendance exported to $path');
+      if (Platform.isWindows) {
+        await Process.run('start', [path], runInShell: true);
+      }
+    } catch (e) {
+      toast('Export failed: $e');
     }
   }
 
@@ -251,7 +267,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           child: IconButton(
             icon: const Icon(Icons.download_outlined, size: 20, color: AppColors.textSecondary),
             tooltip: 'Export',
-            onPressed: () => toast('Export coming soon'),
+            onPressed: _export,
           ),
         ),
       ]),

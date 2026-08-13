@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models import AttendanceLog, Worker, Project
+from app.worker_pool import get_project_workers
 from app.schemas import (
     CheckInReq, CheckOutReq, HeartbeatReq, AttendanceOut,
     WorkerWithStatus, AttendanceSummary,
@@ -222,10 +223,10 @@ def worker_today(wid: int, db: Session = Depends(get_db)):
 
 @router.get("/today", response_model=AttendanceSummary)
 def today_summary(project_id: Optional[int] = None, db: Session = Depends(get_db)):
-    wq = db.query(Worker)
     if project_id:
-        wq = wq.filter(Worker.project_id == project_id)
-    workers = wq.all()
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).all()
 
     rows: list[WorkerWithStatus] = []
     present = late = absent = 0

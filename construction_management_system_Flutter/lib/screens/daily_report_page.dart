@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
@@ -65,6 +66,19 @@ class _DailyReportPageState extends State<DailyReportPage> {
     }
   }
 
+  Future<void> _export() async {
+    if (pid == null) { toast('Please select a project first'); return; }
+    try {
+      final path = await ApiService().exportReport(pid!, 'daily_reports');
+      toast('Daily reports exported to $path');
+      if (Platform.isWindows) {
+        await Process.run('start', [path], runInShell: true);
+      }
+    } catch (e) {
+      toast('Export failed: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext c) {
     if (ld) return const Center(child: CircularProgressIndicator());
@@ -103,6 +117,17 @@ class _DailyReportPageState extends State<DailyReportPage> {
           ]),
         ),
         const SizedBox(height: 24),
+        OutlinedButton.icon(
+          onPressed: _export,
+          icon: const Icon(Icons.download_rounded, size: 18),
+          label: const Text('导出报表'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(44),
+            side: const BorderSide(color: AppColors.accent),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+        const SizedBox(height: 16),
         const Text('Recent Reports', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
         const SizedBox(height: 10),
         if (reports.isEmpty)
