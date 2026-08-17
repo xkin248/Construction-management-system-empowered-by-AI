@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, Boolean, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, Boolean, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -50,6 +50,7 @@ class Worker(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     project = relationship("Project", back_populates="workers")
     tasks = relationship("Task", back_populates="assigned_worker")
+    task_links = relationship("TaskWorker", back_populates="worker", cascade="all, delete-orphan")
     attendance_logs = relationship("AttendanceLog", back_populates="worker")
 
 class AttendanceLog(Base):
@@ -90,7 +91,25 @@ class Task(Base):
     due_date = Column(Date, nullable=True)
     ai_confidence = Column(Float, nullable=True)
     assigned_worker = relationship("Worker", back_populates="tasks")
+    task_workers = relationship("TaskWorker", back_populates="task", cascade="all, delete-orphan")
     project = relationship("Project", back_populates="tasks")
+
+    @property
+    def assigned_workers(self) -> list:
+        """Derived list of {worker_id, name, trade} for the task_workers links."""
+        result = []
+        for link in self.task_workers:
+            if link.worker:
+                result.append({
+                    "worker_id": link.worker.worker_id,
+                    "name": link.worker.name,
+                    "trade": link.worker.trade,
+                })
+        return result
+
+    @property
+    def worker_ids(self) -> list:
+        return [link.worker_id for link in self.task_workers]
 
 class Issue(Base):
     __tablename__ = "issues"
@@ -224,3 +243,22 @@ class NotificationSetting(Base):
     notif_email = Column(Boolean, nullable=False, server_default="0")
     notif_push = Column(Boolean, nullable=False, server_default="0")
     supervisor = relationship("Supervisor")
+
+
+class TaskWorker(Base):
+    """Many-to-many link between Task and Worker (multi-worker assignment).
+
+    Keeps the legacy Task.assigned_worker_id column in sync (first worker) so
+    existing front-ends continue to work while the association table holds the
+    full list of assigned workers.
+    """
+    __tablename__ = "task_workers"
+    __table_args__ = (
+        UniqueConstraint("task_id", "worker_id", name="uq_task_worker"),
+    )
+    link_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=False)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    task = relationship("Task", back_populates="task_workers")
+    worker = relationship("Worker", back_populates="task_links")

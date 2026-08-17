@@ -69,10 +69,22 @@ jobs:
         working-directory: construction_management_system_Flutter
         run: flutter pub get
 
+      # ── Decode signing keystore from secrets ─────────────────────
+      - name: 🔑 Decode Signing Keystore
+        working-directory: construction_management_system_Flutter
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/buildsmart-release.jks
+          ls -la android/app/buildsmart-release.jks
+
       # ── Build ─────────────────────────────────────────────────
       - name: 🔨 Build Release APK
         working-directory: construction_management_system_Flutter
         run: flutter build apk --release --dart-define=BASE_URL=https://construction-management-system-empowered.onrender.com
+        env:
+          ANDROID_KEYSTORE_FILE: app/buildsmart-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
 
       # ── Rename APK ────────────────────────────────────────────
       - name: 📝 Rename APK File

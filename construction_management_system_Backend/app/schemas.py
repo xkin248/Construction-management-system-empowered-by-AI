@@ -134,10 +134,17 @@ class WorkerTaskBoardResponse(BaseModel):
     ai_generated: bool = True
 
 # 5. Task + AI Match
+class WorkerRef(BaseModel):
+    """Lightweight worker summary embedded in task responses (assigned_workers)."""
+    worker_id: int
+    name: str
+    trade: Optional[str] = None
+
 class TaskBase(BaseModel):
     task_name: str = Field(..., max_length=200)
     description: Optional[str] = None
     assigned_worker_id: Optional[int] = None
+    worker_ids: Optional[List[int]] = None   # multi-worker assignment (replaces the full list when set)
     project_id: int
     priority: Optional[str] = "medium"
     status: Optional[str] = "pending"
@@ -146,6 +153,7 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase): pass
 class TaskOut(TaskBase):
     task_id: int; assigned_worker: Optional[WorkerOut] = None; project: Optional[ProjectOut] = None
+    assigned_workers: List[WorkerRef] = []      # full multi-worker list (worker_id/name/trade)
     model_config = ConfigDict(from_attributes=True)
 class AIMatchResult(BaseModel):
     worker_id: int; worker_name: str; trade: str; match_score: float; reason: str
@@ -327,6 +335,7 @@ class AIAutoAssignItem(BaseModel):
     task_id: int
     task_name: str
     assigned_worker_id: Optional[int] = None
+    assigned_worker_ids: List[int] = []
     suggested_workers: List[Dict[str, Any]] = []
     ai_used: bool = False
 

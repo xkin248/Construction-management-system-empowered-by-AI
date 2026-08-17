@@ -2,10 +2,11 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import AttendanceLog, Project, Task, Worker
+from app.models import AttendanceLog, Project, Task, TaskWorker, Worker
 from app.schemas import (
     AIMatchResult, TaskOut,
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
@@ -73,6 +74,44 @@ def _validate_worker(db: Session, project_id: int, worker_id: Optional[int]) -> 
     if not worker:
         raise HTTPException(404, "Worker does not exist")
     return worker
+
+
+def _extract_worker_ids(payload: Dict[str, Any]) -> Optional[List[int]]:
+    """Extract the worker_ids list from a payload.
+
+    Returns None when worker_ids was not provided (caller should fall back to the
+    legacy single-worker fields). Returns [] when explicitly cleared."""
+    if "worker_ids" not in payload:
+        return None
+    raw = payload.get("worker_ids")
+    if raw is None:
+        return []
+    if isinstance(raw, (list, tuple)):
+        return [int(x) for x in raw if x is not None]
+    return [int(raw)]
+
+
+def _set_task_workers(db: Session, task: Task, worker_ids: List[int]) -> List[int]:
+    """Replace the full worker assignment of a task.
+
+    Validates every id, writes the task_workers association rows and keeps the
+    legacy assigned_worker_id column in sync (first worker, or None)."""
+    valid_ids: List[int] = []
+    for wid in worker_ids:
+        worker = _validate_worker(db, task.project_id, wid)
+        if worker and worker.worker_id not in valid_ids:
+            valid_ids.append(worker.worker_id)
+    task.task_workers = [TaskWorker(worker_id=wid) for wid in valid_ids]
+    task.assigned_worker_id = valid_ids[0] if valid_ids else None
+    return valid_ids
+
+
+def _task_load_options():
+    return (
+        joinedload(Task.assigned_worker),
+        joinedload(Task.project),
+        joinedload(Task.task_workers).joinedload(TaskWorker.worker),
+    )
 
 
 def _score_worker(task: Task, worker: Worker, attendance: Optional[AttendanceLog]) -> tuple[int, str]:
@@ -198,10 +237,7 @@ def _assignment_payload(task: Task, db: Session) -> Dict[str, Any]:
 
 @router.get("/projects/{pid}/tasks", response_model=List[TaskOut])
 def list_tasks(pid: int, db: Session = Depends(get_db)):
-    return db.query(Task).options(
-        joinedload(Task.assigned_worker),
-        joinedload(Task.project),
-    ).filter(Task.project_id == pid).order_by(Task.task_id.desc()).all()
+    return db.query(Task).options(*_task_load_options()).filter(Task.project_id == pid).order_by(Task.task_id.desc()).all()
 
 
 @router.post("/tasks")
@@ -212,13 +248,17 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
         raise HTTPException(400, "Task name is required")
 
     status = _normalize_status(payload.get("status"), payload.get("progress"))
-    worker_id = payload.get("assigned_worker_id") or payload.get("worker_id")
-    worker = _validate_worker(db, project.project_id, worker_id)
+
+    # Multi-worker support: worker_ids replaces the legacy single-worker fields.
+    worker_ids = _extract_worker_ids(payload)
+    if worker_ids is None:
+        worker_id = payload.get("assigned_worker_id") or payload.get("worker_id")
+        worker_ids = [int(worker_id)] if worker_id is not None else []
 
     task = Task(
         task_name=task_name,
         description=(payload.get("description") or payload.get("subtitle") or "").strip() or None,
-        assigned_worker_id=worker.worker_id if worker else None,
+        assigned_worker_id=None,
         project_id=project.project_id,
         priority=str(payload.get("priority") or "medium").strip().lower(),
         status=status,
@@ -226,15 +266,17 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
         ai_confidence=(float(payload["ai_confidence"]) if payload.get("ai_confidence") is not None else None),
     )
     db.add(task)
+    db.flush()
+    _set_task_workers(db, task, worker_ids)
     db.commit()
     db.refresh(task)
-    task = db.query(Task).options(joinedload(Task.assigned_worker), joinedload(Task.project)).get(task.task_id)
+    task = db.query(Task).options(*_task_load_options()).get(task.task_id)
     return _serialize_task(task)
 
 
 @router.put("/tasks/{task_id}")
 def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)):
-    task = db.query(Task).options(joinedload(Task.assigned_worker), joinedload(Task.project)).get(task_id)
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
     if not task:
         raise HTTPException(404, "Task does not exist")
 
@@ -257,17 +299,24 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     if "due_date" in payload or "due" in payload:
         task.due_date = _parse_date(payload.get("due_date") or payload.get("due"))
 
-    if "assigned_worker_id" in payload or "worker_id" in payload:
+    # Multi-worker support: worker_ids replaces the full assignment list.
+    worker_ids = _extract_worker_ids(payload)
+    if worker_ids is not None:
+        _set_task_workers(db, task, worker_ids)
+    elif "assigned_worker_id" in payload or "worker_id" in payload:
         worker_id = payload.get("assigned_worker_id") or payload.get("worker_id")
         worker = _validate_worker(db, task.project_id, worker_id)
-        task.assigned_worker_id = worker.worker_id if worker else None
+        if worker:
+            _set_task_workers(db, task, [worker.worker_id])
+        else:
+            _set_task_workers(db, task, [])
 
     if payload.get("ai_confidence") is not None:
         task.ai_confidence = float(payload["ai_confidence"])
 
     db.commit()
     db.refresh(task)
-    task = db.query(Task).options(joinedload(Task.assigned_worker), joinedload(Task.project)).get(task.task_id)
+    task = db.query(Task).options(*_task_load_options()).get(task.task_id)
     return _serialize_task(task)
 
 
@@ -302,16 +351,13 @@ def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)
 
 @router.get("/ai-assign")
 def list_ai_assignments(db: Session = Depends(get_db)):
-    tasks = db.query(Task).options(
-        joinedload(Task.assigned_worker),
-        joinedload(Task.project),
-    ).order_by(Task.task_id.asc()).all()
+    tasks = db.query(Task).options(*_task_load_options()).order_by(Task.task_id.asc()).all()
     return [_assignment_payload(task, db) for task in tasks]
 
 
 @router.post("/ai-assign/{task_id}")
 def assign_worker(task_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)):
-    task = db.query(Task).options(joinedload(Task.assigned_worker), joinedload(Task.project)).get(task_id)
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
     if not task:
         raise HTTPException(404, "Task does not exist")
 
@@ -324,7 +370,7 @@ def assign_worker(task_id: int, payload: Dict[str, Any], db: Session = Depends(g
     if not chosen:
         raise HTTPException(400, "Unable to score the selected worker for this task")
 
-    task.assigned_worker_id = worker.worker_id
+    _set_task_workers(db, task, [worker.worker_id])
     task.ai_confidence = round(chosen["match_score"] / 100, 2)
     if task.status == "pending":
         task.status = "in_progress"
@@ -341,7 +387,7 @@ def assign_worker(task_id: int, payload: Dict[str, Any], db: Session = Depends(g
 
 @router.post("/ai-assign/all")
 def auto_assign_all(db: Session = Depends(get_db)):
-    tasks = db.query(Task).filter(
+    tasks = db.query(Task).options(*_task_load_options()).filter(
         Task.assigned_worker_id.is_(None),
         Task.status.in_(["pending", "in_progress"]),
     ).order_by(Task.task_id.asc()).all()
@@ -351,9 +397,11 @@ def auto_assign_all(db: Session = Depends(get_db)):
         candidates = _task_candidates(task, db)
         if not candidates:
             continue
-        best = candidates[0]
-        task.assigned_worker_id = best["worker_id"]
-        task.ai_confidence = round(best["match_score"] / 100, 2)
+        # Assign up to 3 best-matched workers (multi-worker assignment).
+        best = candidates[:3]
+        task.task_workers = [TaskWorker(worker_id=item["worker_id"]) for item in best]
+        task.assigned_worker_id = best[0]["worker_id"]
+        task.ai_confidence = round(best[0]["match_score"] / 100, 2)
         if task.status == "pending":
             task.status = "in_progress"
         assigned += 1
@@ -458,8 +506,12 @@ def worker_task_board(
     query = db.query(Task).options(
         joinedload(Task.assigned_worker),
         joinedload(Task.project),
+        joinedload(Task.task_workers).joinedload(TaskWorker.worker),
     ).filter(
-        Task.assigned_worker_id == user.id,
+        or_(
+            Task.assigned_worker_id == user.id,
+            Task.task_workers.any(TaskWorker.worker_id == user.id),
+        ),
     ).order_by(
         Task.status.asc(), Task.priority.desc()).all()
 
@@ -467,6 +519,7 @@ def worker_task_board(
 
     task_items: List[WorkerTaskItem] = []
     for t in query:
+        link = next((l for l in t.task_workers if l.worker_id == user.id), None)
         task_items.append(WorkerTaskItem(
             task_id=t.task_id,
             task_name=t.task_name,
@@ -477,7 +530,7 @@ def worker_task_board(
             status=(t.status or "pending").replace("_", " ").title(),
             due_date=t.due_date,
             ai_confidence=t.ai_confidence,
-            assigned_at=now,
+            assigned_at=link.assigned_at if link else None,
             part_section=_ai_infer_part_section(t, worker),
             work_instructions=_ai_work_instructions(t, worker),
         ))

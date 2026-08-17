@@ -1,8 +1,18 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Load signing config from key.properties (local dev) or environment (CI / GitHub Secrets)
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -27,10 +37,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String? ?: System.getenv("ANDROID_KEY_ALIAS") ?: ""
+            keyPassword = keystoreProperties["keyPassword"] as String? ?: System.getenv("ANDROID_KEY_PASSWORD") ?: ""
+            storeFile = (keystoreProperties["storeFile"] as String?)?.let { rootProject.file(it) }
+                ?: System.getenv("ANDROID_KEYSTORE_FILE")?.let { rootProject.file(it) }
+            storePassword = keystoreProperties["storePassword"] as String? ?: System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
+        }
+    }
+
     buildTypes {
         release {
-            // Use debug signing — sufficient for personal/internal distribution
-            signingConfig = signingConfigs.getByName("debug")
+            // Unified release signing — every build uses the same keystore so new
+            // APKs can be installed as updates without uninstalling the old one.
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             isShrinkResources = false
         }

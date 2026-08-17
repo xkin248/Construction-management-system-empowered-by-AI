@@ -389,7 +389,14 @@ class _TaskCardState extends State<_TaskCard> {
   @override
   Widget build(BuildContext context) {
     final priority = widget.task['priority'] as String? ?? 'medium';
-    final worker = widget.task['assigned_worker'] as Map?;
+    final assignedRaw = widget.task['assigned_workers'];
+    List<Map> workers = [];
+    if (assignedRaw is List) {
+      workers = assignedRaw.cast<Map>();
+    } else {
+      final single = widget.task['assigned_worker'] as Map?;
+      if (single != null) workers = [single];
+    }
     final progress = (widget.task['progress'] as num? ?? 0).toDouble();
     final isInProgress = _status == 'in_progress';
     final isCompleted = _status == 'completed';
@@ -474,14 +481,21 @@ class _TaskCardState extends State<_TaskCard> {
             const SizedBox(height: 10),
             // Worker + due date row
             Row(children: [
-              if (worker != null) ...[
-                initialsAvatar(worker['name'] ?? '?', radius: 11),
+              if (workers.isNotEmpty) ...[
+                initialsAvatar(workers.first['name'] ?? '?', radius: 11),
                 const SizedBox(width: 6),
-                Text(worker['name'] ?? '',
+                Flexible(
+                  child: Text(
+                    workers.length > 1
+                        ? '${workers.first['name'] ?? ''} +${workers.length - 1}'
+                        : (workers.first['name'] ?? ''),
                     style: GoogleFonts.outfit(
                         fontSize: 14,
                         color: AppColors.accent,
-                        fontWeight: FontWeight.w600)),
+                        fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ] else
                 Text('Unassigned',
                     style:
@@ -616,7 +630,7 @@ class TaskDetailPage extends StatefulWidget {
 class _TaskDetailPageState extends State<TaskDetailPage> {
   bool _loadingAI = false;
   List _aiWorkers = [];          // AI-suggested workers
-  Map? _assignedWorker;          // currently-assigned worker (mutable)
+  List _assignedWorkers = [];    // currently-assigned workers (mutable)
   List _projectWorkers = [];     // all workers in the project
   bool _sameProjectOnly = false; // restrict AI to same-project workers
   late Map _task;
@@ -625,7 +639,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   void initState() {
     super.initState();
     _task = Map.from(widget.task);
-    _assignedWorker = _task['assigned_worker'] as Map?;
+    final raw = _task['assigned_workers'];
+    if (raw is List && raw.isNotEmpty) {
+      _assignedWorkers = raw.cast<Map>();
+    } else {
+      final single = _task['assigned_worker'] as Map?;
+      if (single != null) _assignedWorkers = [single];
+    }
     _loadWorkers();
   }
 
@@ -651,13 +671,24 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
-  Future<void> _assignWorker(Map worker) async {
+  Future<void> _saveAssignments(Set<int> workerIds) async {
     try {
       await ApiService().updateTask(_task['task_id'], {
-        'assigned_worker_id': worker['worker_id'],
+        'worker_ids': workerIds.toList(),
       });
-      setState(() => _assignedWorker = worker);
-      toast('${worker['name']} assigned!');
+      // 用完整工人池（项目工人 + AI 推荐）还原选中对象
+      final pool = [..._projectWorkers, ..._aiWorkers];
+      final selected = <Map>[];
+      final seen = <int>{};
+      for (final w in pool) {
+        final id = w['worker_id'] as int?;
+        if (id != null && workerIds.contains(id) && !seen.contains(id)) {
+          seen.add(id);
+          selected.add(w);
+        }
+      }
+      setState(() => _assignedWorkers = selected);
+      toast('${selected.length} worker(s) assigned');
       if (mounted) Navigator.pop(context);
     } catch (e) {
       toast('Failed to assign: $e');
@@ -666,9 +697,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
   Future<void> _unassign() async {
     try {
-      await ApiService().updateTask(_task['task_id'], {'assigned_worker_id': null});
-      setState(() => _assignedWorker = null);
-      toast('Worker unassigned');
+      await ApiService().updateTask(_task['task_id'], {'worker_ids': []});
+      setState(() => _assignedWorkers = []);
+      toast('All workers unassigned');
     } catch (e) {
       toast('Failed: $e');
     }
@@ -677,6 +708,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   void _openAssignSheet() {
     // Load AI when the sheet opens
     if (_aiWorkers.isEmpty) _loadAI();
+
+    // 当前已分配的 worker_id 集合（弹窗内可勾选/取消，保存时整体替换）
+    final currentIds = _assignedWorkers
+        .map((w) => w['worker_id'] as int?)
+        .whereType<int>()
+        .toSet();
+    final selectedIds = <int>{...currentIds};
 
     showModalBottomSheet(
       context: context,
@@ -706,7 +744,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Assign Worker', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
+                    Text('Assign Worker(s)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
                     Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]),
                 ),
@@ -763,14 +801,36 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 if (_aiWorkers.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                    child: Text('Top AI Picks', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                    child: Row(children: [
+                      Text('Top AI Picks', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.purple)),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          setS(() {
+                            for (final w in _aiWorkers.take(3)) {
+                              final id = w['worker_id'] as int?;
+                              if (id != null) selectedIds.add(id);
+                            }
+                          });
+                        },
+                        style: TextButton.styleFrom(foregroundColor: AppColors.purple, padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 32)),
+                        child: Text('Add All', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                      ),
+                    ]),
                   ),
                   ..._aiWorkers.take(3).map((w) => _WorkerTile(
                     worker: w,
                     isAI: true,
+                    selected: selectedIds.contains(w['worker_id']),
                     score: (w['score'] as num?)?.toDouble(),
                     reasons: (w['reasons'] as List?)?.cast<String>(),
-                    onAssign: () { _assignWorker(w); setS(() {}); },
+                    onToggle: () {
+                      setS(() {
+                        final id = w['worker_id'] as int?;
+                        if (id == null) return;
+                        if (!selectedIds.add(id)) selectedIds.remove(id);
+                      });
+                    },
                   )),
                   const Divider(indent: 16, endIndent: 16),
                 ],
@@ -791,9 +851,37 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       return _WorkerTile(
                         worker: w,
                         isAI: false,
-                        onAssign: () { _assignWorker(w); setS(() {}); },
+                        selected: selectedIds.contains(w['worker_id']),
+                        onToggle: () {
+                          setS(() {
+                            final id = w['worker_id'] as int?;
+                            if (id == null) return;
+                            if (!selectedIds.add(id)) selectedIds.remove(id);
+                          });
+                        },
                       );
                     },
+                  ),
+                ),
+                // Save bar (整体替换分配)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  decoration: const BoxDecoration(
+                    color: AppColors.bgCard,
+                    border: Border(top: BorderSide(color: AppColors.border)),
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _saveAssignments(selectedIds),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: Text('Save Assignment (${selectedIds.length})', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
+                    ),
                   ),
                 ),
               ],
@@ -815,7 +903,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       appBar: AppBar(
         title: Text('Task Details', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
         actions: [
-          if (_assignedWorker != null)
+          if (_assignedWorkers.isNotEmpty)
             TextButton(
               onPressed: _unassign,
               child: Text('Unassign', style: GoogleFonts.outfit(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
@@ -879,17 +967,20 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             Text('Assigned Worker', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
           ]),
           const SizedBox(height: 12),
-          if (_assignedWorker != null) ...[
-            Row(children: [
-              initialsAvatar(_assignedWorker!['name'] ?? '?', radius: 22),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_assignedWorker!['name'] ?? '-', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15)),
-                Text(_assignedWorker!['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
-              ])),
-              const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
-            ]),
-            const SizedBox(height: 12),
+          if (_assignedWorkers.isNotEmpty) ...[
+            ..._assignedWorkers.map((w) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(children: [
+                initialsAvatar(w['name'] ?? '?', radius: 22),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(w['name'] ?? '-', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(w['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
+                ])),
+                const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+              ]),
+            )),
+            const SizedBox(height: 6),
           ] else
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -909,11 +1000,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             child: OutlinedButton.icon(
               onPressed: _openAssignSheet,
               icon: Icon(
-                _assignedWorker != null ? Icons.swap_horiz_rounded : Icons.person_search_rounded,
+                _assignedWorkers.isNotEmpty ? Icons.swap_horiz_rounded : Icons.person_search_rounded,
                 size: 18,
               ),
               label: Text(
-                _assignedWorker != null ? 'Change Assignment' : 'Assign Worker (AI)',
+                _assignedWorkers.isNotEmpty ? 'Change Assignment' : 'Assign Worker (AI)',
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
@@ -934,10 +1025,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 class _WorkerTile extends StatelessWidget {
   final Map worker;
   final bool isAI;
+  final bool selected;
   final double? score;
   final List<String>? reasons;
-  final VoidCallback onAssign;
-  const _WorkerTile({required this.worker, required this.isAI, required this.onAssign, this.score, this.reasons});
+  final VoidCallback onToggle;
+  const _WorkerTile({required this.worker, required this.isAI, required this.selected, required this.onToggle, this.score, this.reasons});
 
   @override
   Widget build(BuildContext context) {
@@ -971,15 +1063,15 @@ class _WorkerTile extends StatelessWidget {
           ])),
           const SizedBox(width: 8),
           ElevatedButton(
-            onPressed: onAssign,
+            onPressed: onToggle,
             style: ElevatedButton.styleFrom(
-              backgroundColor: isAI ? AppColors.purple : AppColors.accent,
+              backgroundColor: selected ? AppColors.green : (isAI ? AppColors.purple : AppColors.accent),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               minimumSize: const Size(70, 36),
             ),
-            child: Text('Assign', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+            child: Text(selected ? '✓' : 'Add', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ]),
         // AI reason chips

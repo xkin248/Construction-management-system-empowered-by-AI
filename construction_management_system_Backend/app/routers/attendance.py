@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from app.database import get_db
 from app.models import AttendanceLog, Worker, Project
@@ -19,6 +20,10 @@ router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
 
 OUT_OF_FENCE_LIMIT = 2
 
+# Timezone used for all worker-facing attendance output & window checks.
+# Storage stays UTC (datetime.utcnow()); output is converted to local time.
+KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
+
 # Check-in time window (can be moved to Settings later)
 CHECK_IN_WINDOW_START = time(5, 0)    # 05:00 AM
 CHECK_IN_WINDOW_END = time(10, 30)    # 10:30 AM
@@ -26,12 +31,28 @@ CHECK_OUT_WINDOW_START = time(15, 0)  # 03:00 PM
 CHECK_OUT_WINDOW_END = time(21, 0)    # 09:00 PM
 
 def _today_start():
-    t = date.today()
-    return datetime(t.year, t.month, t.day)
+    """Start of today in Asia/Kuala_Lumpur, converted back to naive UTC for
+    comparing against the UTC-naive values stored by datetime.utcnow()."""
+    now_kl = datetime.now(KL_TZ)
+    local_midnight = datetime(now_kl.year, now_kl.month, now_kl.day, tzinfo=KL_TZ)
+    utc_midnight = local_midnight.astimezone(timezone.utc)
+    return utc_midnight.replace(tzinfo=None)
+
+def _to_local(dt: Optional[datetime]) -> Optional[datetime]:
+    """Convert a stored naive-UTC datetime to Asia/Kuala_Lumpur aware datetime."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(KL_TZ)
 
 def _to_out(a: AttendanceLog) -> AttendanceOut:
     o = AttendanceOut.model_validate(a)
     o.worker_name = a.worker.name if a.worker else None
+    # Output to clients in local time (storage remains UTC).
+    o.check_in_time = _to_local(a.check_in_time)
+    o.check_out_time = _to_local(a.check_out_time)
+    o.last_heartbeat_time = _to_local(a.last_heartbeat_time)
     return o
 
 def _format_hhmm(dt: Optional[datetime]) -> str:
@@ -240,7 +261,8 @@ def today_summary(project_id: Optional[int] = None, db: Session = Depends(get_db
         hours = None
         if a and a.status in ("checked_in", "checked_out"):
             status = "present"
-            if a.check_in_time and a.check_in_time.strftime("%H:%M") > "07:30":
+            check_in_local = _to_local(a.check_in_time)
+            if check_in_local and check_in_local.strftime("%H:%M") > "07:30":
                 status = "late"
             if a.check_in_time and a.check_out_time:
                 hours = round((a.check_out_time - a.check_in_time).total_seconds() / 3600, 1)
@@ -254,8 +276,8 @@ def today_summary(project_id: Optional[int] = None, db: Session = Depends(get_db
 
         row = WorkerWithStatus.model_validate(w)
         row.today_status = status
-        row.check_in_time = a.check_in_time if a else None
-        row.check_out_time = a.check_out_time if a else None
+        row.check_in_time = _to_local(a.check_in_time) if a else None
+        row.check_out_time = _to_local(a.check_out_time) if a else None
         row.hours_today = hours
         rows.append(row)
 
@@ -296,12 +318,12 @@ def worker_self_check_in(
     if existing:
         raise HTTPException(
             400,
-            f"You have already checked in today at {_format_hhmm(existing.check_in_time)}. "
+            f"You have already checked in today at {_format_hhmm(_to_local(existing.check_in_time))}. "
             f"Duplicate check-in is not allowed.",
         )
 
     # ── Check-in time window enforcement ──
-    now_local = datetime.now()
+    now_local = datetime.now(KL_TZ)
     now_time = now_local.time()
     if not _in_time_window(now_time, CHECK_IN_WINDOW_START, CHECK_IN_WINDOW_END):
         raise HTTPException(
@@ -368,7 +390,7 @@ def worker_self_check_out(
         raise HTTPException(404, "Project not found")
 
     # ── Check-out time window ──
-    now_local = datetime.now()
+    now_local = datetime.now(KL_TZ)
     now_time = now_local.time()
     if not _in_time_window(now_time, CHECK_OUT_WINDOW_START, CHECK_OUT_WINDOW_END):
         # Allow check-out but warn — use informational header instead of blocking

@@ -12,7 +12,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 from app.database import get_db
-from app.models import Worker, Task, AttendanceLog, Project, DailyReport, Issue
+from app.models import Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue
 from app.worker_pool import get_project_workers
 
 load_dotenv()
@@ -329,24 +329,33 @@ def auto_assign_tasks(
 
     assignments = []
     for t in tasks:
-        if t.assigned_worker_id:
+        # Skip tasks that already have a full assignment (legacy single-worker
+        # rows with only assigned_worker_id are still processed to backfill links).
+        if t.assigned_worker_id and t.task_workers:
             continue
         task_info = {"task_name": t.task_name, "description": t.description or ""}
         rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k))
         suggested = rec.get("suggested_workers") or []
-        chosen = suggested[0] if suggested else None
-        chosen_worker_id = chosen.get("worker_id") if isinstance(chosen, dict) else None
-        if chosen_worker_id and chosen_worker_id not in worker_ids:
-            chosen_worker_id = None
 
-        if not dry_run and chosen_worker_id:
-            t.assigned_worker_id = int(chosen_worker_id)
+        # Pick up to top_k valid workers, ordered by match score (multi-worker).
+        chosen_ids: List[int] = []
+        for item in suggested:
+            wid = item.get("worker_id") if isinstance(item, dict) else None
+            if wid is not None and int(wid) in worker_ids and int(wid) not in chosen_ids:
+                chosen_ids.append(int(wid))
+            if len(chosen_ids) >= max(1, top_k):
+                break
+
+        if not dry_run and chosen_ids:
+            t.task_workers = [TaskWorker(worker_id=wid) for wid in chosen_ids]
+            t.assigned_worker_id = chosen_ids[0]
             db.add(t)
 
         assignments.append({
             "task_id": t.task_id,
             "task_name": t.task_name,
-            "assigned_worker_id": int(chosen_worker_id) if chosen_worker_id else None,
+            "assigned_worker_id": chosen_ids[0] if chosen_ids else None,
+            "assigned_worker_ids": chosen_ids,
             "suggested_workers": suggested,
             "ai_used": bool(get_gemini_model()),
         })

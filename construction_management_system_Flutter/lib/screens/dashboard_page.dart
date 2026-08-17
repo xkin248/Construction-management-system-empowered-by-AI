@@ -79,6 +79,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final completedPct = totalTasks > 0 ? (completed / totalTasks * 100).toInt() : 42;
     final inProgressPct = totalTasks > 0 ? (inProgress / totalTasks * 100).toInt() : 33;
     final pendingPct = totalTasks > 0 ? (pending / totalTasks * 100).toInt() : 25;
+    final upcoming = _upcomingProjects();
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -114,6 +115,15 @@ class _DashboardPageState extends State<DashboardPage> {
             const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))
           else
             ...projects.take(4).map((p) => _projectProductivityRow(p)),
+          const SizedBox(height: 24),
+
+          // ── Upcoming Due Projects ──
+          _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
+          const SizedBox(height: 12),
+          if (upcoming.isEmpty)
+            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('无临近到期项目', style: TextStyle(color: AppColors.textMuted))))
+          else
+            ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
 
           // ── AI Site Progress Prediction ──
@@ -311,6 +321,71 @@ class _DashboardPageState extends State<DashboardPage> {
             backgroundColor: AppColors.border,
             valueColor: const AlwaysStoppedAnimation(AppColors.accent),
           ),
+        ),
+      ]),
+    );
+  }
+
+  // ── Upcoming Due Projects ──
+  List _upcomingProjects() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final due = projects.where((p) {
+      final status = (p['status'] as String? ?? '').toLowerCase();
+      if (status == 'completed' || status == 'done') return false;
+      final end = DateTime.tryParse((p['end_date'] as String?) ?? '');
+      if (end == null) return false;
+      final endDay = DateTime(end.year, end.month, end.day);
+      return endDay.difference(today).inDays <= 30;
+    }).toList();
+    due.sort((a, b) {
+      final da = DateTime.tryParse((a['end_date'] as String?) ?? '') ?? DateTime(9999);
+      final db = DateTime.tryParse((b['end_date'] as String?) ?? '') ?? DateTime(9999);
+      return da.compareTo(db);
+    });
+    return due;
+  }
+
+  Widget _upcomingProjectCard(Map p) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final end = DateTime.tryParse((p['end_date'] as String?) ?? '');
+    int daysLeft = 0;
+    if (end != null) {
+      final endDay = DateTime(end.year, end.month, end.day);
+      daysLeft = endDay.difference(today).inDays;
+    }
+    final overdue = daysLeft < 0;
+    final dueToday = daysLeft == 0;
+    final label = overdue ? '已逾期 ${-daysLeft} 天' : (dueToday ? '今天到期' : '剩 $daysLeft 天');
+    final color = overdue ? AppColors.red : (dueToday ? AppColors.yellow : AppColors.green);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+          child: Icon(overdue ? Icons.event_busy_rounded : (dueToday ? Icons.event_available_rounded : Icons.event_rounded), size: 18, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(p['project_name'] ?? '-', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 2),
+            Text('Due: ${_fmtDate((p['end_date'] as String?) ?? '')}', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          ]),
+        ),
+        const SizedBox(width: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+          child: Text(label, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
         ),
       ]),
     );
