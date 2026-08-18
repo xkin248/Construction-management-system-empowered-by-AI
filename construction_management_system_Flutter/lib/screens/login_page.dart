@@ -15,7 +15,7 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
-  final _email = TextEditingController(text: 'manager@buildsmart.my');
+  final _email = TextEditingController();
   final _pwd = TextEditingController();
   bool ld = false, obscure = true;
   late final AnimationController _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 600));

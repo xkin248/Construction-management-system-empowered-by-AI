@@ -25,10 +25,14 @@ OUT_OF_FENCE_LIMIT = 2
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
 
 # Check-in time window (can be moved to Settings later)
-CHECK_IN_WINDOW_START = time(5, 0)    # 05:00 AM
+CHECK_IN_WINDOW_START = time(8, 0)    # 08:00 AM
 CHECK_IN_WINDOW_END = time(10, 30)    # 10:30 AM
 CHECK_OUT_WINDOW_START = time(15, 0)  # 03:00 PM
-CHECK_OUT_WINDOW_END = time(21, 0)    # 09:00 PM
+CHECK_OUT_WINDOW_END = time(17, 0)    # 05:00 PM
+
+# Work hours: 08:00-17:00 with a lunch break 12:00-13:00 (no attendance allowed)
+BREAK_START = time(12, 0)             # 12:00 PM
+BREAK_END = time(13, 0)               # 01:00 PM
 
 def _today_start():
     """Start of today in Asia/Kuala_Lumpur, converted back to naive UTC for
@@ -60,6 +64,10 @@ def _format_hhmm(dt: Optional[datetime]) -> str:
 
 def _in_time_window(t: time, start: time, end: time) -> bool:
     return start <= t <= end
+
+def _in_break(t: time) -> bool:
+    """Lunch break 12:00-13:00 — attendance is not allowed during this period."""
+    return BREAK_START <= t < BREAK_END
 
 def _client_ip(request: Request) -> str:
     try:
@@ -334,6 +342,14 @@ def worker_self_check_in(
             f"Current time: {now_time.strftime('%H:%M')}",
         )
 
+    # ── Break time check (12:00-13:00, no attendance allowed) ──
+    if _in_break(now_time):
+        raise HTTPException(
+            400,
+            f"Break time ({BREAK_START.strftime('%H:%M')} - {BREAK_END.strftime('%H:%M')}) - "
+            f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
+        )
+
     # ── Geofence validation ──
     verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
 
@@ -395,6 +411,14 @@ def worker_self_check_out(
     if not _in_time_window(now_time, CHECK_OUT_WINDOW_START, CHECK_OUT_WINDOW_END):
         # Allow check-out but warn — use informational header instead of blocking
         pass
+
+    # ── Break time check (12:00-13:00, no attendance allowed) ──
+    if _in_break(now_time):
+        raise HTTPException(
+            400,
+            f"Break time ({BREAK_START.strftime('%H:%M')} - {BREAK_END.strftime('%H:%M')}) - "
+            f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
+        )
 
     _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
 

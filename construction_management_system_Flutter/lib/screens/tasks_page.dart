@@ -741,6 +741,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
+                Expanded(
+                  child: ListView(
+                    controller: sc,
+                    padding: const EdgeInsets.only(bottom: 16),
+                    children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -839,28 +844,23 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                   child: Text('All Workers', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                 ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: sc,
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: _projectWorkers.length,
-                    itemBuilder: (_, i) {
-                      final w = _projectWorkers[i];
-                      final alreadyAI = _aiWorkers.any((ai) => ai['worker_id'] == w['worker_id']);
-                      if (alreadyAI) return const SizedBox.shrink();
-                      return _WorkerTile(
-                        worker: w,
-                        isAI: false,
-                        selected: selectedIds.contains(w['worker_id']),
-                        onToggle: () {
-                          setS(() {
-                            final id = w['worker_id'] as int?;
-                            if (id == null) return;
-                            if (!selectedIds.add(id)) selectedIds.remove(id);
-                          });
-                        },
-                      );
+                ..._projectWorkers.map((w) {
+                  final alreadyAI = _aiWorkers.any((ai) => ai['worker_id'] == w['worker_id']);
+                  if (alreadyAI) return const SizedBox.shrink();
+                  return _WorkerTile(
+                    worker: w,
+                    isAI: false,
+                    selected: selectedIds.contains(w['worker_id']),
+                    onToggle: () {
+                      setS(() {
+                        final id = w['worker_id'] as int?;
+                        if (id == null) return;
+                        if (!selectedIds.add(id)) selectedIds.remove(id);
+                      });
                     },
+                  );
+                }),
+                    ],
                   ),
                 ),
                 // Save bar (整体替换分配)

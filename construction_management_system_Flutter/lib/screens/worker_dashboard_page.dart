@@ -22,8 +22,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   bool _checkedOut = false;
   int? _attendanceId;
   double _hoursToday = 0;
-  String _checkInWindow = '05:00 - 10:30';
-  String _checkOutWindow = '15:00 - 21:00';
+  String _checkInWindow = '08:00 - 10:30';
+  String _checkOutWindow = '15:00 - 17:00';
   String _statusMsg = 'Tap the button below to check in with GPS geofencing';
   String _deviceType = 'web';
   String _deviceInfo = 'BuildSmart Web Client';
