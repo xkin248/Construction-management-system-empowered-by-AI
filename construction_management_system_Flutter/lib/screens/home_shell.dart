@@ -14,6 +14,7 @@ import 'ai_chat_page.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'profile_page.dart';
+import 'worker_home_shell.dart';
 
 // ──────────────── Nav model ────────────────
 class _NavItem {
@@ -79,12 +80,41 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    _guardWorkerEntry();
     _loadUser();
+  }
+
+  /// Role guard: worker accounts must never enter the supervisor HomeShell.
+  /// Redirects immediately to WorkerHomeShell and fixes stale cached role.
+  Future<void> _guardWorkerEntry() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final cachedType = sp.getString('user_type') ?? '';
+      final cachedRole = sp.getString('user_role') ?? '';
+      if (cachedType.toLowerCase() == 'worker' || cachedRole.toLowerCase() == 'worker') {
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+              context, MaterialPageRoute(builder: (_) => const WorkerHomeShell()), (_) => false);
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadUser() async {
     try {
       final data = await ApiService().me();
+      final t = (data['user_type'] ?? '').toString().toLowerCase();
+      final r = (data['role'] ?? '').toString().toLowerCase();
+      if (t == 'worker' || r == 'worker') {
+        final sp = await SharedPreferences.getInstance();
+        await sp.setString('user_type', 'worker');
+        await sp.setString('user_role', 'worker');
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+              context, MaterialPageRoute(builder: (_) => const WorkerHomeShell()), (_) => false);
+        }
+        return;
+      }
       if (mounted) setState(() { _user = Map<String, dynamic>.from(data); _userLoaded = true; });
     } catch (_) {
       if (mounted) setState(() => _userLoaded = true);

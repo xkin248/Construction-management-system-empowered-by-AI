@@ -519,6 +519,35 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
         ]),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              Column(children: [
+                Text('Work Hours',
+                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('08:00 - 17:00',
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
+              ]),
+              Container(width: 1, height: 30, color: AppColors.border),
+              Column(children: [
+                Text('Break (no check-in)',
+                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('12:00 - 13:00',
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w800)),
+              ]),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
 
         SizedBox(

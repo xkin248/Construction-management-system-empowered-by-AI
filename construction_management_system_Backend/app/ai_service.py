@@ -583,6 +583,31 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
     unassigned = sum(1 for t in all_tasks if not t.assigned_worker_id and t.status != "completed")
     current_progress = round(completed / total_tasks * 100, 1) if total_tasks > 0 else 0.0
 
+    # ── Scheduled progress (linear plan timeline vs actual) ──
+    # scheduled_progress = % the project *should* be at today on the planned
+    # start_date -> end_date timeline. Fall back to earliest/latest task due_date
+    # when the project has no explicit start/end date.
+    plan_start = project.start_date
+    plan_end = project.end_date
+    task_due_dates = [t.due_date for t in all_tasks if t.due_date]
+    if plan_start is None and task_due_dates:
+        plan_start = min(task_due_dates)
+    if plan_end is None and task_due_dates:
+        plan_end = max(task_due_dates)
+
+    scheduled_progress = None
+    if plan_start and plan_end:
+        total_plan_days = (plan_end - plan_start).days
+        if total_plan_days > 0:
+            elapsed_plan_days = (today - plan_start).days
+            if elapsed_plan_days <= 0:
+                scheduled_progress = 0.0
+            elif elapsed_plan_days >= total_plan_days:
+                scheduled_progress = 100.0
+            else:
+                scheduled_progress = round(elapsed_plan_days / total_plan_days * 100, 1)
+    progress_gap = round(current_progress - scheduled_progress, 1) if scheduled_progress is not None else None
+
     # ── Velocity (tasks completed per week, last 4 weeks) ──
     velocity_data = []
     for weeks_ago in range(4, 0, -1):
@@ -704,6 +729,8 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
         prompt_data = {
             "project_name": project.project_name,
             "current_progress_pct": current_progress,
+            "scheduled_progress_pct": scheduled_progress,
+            "progress_gap_pct": progress_gap,
             "total_tasks": total_tasks,
             "completed": completed,
             "in_progress": in_progress,
@@ -732,7 +759,7 @@ Output format (strict JSON):
   "trend": "<ahead|on_track|behind|critical>",
   "confidence": <integer 50-100, how confident the AI is in this prediction>,
   "predicted_completion_date": "<YYYY-MM-DD>",
-  "ai_insights": "<2-3 sentence analysis of project trajectory in English>",
+  "ai_insights": "<2-3 sentence analysis in English. MUST compare current_progress_pct vs scheduled_progress_pct: state whether the project is ahead/behind the planned timeline and by how much (progress_gap_pct), and whether it can finish by the planned end date at the current pace. If scheduled_progress_pct is null, analyse the trajectory without the plan comparison.>",
   "risk_factors": ["<risk 1>", "<risk 2>", "<risk 3>"],
   "recommendations": ["<action 1>", "<action 2>", "<action 3>"],
   "milestones": [
@@ -781,6 +808,9 @@ Output format (strict JSON):
         "project_name": project.project_name,
         "generated_at": datetime.utcnow().isoformat(),
         "current_progress": current_progress,
+        "scheduled_progress": scheduled_progress,
+        "progress_gap": progress_gap,
+        "estimated_days_remaining": max((ai_predicted_date - today).days, 0),
         "planned_start_date": project.start_date.isoformat() if project.start_date else None,
         "planned_end_date": project.end_date.isoformat() if project.end_date else None,
         "predicted_completion_date": ai_predicted_date.isoformat(),

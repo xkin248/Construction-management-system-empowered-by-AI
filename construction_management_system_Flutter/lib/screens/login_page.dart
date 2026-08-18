@@ -60,7 +60,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       if (!mounted) return;
 
-      if (userType == 'worker' || role == 'worker') {
+      final isWorker = userType.toLowerCase() == 'worker' || role == 'worker';
+      if (isWorker) {
         Navigator.pushAndRemoveUntil(
             context, MaterialPageRoute(builder: (_) => const WorkerHomeShell()), (_) => false);
       } else {

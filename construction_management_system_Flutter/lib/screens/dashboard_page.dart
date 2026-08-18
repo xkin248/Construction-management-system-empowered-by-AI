@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
@@ -16,15 +18,29 @@ class _DashboardPageState extends State<DashboardPage> {
   Map attSummary = {};
   List projects = [];
   Map<int, Map> _predictions = {};
+  Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _startAutoRefresh();
   }
 
-  Future<void> _load() async {
-    setState(() => ld = true);
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer =
+        Timer.periodic(const Duration(seconds: 60), (_) => _load(silent: true));
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => ld = true);
     try {
       final results = await Future.wait([
         ApiService().kpi(),
@@ -46,7 +62,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }));
       _predictions = preds;
     } catch (e) {
-      toast('Failed to load dashboard: $e');
+      if (!silent) toast('Failed to load dashboard: $e');
     } finally {
       if (mounted) setState(() => ld = false);
     }
@@ -402,6 +418,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final insights = pred['ai_insights'] as String? ?? '';
     final milestones = (pred['milestones'] as List?) ?? [];
     final currentProgress = (pred['current_progress'] as num? ?? 0).toDouble();
+    final scheduled = (pred['scheduled_progress'] as num?)?.toDouble();
+    final gap = (pred['progress_gap'] as num?)?.toDouble();
+    final estDays = (pred['estimated_days_remaining'] as num?)?.toInt();
 
     final trendColor = switch (trend) {
       'ahead' => AppColors.green,
@@ -432,6 +451,26 @@ class _DashboardPageState extends State<DashboardPage> {
         predProgress = (m['predicted_progress'] as num).toDouble();
         break;
       }
+    }
+
+    // Real-Time gap color/label: ahead(green) / on track(blue) / behind(accent) / critical(red)
+    final Color gapColor;
+    final String gapLabel;
+    if (gap == null) {
+      gapColor = trendColor;
+      gapLabel = '';
+    } else if (gap >= 5) {
+      gapColor = AppColors.green;
+      gapLabel = 'Ahead +${gap.toStringAsFixed(1)}%';
+    } else if (gap >= 0) {
+      gapColor = AppColors.blue;
+      gapLabel = 'On Track ${gap.toStringAsFixed(1)}%';
+    } else if (gap >= -10) {
+      gapColor = AppColors.accent;
+      gapLabel = 'Behind ${gap.toStringAsFixed(1)}%';
+    } else {
+      gapColor = AppColors.red;
+      gapLabel = 'Critical ${gap.toStringAsFixed(1)}%';
     }
 
     return Container(
@@ -474,23 +513,24 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
           ),
 
-        // ── Current vs Predicted Progress Bar ──
+        // ── Actual vs Scheduled Progress ──
         Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Current', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              Text('Actual Progress', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 2),
               Text('${currentProgress.toStringAsFixed(1)}%',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: gapColor)),
             ]),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Predicted (30 days)', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              Text(scheduled != null ? 'Scheduled Today' : 'Predicted (30 days)',
+                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               const SizedBox(height: 2),
-              Text('${predProgress.toStringAsFixed(1)}%',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: trendColor)),
+              Text('${(scheduled ?? predProgress).toStringAsFixed(1)}%',
+                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: gapColor.withValues(alpha: 0.75))),
             ]),
           ),
           const SizedBox(width: 12),
@@ -501,51 +541,47 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.green)),
           ]),
         ]),
+        const SizedBox(height: 8),
+
+        // ── Progress gap badge ──
+        if (gap != null)
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: gapColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(gapLabel,
+                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: gapColor)),
+            ),
+            const SizedBox(width: 8),
+            Text(gap >= 0 ? 'ahead of plan' : 'behind plan',
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          ]),
         const SizedBox(height: 10),
 
-        // ── Dual Progress Bar (current + predicted) ──
+        // ── Dual Progress Bar (scheduled background + actual foreground) ──
         Stack(
           children: [
-            // Predicted (dashed/background) — full width to predProgress
+            // Scheduled / predicted (background)
             ClipRRect(
               borderRadius: BorderRadius.circular(7),
               child: LinearProgressIndicator(
-                value: predProgress / 100,
+                value: (scheduled ?? predProgress) / 100,
                 minHeight: 14,
                 backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(trendColor.withValues(alpha: 0.25)),
+                valueColor: AlwaysStoppedAnimation(gapColor.withValues(alpha: 0.25)),
               ),
             ),
-            // Current (solid)
+            // Actual (solid foreground)
             ClipRRect(
               borderRadius: BorderRadius.circular(7),
               child: LinearProgressIndicator(
                 value: currentProgress / 100,
                 minHeight: 14,
                 backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(trendColor),
-              ),
-            ),
-            // Milestone markers
-            Positioned.fill(
-              child: Row(
-                children: milestones.take(3).map((m) {
-                  final pct = ((m['predicted_progress'] as num).toDouble()) / 100;
-                  return Expanded(
-                    flex: 1,
-                    child: Align(
-                      alignment: Alignment(pct * 2 - 1, 0),
-                      child: Container(
-                        width: 3,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: AppColors.textPrimary.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                valueColor: AlwaysStoppedAnimation(gapColor),
               ),
             ),
           ],
@@ -558,6 +594,14 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(width: 10),
           _dateChip('AI Predicted', _fmtDate(predictedDate), trendColor),
           const Spacer(),
+          if (estDays != null) ...[
+            _dateChip(
+              estDays > 0 ? '≈ Days Left' : 'Overdue',
+              estDays > 0 ? '$estDays days' : '${-estDays} days',
+              estDays > 0 ? AppColors.textSecondary : AppColors.red,
+            ),
+            const SizedBox(width: 10),
+          ],
           if (confidence >= 80)
             const Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
           else if (confidence >= 60)

@@ -425,6 +425,9 @@ class SiteProgressPrediction(BaseModel):
     project_name: str
     generated_at: str
     current_progress: float
+    scheduled_progress: Optional[float] = None
+    progress_gap: Optional[float] = None
+    estimated_days_remaining: int = 0
     planned_start_date: Optional[str] = None
     planned_end_date: Optional[str] = None
     predicted_completion_date: str
