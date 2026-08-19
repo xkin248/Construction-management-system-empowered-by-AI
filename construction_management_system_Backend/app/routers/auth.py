@@ -74,6 +74,7 @@ def cu(t=Depends(oauth2_scheme), db=Depends(get_db)) -> CurrentUser:
             name=u.name,
             role=u.role or "worker",
             phone=u.phone,
+            worker_id=u.worker_id,
         )
     else:
         u = db.query(Supervisor).filter(Supervisor.email == email).first()
@@ -88,6 +89,7 @@ def cu(t=Depends(oauth2_scheme), db=Depends(get_db)) -> CurrentUser:
             name=u.full_name,
             role=u.role or "site_supervisor",
             phone=u.phone,
+            supervisor_id=u.supervisor_id,
         )
 
 # ────────────────── Role-Based Permission Dependencies ──────────────────

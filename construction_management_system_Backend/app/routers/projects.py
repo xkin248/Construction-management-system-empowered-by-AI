@@ -11,7 +11,14 @@ router = APIRouter(tags=["🏗️ Project Management"])
 
 @router.get("/projects", response_model=List[ProjectOut])
 def lp(db=Depends(get_db)):
-    return db.query(Project).order_by(Project.project_id.desc()).all()
+    projects = db.query(Project).order_by(Project.project_id.desc()).all()
+    # 动态计算 progress：有任务的项目按任务完成率展示，无任务时保留手动值（不写库）
+    for p in projects:
+        total = len(p.tasks)
+        if total > 0:
+            done = sum(1 for t in p.tasks if t.status == "completed")
+            p.progress = round(done / total * 100, 1)
+    return projects
 
 @router.post("/projects", response_model=ProjectOut)
 def cp(d: ProjectCreate, db=Depends(get_db)):

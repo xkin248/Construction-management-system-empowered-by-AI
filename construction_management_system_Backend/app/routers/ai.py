@@ -5,126 +5,19 @@ from datetime import date
 
 from app.database import get_db
 from app.models import (
-    Supervisor, AIChatSession, AIChatMessage,
-    Task, Worker, Project, PredictionHistory
+    Supervisor, Task, Worker, Project, PredictionHistory
 )
 from app.schemas import (
-    AIChatSessionOut, AIChatMessageOut,
-    AIChatRequest, AITaskAnalysisRequest, AITaskAnalysisResponse,
+    AITaskAnalysisRequest, AITaskAnalysisResponse,
     AIAutoAssignRequest, AIAutoAssignResponse,
     SiteProgressPrediction
 )
 from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
-    chat_with_ai, analyze_task,
-    auto_assign_tasks, compute_project_progress, predict_site_progress
+    analyze_task, auto_assign_tasks, compute_project_progress, predict_site_progress
 )
 
 router = APIRouter(tags=["🤖 AI Services"])
-
-
-@router.get("/ai/chat/sessions", response_model=List[AIChatSessionOut])
-def list_chat_sessions(
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    sessions = db.query(AIChatSession).options(
-        joinedload(AIChatSession.messages)
-    ).filter(
-        AIChatSession.supervisor_id == current_user.supervisor_id
-    ).order_by(AIChatSession.updated_at.desc()).all()
-    return sessions
-
-
-@router.get("/ai/chat/sessions/{session_id}", response_model=AIChatSessionOut)
-def get_chat_session(
-    session_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    session = db.query(AIChatSession).options(
-        joinedload(AIChatSession.messages)
-    ).filter(
-        AIChatSession.session_id == session_id,
-        AIChatSession.supervisor_id == current_user.supervisor_id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return session
-
-
-@router.delete("/ai/chat/sessions/{session_id}")
-def delete_chat_session(
-    session_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    session = db.query(AIChatSession).filter(
-        AIChatSession.session_id == session_id,
-        AIChatSession.supervisor_id == current_user.supervisor_id
-    ).first()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    db.delete(session)
-    db.commit()
-    return {"status": "ok", "message": "Session deleted"}
-
-
-@router.post("/ai/chat", response_model=Dict[str, Any])
-def chat(
-    request: AIChatRequest,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    session = None
-    if request.session_id:
-        session = db.query(AIChatSession).options(
-            joinedload(AIChatSession.messages)
-        ).filter(
-            AIChatSession.session_id == request.session_id,
-            AIChatSession.supervisor_id == current_user.supervisor_id
-        ).first()
-
-    if not session:
-        session = AIChatSession(supervisor_id=current_user.supervisor_id)
-        db.add(session)
-        db.commit()
-        db.refresh(session)
-
-    user_msg = AIChatMessage(
-        session_id=session.session_id,
-        role="user",
-        content=request.message
-    )
-    db.add(user_msg)
-    db.flush()
-
-    messages = [
-        {"role": m.role, "content": m.content}
-        for m in session.messages
-    ]
-
-    ai_response, tokens = chat_with_ai(messages)
-
-    ai_msg = AIChatMessage(
-        session_id=session.session_id,
-        role="assistant",
-        content=ai_response,
-        tokens_used=tokens
-    )
-    db.add(ai_msg)
-    db.commit()
-
-    db.refresh(session)
-
-    return {
-        "session_id": session.session_id,
-        "response": ai_response,
-        "tokens_used": tokens
-    }
 
 
 @router.post("/ai/tasks/analyze", response_model=AITaskAnalysisResponse)

@@ -10,7 +10,6 @@ import 'tasks_page.dart';
 import 'attendance_page.dart';
 import 'workers_page.dart';
 import 'files_page.dart';
-import 'ai_chat_page.dart';
 import 'notifications_page.dart';
 import 'settings_page.dart';
 import 'profile_page.dart';
@@ -41,7 +40,6 @@ const _mainMenu = [
   _NavItem('Workers', Icons.badge_outlined),
   _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
   _NavItem('Notifications', Icons.notifications_outlined, Icons.notifications_rounded),
-  _NavItem('AI Assistant', Icons.smart_toy_outlined),
 ];
 const _settingsMenu = [
   _NavItem('Settings', Icons.settings_outlined),
@@ -55,8 +53,7 @@ final _pages = <Widget>[
   const WorkersPage(),     // 4 Workers
   const FilesPage(),       // 5 Files
   const NotificationsPage(), // 6 Notifications
-  const AiChatPage(),      // 7 AI Assistant
-  const SettingsPage(),    // 8 Settings
+  const SettingsPage(),    // 7 Settings
 ];
 
 final _titles = [
@@ -403,10 +400,7 @@ class _MoreSheet extends StatelessWidget {
       {'label': 'Workers', 'icon': Icons.badge_outlined, 'idx': 4},
       {'label': 'Files', 'icon': Icons.folder_outlined, 'idx': 5},
       {'label': 'Notifications', 'icon': Icons.notifications_outlined, 'idx': 6},
-      {'label': 'Daily Reports', 'icon': Icons.description_outlined, 'idx': -1},
-      {'label': 'Issues', 'icon': Icons.warning_amber_outlined, 'idx': -1},
-      {'label': 'AI Assistant', 'icon': Icons.smart_toy_outlined, 'idx': 7},
-      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 8},
+      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 7},
     ];
 
     return Container(
@@ -559,7 +553,6 @@ class _SidebarContent extends StatelessWidget {
                       item: e.value,
                       selected: e.key == idx,
                       onTap: () => onNav(e.key),
-                      showAiBadge: e.value.label == 'AI Assistant',
                       showNotificationBadge: e.value.label == 'Notifications',
                     )),
                 _sectionLabel('SETTINGS'),
@@ -617,14 +610,12 @@ class _NavTile extends StatelessWidget {
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
-  final bool showAiBadge;
   final bool showNotificationBadge;
 
   const _NavTile({
     required this.item,
     required this.selected,
     required this.onTap,
-    this.showAiBadge = false,
     this.showNotificationBadge = false,
   });
 
@@ -651,14 +642,6 @@ class _NavTile extends StatelessWidget {
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600)),
               ),
-              if (showAiBadge)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(8)),
-                  child: Text('AI',
-                      style: GoogleFonts.outfit(
-                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
-                ),
               if (showNotificationBadge)
                 Container(
                   width: 8, height: 8,

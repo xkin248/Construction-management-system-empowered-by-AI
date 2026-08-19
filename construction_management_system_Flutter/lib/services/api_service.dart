@@ -400,22 +400,6 @@ class ApiService {
   String thumbnailUrl(String? path) =>
       path != null && path.isNotEmpty ? '$baseUrl/$path' : '';
 
-  // ───────── AI Chat ─────────
-  Future<Map> sendAiChat(int projectId, String message,
-          {int? sessionId}) async =>
-      Map.from((await dio.post('/ai/chat', data: {
-        'project_id': projectId,
-        'message': message,
-        if (sessionId != null) 'session_id': sessionId,
-      })).data);
-
-  Future<List> getAiSessions() async =>
-      (await dio.get('/ai/chat/sessions')).data as List;
-
-  Future<List> getAiMessages(int sessionId) async =>
-      ((await dio.get('/ai/chat/sessions/$sessionId')).data as Map)['messages']
-          as List;
-
   // ───────── Notifications ─────────
   Future<List> getNotifications() async =>
       (await dio.get('/notifications')).data as List;

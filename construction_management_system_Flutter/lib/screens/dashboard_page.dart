@@ -175,6 +175,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final inProgressPct = totalTasks > 0 ? (inProgress / totalTasks * 100).toInt() : 33;
     final pendingPct = totalTasks > 0 ? (pending / totalTasks * 100).toInt() : 25;
     final upcoming = _upcomingProjects();
+    final activeProjects = projects.where((p) {
+      final s = (p['status'] as String? ?? '').toLowerCase();
+      return s != 'completed' && s != 'done';
+    }).toList();
 
     return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
@@ -221,7 +225,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
 
-          // ── AI Estimated Progress (weekly) ──
+          // ── AI Estimated Progress (weekly, all active projects) ──
           _sectionHeader(
             'AI Estimated Progress',
             sub: _lastPredUpdate == null
@@ -229,10 +233,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 : 'AI Estimated · 每周更新 · Updated: ${_fmtMd(_lastPredUpdate!)}',
           ),
           const SizedBox(height: 12),
-          if (upcoming.isEmpty)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('无临近到期项目', style: TextStyle(color: AppColors.textMuted))))
+          if (activeProjects.isEmpty)
+            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No active projects', style: TextStyle(color: AppColors.textMuted))))
           else
-            ...upcoming.map((p) => _aiEstimatedBar(p)),
+            ...activeProjects.map((p) => _aiEstimatedBar(p)),
           const SizedBox(height: 24),
 
           // ── AI Site Progress Prediction ──

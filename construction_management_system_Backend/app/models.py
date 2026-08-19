@@ -204,27 +204,6 @@ class FileLink(Base):
     file = relationship("File", back_populates="links")
 
 
-class AIChatSession(Base):
-    __tablename__ = "ai_chat_sessions"
-    session_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    supervisor = relationship("Supervisor")
-    messages = relationship("AIChatMessage", back_populates="session", cascade="all, delete-orphan")
-
-
-class AIChatMessage(Base):
-    __tablename__ = "ai_chat_messages"
-    message_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("ai_chat_sessions.session_id"), nullable=False)
-    role = Column(String(20), nullable=False)
-    content = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    tokens_used = Column(Integer, nullable=True)
-    session = relationship("AIChatSession", back_populates="messages")
-
-
 class Notification(Base):
     __tablename__ = "notifications"
     notification_id = Column(Integer, primary_key=True, index=True, autoincrement=True)

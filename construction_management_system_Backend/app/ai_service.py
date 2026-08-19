@@ -45,26 +45,6 @@ def get_gemini_model():
         return None
 
 
-def chat_with_ai(messages: List[Dict[str, str]]) -> Tuple[str, int]:
-    model = get_gemini_model()
-    if not model:
-        return "抱歉，AI 服务当前不可用。请检查 API 配置。", 0
-
-    try:
-        conversation = []
-        conversation.append({"role": "user", "parts": [SYSTEM_PROMPT]})
-        conversation.append({"role": "model", "parts": ["明白了，我会作为 BuildSmart AI 专业助手帮助你。"]})
-
-        for msg in messages:
-            role = "user" if msg["role"] == "user" else "model"
-            conversation.append({"role": role, "parts": [msg["content"]]})
-
-        response = model.generate_content(conversation)
-        return response.text, len(response.text) // 4
-    except Exception as e:
-        return f"抱歉，发生了错误：{str(e)}", 0
-
-
 def analyze_task(
     db,
     task_info: Dict[str, Any],

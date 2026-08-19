@@ -72,6 +72,8 @@ class CurrentUser(BaseModel):
     name: str
     role: str
     phone: Optional[str] = None
+    supervisor_id: Optional[int] = None
+    worker_id: Optional[int] = None
     model_config = ConfigDict(from_attributes=True)
 
 # 4. Attendance (GPS geofence check-in)
@@ -285,39 +287,6 @@ class FileLinkOut(FileLinkBase):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
-
-# 14. AI Chat
-class AIChatMessageBase(BaseModel):
-    role: str = Field(..., max_length=20)
-    content: str
-
-class AIChatMessageCreate(AIChatMessageBase):
-    pass
-
-class AIChatMessageOut(AIChatMessageBase):
-    message_id: int
-    session_id: int
-    created_at: datetime
-    tokens_used: Optional[int] = None
-    model_config = ConfigDict(from_attributes=True)
-
-class AIChatSessionBase(BaseModel):
-    pass
-
-class AIChatSessionCreate(AIChatSessionBase):
-    pass
-
-class AIChatSessionOut(AIChatSessionBase):
-    session_id: int
-    supervisor_id: int
-    created_at: datetime
-    updated_at: datetime
-    messages: List[AIChatMessageOut] = []
-    model_config = ConfigDict(from_attributes=True)
-
-class AIChatRequest(BaseModel):
-    message: str
-    session_id: Optional[int] = None
 
 class AITaskAnalysisRequest(BaseModel):
     task_id: Optional[int] = None

@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:dio/dio.dart';
+import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/notification.dart';
@@ -8,6 +11,10 @@ import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'workers_page.dart';
 import 'attendance_page.dart';
+
+const _weathers = ['Sunny', 'Cloudy', 'Rain', 'Thunderstorm'];
+const _severities = ['low', 'medium', 'high'];
+const _categories = ['safety', 'delay', 'equipment', 'quality', 'other'];
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -22,16 +29,41 @@ class _NotificationsPageState extends State<NotificationsPage> {
   NotificationSettings? _settings;
   Timer? _pollTimer;
 
+  bool _repLoading = false;
+  bool _issLoading = false;
+  List projects = [];
+  List reports = [];
+  List issues = [];
+  int? _repPid;
+  int? _issPid;
+  final _workProgress = TextEditingController();
+  final _materials = TextEditingController();
+  final _issuesEnc = TextEditingController();
+  final _manpower = TextEditingController();
+  final _issTitle = TextEditingController();
+  final _issDesc = TextEditingController();
+  String _weather = 'Sunny';
+  String _severity = 'low';
+  String _category = 'safety';
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadReports();
+    _loadIssues();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshCount());
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _workProgress.dispose();
+    _materials.dispose();
+    _issuesEnc.dispose();
+    _manpower.dispose();
+    _issTitle.dispose();
+    _issDesc.dispose();
     super.dispose();
   }
 
@@ -198,54 +230,432 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgMain,
-      appBar: AppBar(
-        title: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text('Notifications',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
-          if (_unreadCount > 0) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.red,
-                borderRadius: BorderRadius.circular(10),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: AppColors.bgMain,
+        appBar: AppBar(
+          title: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text('Notifications',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
+            if (_unreadCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.red,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('$_unreadCount',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
               ),
-              child: Text('$_unreadCount',
-                  style: GoogleFonts.outfit(
-                      color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+            ],
+          ]),
+          actions: [
+            if (_items.any((e) => !e.isRead))
+              TextButton.icon(
+                onPressed: _markAllRead,
+                icon: const Icon(Icons.done_all_rounded, size: 18),
+                label: const Text('All Read'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+              ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+              tooltip: 'Notification settings',
+              onPressed: _openSettings,
             ),
           ],
-        ]),
-        actions: [
-          if (_items.any((e) => !e.isRead))
-            TextButton.icon(
-              onPressed: _markAllRead,
-              icon: const Icon(Icons.done_all_rounded, size: 18),
-              label: const Text('All Read'),
-              style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-            ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-            tooltip: 'Notification settings',
-            onPressed: _openSettings,
+          bottom: TabBar(
+            indicatorColor: AppColors.accent,
+            labelColor: AppColors.accent,
+            unselectedLabelColor: AppColors.textSecondary,
+            labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+            tabs: const [
+              Tab(text: 'Notifications'),
+              Tab(text: 'Daily Reports'),
+              Tab(text: 'Issues'),
+            ],
           ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildNotificationsTab(),
+            _buildReportsTab(),
+            _buildIssuesTab(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationsTab() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_items.isEmpty) return _emptyState();
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _items.length,
+        itemBuilder: (ctx, i) => _notificationTile(_items[i]),
+      ),
+    );
+  }
+
+  Widget _buildReportsTab() {
+    if (_repLoading) return const Center(child: CircularProgressIndicator());
+    return RefreshIndicator(
+      onRefresh: _loadReports,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _sectionCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Submit Daily Report',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+              const SizedBox(height: 14),
+              if (projects.length > 1) ...[
+                DropdownButtonFormField<int>(
+                  initialValue: _repPid,
+                  decoration: const InputDecoration(labelText: 'Project'),
+                  items: projects.map<DropdownMenuItem<int>>((p) =>
+                      DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
+                  onChanged: (v) async {
+                    setState(() => _repPid = v);
+                    if (v != null) {
+                      setState(() => _repLoading = true);
+                      reports = await ApiService().getReports(v);
+                      if (mounted) setState(() => _repLoading = false);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              DropdownButtonFormField<String>(
+                initialValue: _weather,
+                decoration: const InputDecoration(labelText: 'Weather'),
+                items: _weathers.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
+                onChanged: (v) => setState(() => _weather = v!),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _manpower,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Workers Present', hintText: 'e.g. 45'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _workProgress,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: "Today's Progress *", hintText: "Describe today's progress..."),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _materials,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'Materials Used'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _issuesEnc,
+                maxLines: 2,
+                decoration: const InputDecoration(labelText: 'Safety Notes / Issues Encountered'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _submitReport,
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Submit Report'),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _exportReport,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Export Report'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(44),
+              side: const BorderSide(color: AppColors.accent),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text('Recent Reports',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+          const SizedBox(height: 10),
+          if (reports.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: Text('No reports submitted yet',
+                  style: TextStyle(color: AppColors.textMuted))),
+            )
+          else
+            ...reports.map((r) => _sectionCard(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${r['report_date'] ?? ''} · ${r['weather'] ?? ''}',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                        const SizedBox(height: 2),
+                        Text(r['work_progress']?.toString() ?? 'No content',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                      ]),
+                    ),
+                    Text('${r['manpower_count'] ?? 0}\nworkers',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                  ]),
+                )),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? _emptyState()
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    itemCount: _items.length,
-                    itemBuilder: (ctx, i) => _notificationTile(_items[i]),
+    );
+  }
+
+  Widget _buildIssuesTab() {
+    if (_issLoading) return const Center(child: CircularProgressIndicator());
+    return RefreshIndicator(
+      onRefresh: _loadIssues,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _sectionCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Report an Issue',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+              const SizedBox(height: 14),
+              if (projects.length > 1) ...[
+                DropdownButtonFormField<int>(
+                  initialValue: _issPid,
+                  decoration: const InputDecoration(labelText: 'Project'),
+                  items: projects.map<DropdownMenuItem<int>>((p) =>
+                      DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
+                  onChanged: (v) => setState(() => _issPid = v),
+                ),
+                const SizedBox(height: 12),
+              ],
+              TextField(
+                controller: _issTitle,
+                decoration: const InputDecoration(labelText: 'Issue Title', hintText: 'Short description of the issue'),
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _severity,
+                    decoration: const InputDecoration(labelText: 'Severity'),
+                    items: _severities.map((s) => DropdownMenuItem(
+                        value: s, child: Text(s[0].toUpperCase() + s.substring(1)))).toList(),
+                    onChanged: (v) => setState(() => _severity = v!),
                   ),
                 ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _category,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    items: _categories.map((c) => DropdownMenuItem(
+                        value: c, child: Text(c[0].toUpperCase() + c.substring(1)))).toList(),
+                    onChanged: (v) => setState(() => _category = v!),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _issDesc,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Detailed Description', hintText: 'Provide as much detail as possible...'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _submitIssue,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.red,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Report Issue'),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          Text('Active Issues',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+          const SizedBox(height: 10),
+          if (issues.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: Text('No issues reported. Looking good!',
+                  style: TextStyle(color: AppColors.textMuted))),
+            )
+          else
+            ...issues.map((iss) => _sectionCard(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Expanded(
+                        child: Text(iss['title']?.toString() ?? '-',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textPrimary)),
+                      ),
+                      _statusPill(iss['priority']?.toString() ?? 'low'),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text(iss['description']?.toString() ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      _statusPill(iss['incident_type']?.toString() ?? 'general'),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => _resolveIssue(iss['issue_id'] as int),
+                        child: const Text('Mark Resolved'),
+                      ),
+                    ]),
+                  ]),
+                )),
+        ],
+      ),
     );
+  }
+
+  Widget _sectionCard({required Widget child, EdgeInsetsGeometry margin = EdgeInsets.zero}) {
+    return Container(
+      margin: margin,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _statusPill(String text) {
+    final color = text == 'high' ? AppColors.red : (text == 'medium' ? AppColors.yellow : AppColors.green);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+      child: Text(text[0].toUpperCase() + text.substring(1),
+          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
+  Future<void> _loadReports() async {
+    setState(() => _repLoading = true);
+    try {
+      projects = await ApiService().getProjects();
+      if (projects.isNotEmpty) {
+        _repPid ??= projects.first['project_id'] as int;
+        reports = await ApiService().getReports(_repPid!);
+      }
+    } catch (e) {
+      toast('Failed to load reports: $e');
+    } finally {
+      if (mounted) setState(() => _repLoading = false);
+    }
+  }
+
+  Future<void> _submitReport() async {
+    if (_repPid == null) { toast('Please select a project'); return; }
+    if (_workProgress.text.trim().isEmpty) { toast("Please describe today's progress"); return; }
+    try {
+      await ApiService().submitReport({
+        'project_id': _repPid,
+        'report_date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'weather': _weather,
+        'work_progress': _workProgress.text,
+        'materials_used': _materials.text,
+        'issues_encountered': _issuesEnc.text,
+        'manpower_count': int.tryParse(_manpower.text) ?? 0,
+        'submitted_by': 1,
+      });
+      _workProgress.clear();
+      _materials.clear();
+      _issuesEnc.clear();
+      _manpower.clear();
+      toast('Daily report submitted');
+      _loadReports();
+    } on DioException catch (e) {
+      toast(e.message ?? 'Submission failed');
+    }
+  }
+
+  Future<void> _exportReport() async {
+    if (_repPid == null) { toast('Please select a project first'); return; }
+    try {
+      final path = await ApiService().exportReport(_repPid!, 'daily_reports');
+      toast('Daily reports exported to $path');
+      if (Platform.isWindows) {
+        await Process.run('start', [path], runInShell: true);
+      }
+    } catch (e) {
+      toast('Export failed: $e');
+    }
+  }
+
+  Future<void> _loadIssues() async {
+    setState(() => _issLoading = true);
+    try {
+      projects = await ApiService().getProjects();
+      _issPid ??= projects.isNotEmpty ? projects.first['project_id'] as int : null;
+      issues = await ApiService().getIssues(status: 'open');
+    } catch (e) {
+      toast('Failed to load issues: $e');
+    } finally {
+      if (mounted) setState(() => _issLoading = false);
+    }
+  }
+
+  Future<void> _submitIssue() async {
+    if (_issPid == null && projects.isNotEmpty) _issPid = projects.first['project_id'] as int;
+    if (_issPid == null) { toast('Create a project first'); return; }
+    if (_issTitle.text.trim().isEmpty) { toast('Please enter a short issue title'); return; }
+    try {
+      await ApiService().createIssue({
+        'title': _issTitle.text.trim(),
+        'description': _issDesc.text.trim().isEmpty ? _issTitle.text.trim() : _issDesc.text.trim(),
+        'project_id': _issPid,
+        'priority': _severity,
+        'incident_type': _category,
+        'is_safety_incident': _category == 'safety',
+      });
+      _issTitle.clear();
+      _issDesc.clear();
+      toast('Issue reported');
+      _loadIssues();
+    } on DioException catch (e) {
+      toast(e.message ?? 'Failed to report issue');
+    }
+  }
+
+  Future<void> _resolveIssue(int id) async {
+    try {
+      await ApiService().resolveIssue(id);
+      toast('Marked as resolved');
+      _loadIssues();
+    } on DioException catch (e) {
+      toast(e.message ?? 'Failed to update issue');
+    }
   }
 
   Widget _emptyState() => Center(
