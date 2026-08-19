@@ -271,3 +271,22 @@ class TaskWorker(Base):
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     task = relationship("Task", back_populates="task_workers")
     worker = relationship("Worker", back_populates="task_links")
+
+
+class PredictionHistory(Base):
+    """Snapshot of one AI progress prediction, kept for accuracy comparison.
+
+    Every successful call to ``predict_site_progress`` inserts one row so the
+    dashboard can show "predicted vs actual" progress over recent weeks.
+    """
+    __tablename__ = "prediction_history"
+    prediction_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    predicted_progress = Column(Float, nullable=False, server_default="0.0")
+    scheduled_progress = Column(Float, nullable=True)
+    actual_progress = Column(Float, nullable=False, server_default="0.0")
+    predicted_completion_date = Column(Date, nullable=True)
+    trend = Column(String(50), nullable=True)
+    confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    project = relationship("Project")

@@ -20,6 +20,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Map attSummary = {};
   List projects = [];
   Map<int, Map> _predictions = {};
+  List<Map> _predHistory = [];
+  List<Map> _weeklyAtt = [];
   DateTime? _lastPredUpdate;
   Timer? _autoRefreshTimer;
 
@@ -52,16 +54,38 @@ class _DashboardPageState extends State<DashboardPage> {
         ApiService().kpi(),
         ApiService().attendanceToday(),
         ApiService().getProjects(),
+        ApiService().getWeeklyAttendanceStats(),
       ]);
       kpi = results[0] as Map;
       attSummary = results[1] as Map;
       projects = results[2] as List;
+      final weekly = results[3] as Map;
+      if (mounted) {
+        setState(() {
+          _weeklyAtt = List<Map>.from(weekly['days'] ?? []);
+        });
+      }
 
       await _loadPredictions(forceRefresh: forceRefresh);
+      await _loadPredictionHistory();
     } catch (e) {
       if (!silent) toast('Failed to load dashboard: $e');
     } finally {
       if (mounted) setState(() => ld = false);
+    }
+  }
+
+  /// 加载第一个可见项目的 AI 预测历史（预测 vs 实际），用于展示"预测准不准"。
+  Future<void> _loadPredictionHistory() async {
+    if (projects.isEmpty) return;
+    final pid = projects.first['project_id'] as int;
+    try {
+      final hist = await ApiService().getPredictionHistory(pid);
+      if (mounted) {
+        setState(() => _predHistory = List<Map>.from(hist));
+      }
+    } catch (_) {
+      // 历史接口不可用时静默降级（保留空列表）
     }
   }
 
@@ -132,9 +156,15 @@ class _DashboardPageState extends State<DashboardPage> {
     final late = (attSummary['late'] ?? 0) as int;
     final absent = (attSummary['absent'] ?? 0) as int;
 
-    // Weekly attendance mock data (Mon-Today)
-    final weeklyData = [44.0, 46.0, 43.0, 45.0, 44.0, 42.0, 45.0];
-    final weekLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Today'];
+    // Weekly attendance data from backend (Mon-Sun, 本周每日出勤人数)
+    final weeklyData = _weeklyAtt
+        .map((d) => ((d['present_workers'] ?? d['check_in_count'] ?? 0) as num).toDouble())
+        .toList();
+    final weekLabels = _weeklyAtt.map((d) {
+      final wd = ((d['weekday'] as num?) ?? 0).toInt();
+      const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return names[wd.clamp(0, 6).toInt()];
+    }).toList();
 
     // Task distribution from KPI
     final completed = (kpi['completed_tasks'] ?? 0) as int;
@@ -211,6 +241,12 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 12),
             ...projects.take(4).where((p) => _predictions.containsKey(p['project_id'])).map((p) => _aiPredictionCard(p)),
           ],
+
+          // ── Prediction vs Actual (历史预测准确度) ──
+          const SizedBox(height: 20),
+          _sectionHeader('Prediction vs Actual', sub: 'Historical AI forecast vs real project progress'),
+          const SizedBox(height: 12),
+          _predictionHistoryCard(),
         ],
       ),
     );
@@ -294,6 +330,70 @@ class _DashboardPageState extends State<DashboardPage> {
       ]),
     );
   }
+
+  // ── Prediction vs Actual history card ──
+  Widget _predictionHistoryCard() {
+    if (_predHistory.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Center(
+          child: Text('暂无预测历史数据（每次 AI 预测后自动记录）',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        ),
+      );
+    }
+
+    final items = _predHistory.take(8).toList();
+    final predicted = items
+        .map((e) => ((e['predicted_progress'] ?? 0) as num).toDouble())
+        .toList();
+    final actual = items
+        .map((e) => ((e['actual_progress'] ?? e['latest_progress'] ?? 0) as num).toDouble())
+        .toList();
+    final labels = items.map((e) {
+      final d = e['created_at'] as String? ?? '';
+      return d.length >= 10 ? d.substring(5, 10) : '?';
+    }).toList();
+    final projName = projects.isNotEmpty ? (projects.first['project_name'] ?? '') : '';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('$projName'.trim().isEmpty ? 'Progress Accuracy' : '$projName · Accuracy',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            Text('最近 ${items.length} 次预测快照（%）',
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          ]),
+        ]),
+        const SizedBox(height: 16),
+        DualBarChart(seriesA: predicted, seriesB: actual, labels: labels, height: 140),
+        const SizedBox(height: 10),
+        Row(children: [
+          _legendDot(AppColors.blue, 'AI Predicted'),
+          const SizedBox(width: 14),
+          _legendDot(AppColors.green, 'Actual Progress'),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _legendDot(Color color, String text) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(text, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
+      ]);
 
   // ── Weekly Attendance Chart Card ──
   Widget _weeklyAttCard(List<double> data, List<String> labels) {

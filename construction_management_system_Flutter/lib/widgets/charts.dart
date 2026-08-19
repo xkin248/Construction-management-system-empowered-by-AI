@@ -113,6 +113,105 @@ class LabeledBarChart extends StatelessWidget {
   }
 }
 
+// ──────────────── Dual Bar Chart (two series, e.g. predicted vs actual) ────────────────
+class DualBarChart extends StatelessWidget {
+  final List<double> seriesA;
+  final List<double> seriesB;
+  final List<String> labels;
+  final double height;
+  final Color colorA;
+  final Color colorB;
+
+  const DualBarChart({
+    super.key,
+    required this.seriesA,
+    required this.seriesB,
+    required this.labels,
+    this.height = 140,
+    this.colorA = AppColors.blue,
+    this.colorB = AppColors.green,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final all = [...seriesA, ...seriesB];
+    final maxV = all.isEmpty ? 1.0 : all.reduce((a, b) => a > b ? a : b);
+    final yMax = maxV <= 0 ? 1.0 : ((maxV / 10).ceil() * 10).toDouble();
+    final ySteps = [0, (yMax * 0.25).toInt(), (yMax * 0.5).toInt(), (yMax * 0.75).toInt(), yMax.toInt()];
+
+    return Column(children: [
+      SizedBox(
+        height: height,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: ySteps.reversed.map((y) => Text('$y',
+                maxLines: 1,
+                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted))).toList(),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(labels.length, (i) {
+                final hA = yMax <= 0 ? 4.0 : (seriesA[i] / yMax) * height;
+                final hB = yMax <= 0 ? 4.0 : (seriesB[i] / yMax) * height;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Expanded(
+                            child: Container(
+                              height: hA < 4 ? 4 : hA,
+                              decoration: BoxDecoration(
+                                color: colorA.withValues(alpha: 0.7),
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Expanded(
+                            child: Container(
+                              height: hB < 4 ? 4 : hB,
+                              decoration: BoxDecoration(
+                                color: colorB.withValues(alpha: 0.9),
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 6),
+      Row(children: [
+        const SizedBox(width: 28),
+        Expanded(
+          child: Row(
+            children: labels.map((l) => Expanded(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(l, textAlign: TextAlign.center, maxLines: 1,
+                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+              ),
+            )).toList(),
+          ),
+        ),
+      ]),
+    ]);
+  }
+}
+
 // ──────────────── Stacked Bar (attendance rate) ────────────────
 class StackedProgressBar extends StatelessWidget {
   final int present;

@@ -3,8 +3,71 @@ import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+
+// ─────────────────────────────────────────────
+//  Fence Map (OpenStreetMap free tiles) — center marker + radius circle
+// ─────────────────────────────────────────────
+class _FenceMap extends StatelessWidget {
+  final double lat;
+  final double lng;
+  final double radiusMeters;
+  final void Function(LatLng point)? onTap;
+  final double height;
+
+  const _FenceMap({
+    required this.lat,
+    required this.lng,
+    required this.radiusMeters,
+    this.onTap,
+    this.height = 220,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final center = LatLng(lat, lng);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: height,
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 14,
+            onTap: onTap == null ? null : (tapPos, latLng) => onTap!(latLng),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.buildsmart.app',
+            ),
+            CircleLayer(circles: [
+              CircleMarker(
+                point: center,
+                radius: radiusMeters <= 0 ? 5000 : radiusMeters,
+                useRadiusInMeter: true,
+                color: AppColors.accent.withValues(alpha: 0.15),
+                borderColor: AppColors.accent,
+                borderStrokeWidth: 2,
+              ),
+            ]),
+            MarkerLayer(markers: [
+              Marker(
+                point: center,
+                width: 42,
+                height: 42,
+                child: const Icon(Icons.location_on_rounded, color: AppColors.red, size: 38),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ─────────────────────────────────────────────
 //  GPS helper (same pattern as attendance_geo_helper.dart)
@@ -417,6 +480,30 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   ]),
                 ),
 
+              // Fence map — tap to move center
+              _FenceMap(
+                lat: _lat,
+                lng: _lng,
+                radiusMeters: _radius,
+                height: 200,
+                onTap: (p) => setState(() {
+                  _lat = p.latitude;
+                  _lng = p.longitude;
+                  _hasGps = true;
+                  _gpsFailed = false;
+                }),
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                const Icon(Icons.touch_app_outlined, size: 13, color: AppColors.textMuted),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text('Tap on the map to move the fence center',
+                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                ),
+              ]),
+              const SizedBox(height: 12),
+
               // GPS failure hint
               if (_gpsFailed) ...[
                 Padding(
@@ -692,6 +779,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             const SizedBox(height: 8),
             _infoRow(Icons.my_location_rounded, 'Center GPS',
                 'Lat ${lat.toStringAsFixed(5)},  Lng ${lng.toStringAsFixed(5)}'),
+            const SizedBox(height: 14),
+            if (lat != 0.0 || lng != 0.0)
+              _FenceMap(lat: lat, lng: lng, radiusMeters: radius.toDouble(), height: 200),
           ]),
         ),
         const SizedBox(height: 16),

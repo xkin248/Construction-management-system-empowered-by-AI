@@ -12,7 +12,7 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 from app.database import get_db
-from app.models import Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue
+from app.models import Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue, PredictionHistory
 from app.worker_pool import get_project_workers
 
 load_dotenv()
@@ -802,6 +802,18 @@ Output format (strict JSON):
         ai_insights = trend_labels.get(ai_trend, f"Project at {current_progress}% completion.")
         if project.end_date:
             ai_insights += f" Planned end date: {project.end_date.isoformat()}."
+
+    # ── Persist a snapshot for the prediction-accuracy history ──
+    db.add(PredictionHistory(
+        project_id=project_id,
+        predicted_progress=current_progress,
+        scheduled_progress=scheduled_progress,
+        actual_progress=current_progress,
+        predicted_completion_date=ai_predicted_date,
+        trend=ai_trend,
+        confidence=round(ai_confidence, 1),
+    ))
+    db.commit()
 
     return {
         "project_id": project_id,

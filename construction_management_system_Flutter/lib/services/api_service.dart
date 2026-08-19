@@ -333,6 +333,13 @@ class ApiService {
   Future<Map> getProjectProgressPrediction(int projectId) async =>
       Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
 
+  Future<List> getPredictionHistory(int projectId) async =>
+      (await dio.get('/ai/projects/$projectId/prediction-history')).data as List;
+
+  // ───────── Weekly Attendance Stats (Dashboard) ─────────
+  Future<Map> getWeeklyAttendanceStats() async =>
+      Map.from((await dio.get('/attendance/weekly-stats')).data);
+
   // ───────── File Management ─────────
   Future<List> getFiles({int? pid, String? category}) async {
     final params = <String, dynamic>{};

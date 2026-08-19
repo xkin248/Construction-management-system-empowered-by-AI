@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, date, time, timezone
+from datetime import datetime, date, time, timezone, timedelta
 from typing import Optional
 from zoneinfo import ZoneInfo
 
@@ -529,3 +529,47 @@ def worker_self_heartbeat(
     if a.worker_id != user.id:
         raise HTTPException(403, "This attendance record does not belong to you")
     return heartbeat(d, db)
+
+
+@router.get("/weekly-stats")
+def weekly_attendance_stats(
+    project_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_any_authorized),
+):
+    """
+    Current week (Mon-Sun) attendance trend for the dashboard.
+    Returns per-day distinct present workers and total check-in records.
+    Optional project_id filters to one project.
+    """
+    today_local = date.today()
+    monday = today_local - timedelta(days=today_local.weekday())
+    start = datetime(monday.year, monday.month, monday.day)
+    end = start + timedelta(days=7)
+
+    q = db.query(AttendanceLog).filter(
+        AttendanceLog.check_in_time >= start,
+        AttendanceLog.check_in_time < end,
+    )
+    if project_id:
+        q = q.filter(AttendanceLog.project_id == project_id)
+    logs = q.all()
+
+    days = []
+    for i in range(7):
+        day_start = start + timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        day_logs = [
+            a for a in logs
+            if day_start <= a.check_in_time < day_end
+            and a.status in ("checked_in", "checked_out")
+        ]
+        present_workers = len({a.worker_id for a in day_logs})
+        days.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "weekday": i,
+            "present_workers": present_workers,
+            "check_in_count": len(day_logs),
+            "is_today": i == today_local.weekday(),
+        })
+    return {"project_id": project_id, "days": days}

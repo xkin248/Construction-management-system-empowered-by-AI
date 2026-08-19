@@ -6,7 +6,7 @@ from datetime import date
 from app.database import get_db
 from app.models import (
     Supervisor, AIChatSession, AIChatMessage,
-    Task, Worker, Project
+    Task, Worker, Project, PredictionHistory
 )
 from app.schemas import (
     AIChatSessionOut, AIChatMessageOut,
@@ -206,3 +206,42 @@ def get_progress_prediction(
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
+
+
+@router.get("/ai/projects/{pid}/prediction-history")
+def prediction_history(
+    pid: int,
+    db: Session = Depends(get_db),
+    current_user: Supervisor = Depends(cu)
+):
+    """
+    Recent AI prediction snapshots for a project, oldest -> newest, for
+    "predicted vs actual" accuracy comparison on the dashboard.
+    """
+    project = db.query(Project).filter(Project.project_id == pid).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    rows = (
+        db.query(PredictionHistory)
+        .filter(PredictionHistory.project_id == pid)
+        .order_by(PredictionHistory.prediction_id.desc())
+        .limit(12)
+        .all()
+    )
+    latest_progress = float(project.progress or 0.0)
+    out = []
+    for r in reversed(rows):
+        out.append({
+            "prediction_id": r.prediction_id,
+            "project_id": r.project_id,
+            "predicted_progress": round(float(r.predicted_progress or 0.0), 1),
+            "scheduled_progress": round(float(r.scheduled_progress), 1) if r.scheduled_progress is not None else None,
+            "actual_progress": round(float(r.actual_progress or 0.0), 1),
+            "latest_progress": latest_progress,
+            "predicted_completion_date": r.predicted_completion_date.isoformat() if r.predicted_completion_date else None,
+            "trend": r.trend,
+            "confidence": round(float(r.confidence), 1) if r.confidence is not None else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+    return out

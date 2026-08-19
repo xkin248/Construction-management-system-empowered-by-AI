@@ -21,6 +21,26 @@ STATUS_TO_PROGRESS = {
     "completed": 100,
 }
 
+
+def _recalc_project_progress(db: Session, project_id: int) -> None:
+    """Recompute project.progress = completed tasks / total tasks * 100.
+
+    Called on task creation / status change so the project progress stays in
+    sync with its task board (progress closed loop). Supervisor can still
+    override progress manually via the project update endpoint; the next task
+    status change simply recalculates from tasks again.
+    """
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        return
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    total = len(tasks)
+    completed = sum(1 for t in tasks if t.status == "completed")
+    new_progress = round(completed / total * 100, 1) if total > 0 else 0.0
+    if (project.progress or 0.0) != new_progress:
+        project.progress = new_progress
+        db.add(project)
+
 AVATAR_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#8b5cf6", "#ef4444", "#06b6d4"]
 
 
@@ -268,6 +288,7 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
     db.add(task)
     db.flush()
     _set_task_workers(db, task, worker_ids)
+    _recalc_project_progress(db, task.project_id)
     db.commit()
     db.refresh(task)
     task = db.query(Task).options(*_task_load_options()).get(task.task_id)
@@ -294,7 +315,10 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
         task.priority = str(payload["priority"]).strip().lower()
 
     if "status" in payload or "progress" in payload:
+        old_status = task.status
         task.status = _normalize_status(payload.get("status"), payload.get("progress"))
+        if task.status != old_status:
+            _recalc_project_progress(db, task.project_id)
 
     if "due_date" in payload or "due" in payload:
         task.due_date = _parse_date(payload.get("due_date") or payload.get("due"))
