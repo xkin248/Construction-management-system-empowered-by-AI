@@ -24,6 +24,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   double _hoursToday = 0;
   String _checkInWindow = '08:00 - 10:30';
   String _checkOutWindow = '15:00 - 17:00';
+  String _breakWindow = '12:00 - 13:00';
+  String _workHours = '08:00 - 17:00';
   String _statusMsg = 'Tap the button below to check in with GPS geofencing';
   String _deviceType = 'web';
   String _deviceInfo = 'BuildSmart Web Client';
@@ -120,6 +122,12 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           _hoursToday = (r['hours_today'] as num?)?.toDouble() ?? 0;
           _checkInWindow = r['check_in_window']?.toString() ?? _checkInWindow;
           _checkOutWindow = r['check_out_window']?.toString() ?? _checkOutWindow;
+          _breakWindow = r['break_window']?.toString() ?? _breakWindow;
+          final inWin = _checkInWindow.split(' - ');
+          final outWin = _checkOutWindow.split(' - ');
+          if (inWin.isNotEmpty && outWin.length > 1) {
+            _workHours = '${inWin.first} - ${outWin.last}';
+          }
           final att = r['attendance'] as Map?;
           if (att != null) {
             _attendanceId = att['attendance_id'] as int?;
@@ -534,7 +542,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 Text('Work Hours',
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text('08:00 - 17:00',
+                Text(_workHours,
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
               ]),
               Container(width: 1, height: 30, color: AppColors.border),
@@ -542,7 +550,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 Text('Break (no check-in)',
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text('12:00 - 13:00',
+                Text(_breakWindow,
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w800)),
               ]),
             ],

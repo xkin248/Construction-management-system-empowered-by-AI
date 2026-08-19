@@ -96,6 +96,12 @@ try:
         ))
         db.commit()
 
+    # 6) Default settings row (single-row table, id=1). Attendance time-window
+    #    columns use their server defaults (08:00-10:30 / 15:00-17:00 / 12:00-13:00).
+    if db.query(models.Settings).count() == 0:
+        db.add(models.Settings(id=1))
+        db.commit()
+
     print("Database initialized successfully")
     print("Admin login: admin@buildsmart.com / admin123")
     print(f"Default project ID: {project.project_id}")

@@ -163,6 +163,15 @@ class Settings(Base):
     notif_safety = Column(Boolean, nullable=False, server_default="1")
     notif_daily_summary = Column(Boolean, nullable=False, server_default="0")
     notif_weekly_report = Column(Boolean, nullable=False, server_default="0")
+    # Attendance time windows (24h "HH:MM") — consumed by attendance.py & worker dashboard.
+    # Kept as plain strings for easy editing; attendance.py falls back to hardcoded defaults
+    # when the value is missing/invalid.
+    check_in_start = Column(String(20), nullable=False, server_default="08:00")
+    check_in_end = Column(String(20), nullable=False, server_default="10:30")
+    check_out_start = Column(String(20), nullable=False, server_default="15:00")
+    check_out_end = Column(String(20), nullable=False, server_default="17:00")
+    break_start = Column(String(20), nullable=False, server_default="12:00")
+    break_end = Column(String(20), nullable=False, server_default="13:00")
 
 
 class File(Base):

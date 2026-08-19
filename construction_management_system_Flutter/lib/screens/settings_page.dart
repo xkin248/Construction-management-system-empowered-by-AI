@@ -10,7 +10,7 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 4, vsync: this);
+  late final TabController _tab = TabController(length: 5, vsync: this);
 
   @override
   void dispose() {
@@ -26,11 +26,11 @@ class _SettingsPageState extends State<SettingsPage> with SingleTickerProviderSt
         child: TabBar(
           controller: _tab,
           isScrollable: true,
-          tabs: const [Tab(text: 'General'), Tab(text: 'Notifications'), Tab(text: 'Geofence'), Tab(text: 'Users & Roles')],
+          tabs: const [Tab(text: 'General'), Tab(text: 'Notifications'), Tab(text: 'Geofence'), Tab(text: 'Attendance'), Tab(text: 'Users & Roles')],
         ),
       ),
       Expanded(
-        child: TabBarView(controller: _tab, children: const [_GeneralTab(), _NotificationsTab(), _GeofenceTab(), _UsersTab()]),
+        child: TabBarView(controller: _tab, children: const [_GeneralTab(), _NotificationsTab(), _GeofenceTab(), _AttendanceTab(), _UsersTab()]),
       ),
     ]);
   }
@@ -258,6 +258,131 @@ class _GeofenceTabState extends State<_GeofenceTab> {
           ]),
         );
       }),
+    ]);
+  }
+}
+
+// ========== Attendance (check-in/out time windows) ==========
+class _AttendanceTab extends StatefulWidget {
+  const _AttendanceTab();
+  @override
+  State<_AttendanceTab> createState() => _AttendanceTabState();
+}
+
+class _AttendanceTabState extends State<_AttendanceTab> {
+  bool ld = true;
+  Map settings = {};
+  final checkInStart = TextEditingController(), checkInEnd = TextEditingController();
+  final checkOutStart = TextEditingController(), checkOutEnd = TextEditingController();
+  final breakStart = TextEditingController(), breakEnd = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    checkInStart.dispose(); checkInEnd.dispose();
+    checkOutStart.dispose(); checkOutEnd.dispose();
+    breakStart.dispose(); breakEnd.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      settings = await ApiService().getSettings();
+      checkInStart.text = settings['check_in_start'] ?? '08:00';
+      checkInEnd.text = settings['check_in_end'] ?? '10:30';
+      checkOutStart.text = settings['check_out_start'] ?? '15:00';
+      checkOutEnd.text = settings['check_out_end'] ?? '17:00';
+      breakStart.text = settings['break_start'] ?? '12:00';
+      breakEnd.text = settings['break_end'] ?? '13:00';
+    } catch (e) {
+      toast('Failed to load settings: $e');
+    } finally {
+      if (mounted) setState(() => ld = false);
+    }
+  }
+
+  bool _validHHMM(String s) {
+    final parts = s.trim().split(':');
+    if (parts.length != 2) return false;
+    final h = int.tryParse(parts[0]), m = int.tryParse(parts[1]);
+    return h != null && m != null && h >= 0 && h <= 23 && m >= 0 && m <= 59;
+  }
+
+  Future<void> _save() async {
+    final vals = [checkInStart.text, checkInEnd.text, checkOutStart.text, checkOutEnd.text, breakStart.text, breakEnd.text];
+    if (vals.any((v) => !_validHHMM(v))) {
+      toast('All times must use HH:MM 24-hour format (e.g. 08:00)');
+      return;
+    }
+    try {
+      await ApiService().updateSettings({
+        ...settings,
+        'check_in_start': checkInStart.text.trim(),
+        'check_in_end': checkInEnd.text.trim(),
+        'check_out_start': checkOutStart.text.trim(),
+        'check_out_end': checkOutEnd.text.trim(),
+        'break_start': breakStart.text.trim(),
+        'break_end': breakEnd.text.trim(),
+      });
+      toast('✅ Attendance windows saved');
+    } on DioException catch (e) {
+      toast(e.message ?? 'Failed to save settings');
+    }
+  }
+
+  Widget _timeField(TextEditingController ctrl, String label) => Expanded(
+        child: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(labelText: label, helperText: 'HH:MM'),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext c) {
+    if (ld) return const Center(child: CircularProgressIndicator());
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      sectionCard(
+        margin: const EdgeInsets.only(bottom: 14),
+        child: const Row(children: [
+          Icon(Icons.schedule_outlined, size: 16, color: AppColors.accent),
+          SizedBox(width: 8),
+          Expanded(child: Text('Attendance time windows control when workers may check in/out. Times use 24-hour HH:MM format.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary))),
+        ]),
+      ),
+      sectionCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Check-in Window', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 14),
+          Row(children: [
+            _timeField(checkInStart, 'Start'),
+            const SizedBox(width: 10),
+            _timeField(checkInEnd, 'End'),
+          ]),
+          const SizedBox(height: 18),
+          const Text('Check-out Window', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 14),
+          Row(children: [
+            _timeField(checkOutStart, 'Start'),
+            const SizedBox(width: 10),
+            _timeField(checkOutEnd, 'End'),
+          ]),
+          const SizedBox(height: 18),
+          const Text('Break (no check-in)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 14),
+          Row(children: [
+            _timeField(breakStart, 'Start'),
+            const SizedBox(width: 10),
+            _timeField(breakEnd, 'End'),
+          ]),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(onPressed: _save, icon: const Icon(Icons.save_outlined, size: 18), label: const Text('Save Changes')),
+        ]),
+      ),
     ]);
   }
 }

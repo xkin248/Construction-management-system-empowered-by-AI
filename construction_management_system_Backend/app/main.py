@@ -3,9 +3,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 
-from app.database import engine, Base, settings
+from app.database import engine, Base, SessionLocal, settings
 from app import models
+from app.db_migrate import ensure_settings_columns
 Base.metadata.create_all(bind=engine)
+# Existing SQLite databases don't get new columns via create_all — patch them.
+ensure_settings_columns(engine)
+# Ensure the single-row settings table exists with default values on startup.
+with SessionLocal() as db:
+    if db.query(models.Settings).count() == 0:
+        db.add(models.Settings(id=1))
+        db.commit()
 
 app = FastAPI(title="Construction Management System API", version="1.0.0")
 app.add_middleware(

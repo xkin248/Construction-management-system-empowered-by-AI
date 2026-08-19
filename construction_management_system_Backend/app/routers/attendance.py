@@ -5,7 +5,7 @@ from typing import Optional
 from zoneinfo import ZoneInfo
 
 from app.database import get_db
-from app.models import AttendanceLog, Worker, Project
+from app.models import AttendanceLog, Worker, Project, Settings
 from app.worker_pool import get_project_workers
 from app.schemas import (
     CheckInReq, CheckOutReq, HeartbeatReq, AttendanceOut,
@@ -24,7 +24,7 @@ OUT_OF_FENCE_LIMIT = 2
 # Storage stays UTC (datetime.utcnow()); output is converted to local time.
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
 
-# Check-in time window (can be moved to Settings later)
+# Check-in time window defaults (hardcoded fallback when Settings row is missing/invalid)
 CHECK_IN_WINDOW_START = time(8, 0)    # 08:00 AM
 CHECK_IN_WINDOW_END = time(10, 30)    # 10:30 AM
 CHECK_OUT_WINDOW_START = time(15, 0)  # 03:00 PM
@@ -33,6 +33,47 @@ CHECK_OUT_WINDOW_END = time(17, 0)    # 05:00 PM
 # Work hours: 08:00-17:00 with a lunch break 12:00-13:00 (no attendance allowed)
 BREAK_START = time(12, 0)             # 12:00 PM
 BREAK_END = time(13, 0)               # 01:00 PM
+
+def _parse_hhmm(value, fallback: time) -> time:
+    """Parse a 'HH:MM' string from Settings; fall back to default on any error."""
+    if not value:
+        return fallback
+    try:
+        parts = str(value).strip().split(":")
+        if len(parts) != 2:
+            return fallback
+        h = int(parts[0])
+        m = int(parts[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            return fallback
+        return time(h, m)
+    except (ValueError, TypeError):
+        return fallback
+
+def _load_attendance_config(db: Session) -> dict:
+    """Read attendance time windows from the settings table (fallback to defaults).
+
+    Returns a dict with keys: check_in_start/end, check_out_start/end,
+    break_start/end as datetime.time objects.
+    """
+    s = db.query(Settings).get(1)
+    if s is None:
+        return {
+            "check_in_start": CHECK_IN_WINDOW_START,
+            "check_in_end": CHECK_IN_WINDOW_END,
+            "check_out_start": CHECK_OUT_WINDOW_START,
+            "check_out_end": CHECK_OUT_WINDOW_END,
+            "break_start": BREAK_START,
+            "break_end": BREAK_END,
+        }
+    return {
+        "check_in_start": _parse_hhmm(s.check_in_start, CHECK_IN_WINDOW_START),
+        "check_in_end": _parse_hhmm(s.check_in_end, CHECK_IN_WINDOW_END),
+        "check_out_start": _parse_hhmm(s.check_out_start, CHECK_OUT_WINDOW_START),
+        "check_out_end": _parse_hhmm(s.check_out_end, CHECK_OUT_WINDOW_END),
+        "break_start": _parse_hhmm(s.break_start, BREAK_START),
+        "break_end": _parse_hhmm(s.break_end, BREAK_END),
+    }
 
 def _today_start():
     """Start of today in Asia/Kuala_Lumpur, converted back to naive UTC for
@@ -65,9 +106,9 @@ def _format_hhmm(dt: Optional[datetime]) -> str:
 def _in_time_window(t: time, start: time, end: time) -> bool:
     return start <= t <= end
 
-def _in_break(t: time) -> bool:
-    """Lunch break 12:00-13:00 — attendance is not allowed during this period."""
-    return BREAK_START <= t < BREAK_END
+def _in_break(t: time, break_start: time, break_end: time) -> bool:
+    """Lunch break (e.g. 12:00-13:00) — attendance is not allowed during this period."""
+    return break_start <= t < break_end
 
 def _client_ip(request: Request) -> str:
     try:
@@ -331,22 +372,23 @@ def worker_self_check_in(
         )
 
     # ── Check-in time window enforcement ──
+    cfg = _load_attendance_config(db)
     now_local = datetime.now(KL_TZ)
     now_time = now_local.time()
-    if not _in_time_window(now_time, CHECK_IN_WINDOW_START, CHECK_IN_WINDOW_END):
+    if not _in_time_window(now_time, cfg["check_in_start"], cfg["check_in_end"]):
         raise HTTPException(
             400,
             f"Check-in is only allowed between "
-            f"{CHECK_IN_WINDOW_START.strftime('%H:%M')} and "
-            f"{CHECK_IN_WINDOW_END.strftime('%H:%M')}. "
+            f"{cfg['check_in_start'].strftime('%H:%M')} and "
+            f"{cfg['check_in_end'].strftime('%H:%M')}. "
             f"Current time: {now_time.strftime('%H:%M')}",
         )
 
-    # ── Break time check (12:00-13:00, no attendance allowed) ──
-    if _in_break(now_time):
+    # ── Break time check (e.g. 12:00-13:00, no attendance allowed) ──
+    if _in_break(now_time, cfg["break_start"], cfg["break_end"]):
         raise HTTPException(
             400,
-            f"Break time ({BREAK_START.strftime('%H:%M')} - {BREAK_END.strftime('%H:%M')}) - "
+            f"Break time ({cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}) - "
             f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
         )
 
@@ -406,17 +448,18 @@ def worker_self_check_out(
         raise HTTPException(404, "Project not found")
 
     # ── Check-out time window ──
+    cfg = _load_attendance_config(db)
     now_local = datetime.now(KL_TZ)
     now_time = now_local.time()
-    if not _in_time_window(now_time, CHECK_OUT_WINDOW_START, CHECK_OUT_WINDOW_END):
+    if not _in_time_window(now_time, cfg["check_out_start"], cfg["check_out_end"]):
         # Allow check-out but warn — use informational header instead of blocking
         pass
 
-    # ── Break time check (12:00-13:00, no attendance allowed) ──
-    if _in_break(now_time):
+    # ── Break time check (e.g. 12:00-13:00, no attendance allowed) ──
+    if _in_break(now_time, cfg["break_start"], cfg["break_end"]):
         raise HTTPException(
             400,
-            f"Break time ({BREAK_START.strftime('%H:%M')} - {BREAK_END.strftime('%H:%M')}) - "
+            f"Break time ({cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}) - "
             f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
         )
 
@@ -445,6 +488,7 @@ def worker_today_authenticated(
     db: Session = Depends(get_db),
 ):
     """Authenticated version — get today's attendance record for the current worker."""
+    cfg = _load_attendance_config(db)
     a = db.query(AttendanceLog).filter(
         AttendanceLog.worker_id == user.id,
         AttendanceLog.check_in_time >= _today_start(),
@@ -453,8 +497,9 @@ def worker_today_authenticated(
         return {
             "checked_in": False,
             "attendance": None,
-            "check_in_window": f"{CHECK_IN_WINDOW_START.strftime('%H:%M')} - {CHECK_IN_WINDOW_END.strftime('%H:%M')}",
-            "check_out_window": f"{CHECK_OUT_WINDOW_START.strftime('%H:%M')} - {CHECK_OUT_WINDOW_END.strftime('%H:%M')}",
+            "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+            "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+            "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
         }
     hours = 0.0
     if a.check_in_time and a.check_out_time:
@@ -465,8 +510,9 @@ def worker_today_authenticated(
         "status": a.status,
         "hours_today": hours,
         "attendance": _to_out(a),
-        "check_in_window": f"{CHECK_IN_WINDOW_START.strftime('%H:%M')} - {CHECK_IN_WINDOW_END.strftime('%H:%M')}",
-        "check_out_window": f"{CHECK_OUT_WINDOW_START.strftime('%H:%M')} - {CHECK_OUT_WINDOW_END.strftime('%H:%M')}",
+        "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+        "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+        "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
     }
 
 

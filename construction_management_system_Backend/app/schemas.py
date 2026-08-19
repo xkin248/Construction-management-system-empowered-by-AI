@@ -226,6 +226,13 @@ class SettingsBase(BaseModel):
     notif_safety: bool = True
     notif_daily_summary: bool = False
     notif_weekly_report: bool = False
+    # Attendance time windows (24h "HH:MM") — editable from Settings > Attendance
+    check_in_start: str = "08:00"
+    check_in_end: str = "10:30"
+    check_out_start: str = "15:00"
+    check_out_end: str = "17:00"
+    break_start: str = "12:00"
+    break_end: str = "13:00"
 class SettingsUpdate(SettingsBase): pass
 class SettingsOut(SettingsBase):
     id: int
