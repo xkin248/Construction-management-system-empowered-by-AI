@@ -47,6 +47,7 @@ class Worker(Base):
     email = Column(String(100), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=True)
     role = Column(String(50), default="worker")
+    fcm_token = Column(String(500), nullable=True)  # FCM push token (optional, gitignored creds)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     project = relationship("Project", back_populates="workers")
     tasks = relationship("Task", back_populates="assigned_worker")
@@ -290,3 +291,24 @@ class PredictionHistory(Base):
     confidence = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     project = relationship("Project")
+
+
+class WorkerNotification(Base):
+    """In-app notification for workers (FCM push is mirrored here).
+
+    The legacy ``notifications`` table is supervisor-only (supervisor_id NOT
+    NULL FK), so worker-facing notifications live in their own table. Rows are
+    written when a task is assigned/created for the worker; the FCM push itself
+    is best-effort and may be absent when no token is registered.
+    """
+    __tablename__ = "worker_notifications"
+    notification_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    related_entity_type = Column(String(50), nullable=True)
+    related_entity_id = Column(Integer, nullable=True)
+    is_read = Column(Boolean, nullable=False, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    worker = relationship("Worker")

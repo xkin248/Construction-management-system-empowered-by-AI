@@ -6,6 +6,8 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Google Services (reads android/app/google-services.json for FCM)
+    id("com.google.gms.google-services")
 }
 
 // Load signing config from key.properties (local dev) or environment (CI / GitHub Secrets)

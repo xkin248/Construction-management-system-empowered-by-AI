@@ -5,10 +5,11 @@ import os
 
 from app.database import engine, Base, SessionLocal, settings
 from app import models
-from app.db_migrate import ensure_settings_columns
+from app.db_migrate import ensure_settings_columns, ensure_fcm_columns
 Base.metadata.create_all(bind=engine)
 # Existing SQLite databases don't get new columns via create_all — patch them.
 ensure_settings_columns(engine)
+ensure_fcm_columns(engine)
 # Ensure the single-row settings table exists with default values on startup.
 with SessionLocal() as db:
     if db.query(models.Settings).count() == 0:

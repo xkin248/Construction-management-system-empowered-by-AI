@@ -44,6 +44,10 @@ key.properties
 .env.*
 !.env.example
 
+# Firebase credentials (never commit service-account / google-services JSON)
+**/firebase-service-account.json
+**/android/app/google-services.json
+
 # IntelliJ / Android Studio
 *.iml
 *.ipr

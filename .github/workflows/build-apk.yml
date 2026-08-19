@@ -76,6 +76,13 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/buildsmart-release.jks
           ls -la android/app/buildsmart-release.jks
 
+      # ── Decode Google Services (FCM) from secrets ───────────────
+      - name: 🔥 Decode Google Services
+        working-directory: construction_management_system_Flutter
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
+          ls -la android/app/google-services.json
+
       # ── Build ─────────────────────────────────────────────────
       - name: 🔨 Build Release APK
         working-directory: construction_management_system_Flutter
@@ -85,6 +92,15 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+
+      # ── Cleanup secret-generated files ─────────────────────────
+      - name: 🧹 Cleanup Secret Files
+        if: always()
+        working-directory: construction_management_system_Flutter
+        run: |
+          rm -f android/app/google-services.json
+          rm -f android/app/buildsmart-release.jks
+          echo "✅ Removed secret-generated files"
 
       # ── Rename APK ────────────────────────────────────────────
       - name: 📝 Rename APK File

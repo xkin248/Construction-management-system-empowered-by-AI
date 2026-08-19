@@ -19,6 +19,17 @@ _SETTINGS_ADDITIONS = {
     "break_end": "13:00",
 }
 
+# FCM push tokens added to existing user tables over time:
+# {table: {column: column_ddl}}
+_FCM_COLUMN_ADDITIONS = {
+    "workers": {
+        "fcm_token": "VARCHAR(500)",
+    },
+    "supervisors": {
+        "fcm_token": "VARCHAR(500)",
+    },
+}
+
 
 def ensure_settings_columns(engine) -> list:
     """Add missing attendance-window columns to the settings table.
@@ -49,4 +60,30 @@ def ensure_settings_columns(engine) -> list:
                 )
             )
             added.append(col)
+    return added
+
+
+def ensure_fcm_columns(engine) -> list:
+    """Add missing fcm_token columns to workers/supervisors on old databases.
+
+    Column is nullable so existing rows need no default; new installs get the
+    column from ``Base.metadata.create_all`` directly.
+    """
+    added = []
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+
+    for table_name, columns in _FCM_COLUMN_ADDITIONS.items():
+        if table_name not in tables:
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table_name)}
+        missing = {c: ddl for c, ddl in columns.items() if c not in existing}
+        if not missing:
+            continue
+        with engine.begin() as conn:
+            for col, ddl in missing.items():
+                conn.execute(
+                    text("ALTER TABLE %s ADD COLUMN %s %s" % (table_name, col, ddl))
+                )
+                added.append(f"{table_name}.{col}")
     return added

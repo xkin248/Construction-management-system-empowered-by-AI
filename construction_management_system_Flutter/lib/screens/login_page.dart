@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import 'home_shell.dart';
 import 'worker_home_shell.dart';
 import 'worker_register_page.dart';
@@ -57,6 +59,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       }
 
       ApiService().ut(r['access_token']);
+
+      // FCM: register this device token for the freshly logged-in user.
+      unawaited(FcmService.registerTokenToBackend());
 
       if (!mounted) return;
 

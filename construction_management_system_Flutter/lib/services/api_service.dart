@@ -130,6 +130,39 @@ class ApiService {
 
   Future<Map> me() async => Map.from((await dio.get('/auth/me')).data);
 
+  // ───────── FCM device token registration ─────────
+  Future<bool> registerFcmToken({
+    required int userId,
+    required String userType,
+    required String token,
+  }) async {
+    try {
+      final r = await dio.post('/notifications/register-token', data: {
+        'user_id': userId,
+        'user_type': userType,
+        'token': token,
+      });
+      final m = Map.from(r.data);
+      return m['ok'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ───────── Worker in-app notifications ─────────
+  Future<List> getWorkerNotifications(int workerId, {bool unreadOnly = false}) async {
+    final r = await dio.get('/notifications/worker/$workerId', queryParameters: {
+      if (unreadOnly) 'unread_only': 'true',
+    });
+    return (r.data as List).toList();
+  }
+
+  Future<Map> workerUnreadCount(int workerId) async =>
+      Map.from((await dio.get('/notifications/worker/$workerId/unread-count')).data);
+
+  Future<Map> workerMarkAllRead(int workerId) async =>
+      Map.from((await dio.put('/notifications/worker/$workerId/read-all')).data);
+
   // ───────── Worker Authenticated Attendance ─────────
   Future<Map> workerCheckIn({
     required int projectId,

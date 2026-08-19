@@ -126,6 +126,43 @@ def _set_task_workers(db: Session, task: Task, worker_ids: List[int]) -> List[in
     return valid_ids
 
 
+def _notify_workers_assigned(db: Session, task: Task, worker_ids: List[int]) -> None:
+    """Push "new task assigned" to every worker in worker_ids and mirror it to
+    the worker_notifications table.
+
+    Best-effort by design: missing tokens, FCM being unconfigured or network
+    errors are all swallowed — the in-app row is still written and the caller's
+    transaction commits normally (rows are flushed by the caller's commit).
+    """
+    if not worker_ids:
+        return
+    from app.models import WorkerNotification
+    from app.services.fcm import send_to_device
+
+    project_name = task.project.project_name if task.project else "Project"
+    title = "您有新任务"
+    content = f"任务「{task.task_name}」已分配给您（{project_name}）"
+    data = {
+        "type": "task_assigned",
+        "task_id": str(task.task_id),
+        "project_id": str(task.project_id),
+    }
+
+    for wid in worker_ids:
+        worker = db.get(Worker, wid)
+        if not worker:
+            continue
+        db.add(WorkerNotification(
+            worker_id=wid,
+            title=title,
+            content=content,
+            related_entity_type="task",
+            related_entity_id=task.task_id,
+        ))
+        if worker.fcm_token:
+            send_to_device(worker.fcm_token, title, content, data)
+
+
 def _task_load_options():
     return (
         joinedload(Task.assigned_worker),
@@ -326,12 +363,14 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     # Multi-worker support: worker_ids replaces the full assignment list.
     worker_ids = _extract_worker_ids(payload)
     if worker_ids is not None:
-        _set_task_workers(db, task, worker_ids)
+        assigned = _set_task_workers(db, task, worker_ids)
+        _notify_workers_assigned(db, task, assigned)
     elif "assigned_worker_id" in payload or "worker_id" in payload:
         worker_id = payload.get("assigned_worker_id") or payload.get("worker_id")
         worker = _validate_worker(db, task.project_id, worker_id)
         if worker:
-            _set_task_workers(db, task, [worker.worker_id])
+            assigned = _set_task_workers(db, task, [worker.worker_id])
+            _notify_workers_assigned(db, task, assigned)
         else:
             _set_task_workers(db, task, [])
 
@@ -395,6 +434,7 @@ def assign_worker(task_id: int, payload: Dict[str, Any], db: Session = Depends(g
         raise HTTPException(400, "Unable to score the selected worker for this task")
 
     _set_task_workers(db, task, [worker.worker_id])
+    _notify_workers_assigned(db, task, [worker.worker_id])
     task.ai_confidence = round(chosen["match_score"] / 100, 2)
     if task.status == "pending":
         task.status = "in_progress"

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'services/api_service.dart';
+import 'services/fcm_service.dart';
 import 'screens/login_page.dart';
 import 'screens/home_shell.dart';
 import 'screens/worker_home_shell.dart';
@@ -118,6 +119,9 @@ class _SplashGateState extends State<SplashGate> {
           navigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
         },
       );
+      // FCM push setup: Firebase init + notification permission + token
+      // registration. Never blocks startup (failures are swallowed inside).
+      await FcmService.setup();
       if (!mounted) return;
 
       Widget home;
