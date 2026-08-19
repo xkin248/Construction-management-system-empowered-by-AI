@@ -25,7 +25,7 @@ class ProjectBase(BaseModel):
     supervisor_id: Optional[int] = None
     center_lat: Optional[float] = 3.1390
     center_lng: Optional[float] = 101.6869
-    fence_radius: Optional[float] = 500.0
+    fence_radius: Optional[float] = 5000.0
 class ProjectCreate(ProjectBase): pass
 class ProjectOut(ProjectBase):
     project_id: int; supervisor: Optional[SupervisorOut] = None

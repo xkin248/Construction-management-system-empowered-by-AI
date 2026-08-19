@@ -413,7 +413,7 @@ class _ProjectGeofenceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = project['project_name'] as String? ?? '—';
     final location = project['location_address'] as String? ?? '—';
-    final radius = (project['fence_radius'] as num? ?? 200).toInt();
+    final radius = (project['fence_radius'] as num? ?? 5000).toInt();
     final workerCount = project['worker_count'] ?? project['tracked_workers'] ?? 0;
 
     return Container(

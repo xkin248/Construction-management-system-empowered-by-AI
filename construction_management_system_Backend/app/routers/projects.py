@@ -21,7 +21,7 @@ def cp(d: ProjectCreate, db=Depends(get_db)):
                 progress=min(max(d.progress or 0.0, 0.0), 100.0),
                 supervisor_id=d.supervisor_id,
                 center_lat=d.center_lat, center_lng=d.center_lng,
-                fence_radius=max(d.fence_radius or 500.0, 50.0))
+                fence_radius=max(d.fence_radius or 5000.0, 50.0))
     db.add(p); db.commit(); db.refresh(p); return p
 
 @router.get("/projects/{pid}", response_model=ProjectOut)

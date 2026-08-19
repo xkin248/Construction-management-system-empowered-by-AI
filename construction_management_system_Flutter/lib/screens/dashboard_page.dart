@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/charts.dart';
@@ -18,7 +20,11 @@ class _DashboardPageState extends State<DashboardPage> {
   Map attSummary = {};
   List projects = [];
   Map<int, Map> _predictions = {};
+  DateTime? _lastPredUpdate;
   Timer? _autoRefreshTimer;
+
+  static const _kPredTsKey = 'ai_pred_last_fetch_ts';
+  static const _kPredCacheKey = 'ai_pred_cache';
 
   @override
   void initState() {
@@ -39,7 +45,7 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  Future<void> _load({bool silent = false}) async {
+  Future<void> _load({bool silent = false, bool forceRefresh = false}) async {
     if (!silent) setState(() => ld = true);
     try {
       final results = await Future.wait([
@@ -51,20 +57,63 @@ class _DashboardPageState extends State<DashboardPage> {
       attSummary = results[1] as Map;
       projects = results[2] as List;
 
-      // Load AI predictions for each project
-      final api = ApiService();
-      final preds = <int, Map>{};
-      await Future.wait(projects.take(4).map((p) async {
-        try {
-          final pid = p['project_id'] as int;
-          preds[pid] = await api.getProjectProgressPrediction(pid);
-        } catch (_) {}
-      }));
-      _predictions = preds;
+      await _loadPredictions(forceRefresh: forceRefresh);
     } catch (e) {
       if (!silent) toast('Failed to load dashboard: $e');
     } finally {
       if (mounted) setState(() => ld = false);
+    }
+  }
+
+  /// AI 预测拉取：7 天内复用 SharedPreferences 缓存，超过 7 天或强制刷新才重新请求预测接口。
+  Future<void> _loadPredictions({bool forceRefresh = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final lastTs = prefs.getInt(_kPredTsKey) ?? 0;
+    final lastDate = lastTs > 0 ? DateTime.fromMillisecondsSinceEpoch(lastTs) : null;
+    final stale = lastDate == null || now.difference(lastDate).inDays >= 7;
+
+    if (!forceRefresh && !stale) {
+      final cached = prefs.getString(_kPredCacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(cached) as Map<String, dynamic>;
+          final preds = <int, Map>{};
+          decoded.forEach((k, v) {
+            final id = int.tryParse(k);
+            if (id != null && v is Map) {
+              preds[id] = Map<String, dynamic>.from(v);
+            }
+          });
+          if (mounted) {
+            setState(() {
+              _predictions = preds;
+              _lastPredUpdate = lastDate;
+            });
+          }
+          return;
+        } catch (_) {
+          // 缓存损坏则回退重新拉取
+        }
+      }
+    }
+
+    final api = ApiService();
+    final preds = <int, Map>{};
+    await Future.wait(projects.take(4).map((p) async {
+      try {
+        final pid = p['project_id'] as int;
+        preds[pid] = await api.getProjectProgressPrediction(pid);
+      } catch (_) {}
+    }));
+    final ts = now.millisecondsSinceEpoch;
+    await prefs.setInt(_kPredTsKey, ts);
+    await prefs.setString(_kPredCacheKey, jsonEncode(preds));
+    if (mounted) {
+      setState(() {
+        _predictions = preds;
+        _lastPredUpdate = now;
+      });
     }
   }
 
@@ -98,7 +147,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final upcoming = _upcomingProjects();
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: () => _load(forceRefresh: true),
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
@@ -140,6 +189,20 @@ class _DashboardPageState extends State<DashboardPage> {
             const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('无临近到期项目', style: TextStyle(color: AppColors.textMuted))))
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
+          const SizedBox(height: 24),
+
+          // ── AI Estimated Progress (weekly) ──
+          _sectionHeader(
+            'AI Estimated Progress',
+            sub: _lastPredUpdate == null
+                ? 'AI Estimated · 每周更新'
+                : 'AI Estimated · 每周更新 · Updated: ${_fmtMd(_lastPredUpdate!)}',
+          ),
+          const SizedBox(height: 12),
+          if (upcoming.isEmpty)
+            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('无临近到期项目', style: TextStyle(color: AppColors.textMuted))))
+          else
+            ...upcoming.map((p) => _aiEstimatedBar(p)),
           const SizedBox(height: 24),
 
           // ── AI Site Progress Prediction ──
@@ -405,6 +468,87 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ]),
     );
+  }
+
+  // ── AI Estimated Progress Bar (upcoming projects, weekly) ──
+  Widget _aiEstimatedBar(Map p) {
+    final pid = p['project_id'] as int;
+    final pred = _predictions[pid];
+    final actual = (p['progress'] as num? ?? 0).toDouble();
+    final scheduled = pred != null ? (pred['scheduled_progress'] as num?)?.toDouble() : null;
+
+    // AI estimated：优先 scheduled_progress，其次 30 天 milestone 预测值，最后回退实际进度
+    double aiEst = actual;
+    if (pred != null) {
+      if (scheduled != null) {
+        aiEst = scheduled;
+      } else {
+        final milestones = (pred['milestones'] as List?) ?? [];
+        for (final m in milestones) {
+          if (m['label'] == '30 days') {
+            aiEst = (m['predicted_progress'] as num?)?.toDouble() ?? actual;
+            break;
+          }
+        }
+      }
+    }
+    aiEst = aiEst.clamp(0.0, 100.0).toDouble();
+
+    final gap = pred != null ? (pred['progress_gap'] as num?)?.toDouble() : null;
+    final Color barColor;
+    if (pred == null) {
+      barColor = AppColors.textSecondary;
+    } else if (gap != null && gap < 0) {
+      barColor = gap < -10 ? AppColors.red : AppColors.accent;
+    } else if (gap != null && gap >= 5) {
+      barColor = AppColors.green;
+    } else {
+      barColor = AppColors.blue;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: barColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Expanded(
+            child: Text(p['project_name'] ?? '-',
+                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis),
+          ),
+          Text('AI Est ${aiEst.toStringAsFixed(0)}%',
+              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: barColor)),
+        ]),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: aiEst / 100,
+            minHeight: 8,
+            backgroundColor: AppColors.border,
+            valueColor: AlwaysStoppedAnimation(barColor.withValues(alpha: 0.85)),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(children: [
+          Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.accent),
+          const SizedBox(width: 4),
+          Text('Actual ${actual.toStringAsFixed(0)}%  ·  AI Estimated · 每周更新',
+              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+        ]),
+      ]),
+    );
+  }
+
+  String _fmtMd(DateTime dt) {
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    return '$m-$d';
   }
 
   // ── AI Progress Prediction Card ──

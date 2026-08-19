@@ -103,7 +103,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                         final p = projects[i];
                         final progress = (p['progress'] as num? ?? 0).toDouble();
                         final workerCount = p['worker_count'] ?? p['tracked_workers'] ?? 0;
-                        final radius = (p['fence_radius'] as num? ?? 500).toInt();
+                        final radius = (p['fence_radius'] as num? ?? 5000).toInt();
                         return sectionCard(
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: EdgeInsets.zero,
@@ -208,8 +208,9 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   final _loc  = TextEditingController();
   DateTime? _start, _end;
   double _lat = 3.1390, _lng = 101.6869; // default: KL
-  double _radius = 300.0; // meters
+  double _radius = 5000.0; // meters (default 5km)
   bool _hasGps = false;
+  bool _gpsFailed = false;
   bool _saving = false;
   bool _gpsLoading = false;
 
@@ -224,8 +225,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
       _loc.text  = e['location_address'] ?? '';
       _lat    = (e['center_lat'] as num?)?.toDouble() ?? 3.1390;
       _lng    = (e['center_lng'] as num?)?.toDouble() ?? 101.6869;
-      _radius = (e['fence_radius'] as num?)?.toDouble() ?? 300.0;
-      _hasGps = true;
+      _radius = (e['fence_radius'] as num?)?.toDouble() ?? 5000.0;
+      // 编辑模式也需重新捕获位置后才允许保存，防止沿用旧坐标静默放行
+      _hasGps = false;
+      _gpsFailed = false;
       if (e['start_date'] != null) _start = DateTime.tryParse(e['start_date'].toString());
       if (e['end_date']   != null) _end   = DateTime.tryParse(e['end_date'].toString());
     }
@@ -247,12 +250,17 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
         _lat = pos['lat']!;
         _lng = pos['lng']!;
         _hasGps = true;
+        _gpsFailed = false;
         _gpsLoading = false;
       });
       toast('Site location captured!');
     } else {
-      setState(() => _gpsLoading = false);
-      toast('Could not get GPS. Please allow location permission.');
+      setState(() {
+        _hasGps = false;
+        _gpsFailed = true;
+        _gpsLoading = false;
+      });
+      toast('定位失败，无法更新位置');
     }
   }
 
@@ -269,7 +277,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) { toast('Project name is required'); return; }
     if (_loc.text.trim().isEmpty)  { toast('Location address is required'); return; }
-    if (!_hasGps) { toast('Please capture the site GPS location first'); return; }
+    if (!_hasGps) {
+      toast(_gpsFailed ? '定位失败，无法更新位置' : 'Please capture the site GPS location first');
+      return;
+    }
 
     setState(() => _saving = true);
     try {
@@ -365,9 +376,14 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _hasGps ? AppColors.greenLight : AppColors.bgMain,
+              color: _hasGps
+                  ? AppColors.greenLight
+                  : (_gpsFailed ? AppColors.red.withValues(alpha: 0.06) : AppColors.bgMain),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _hasGps ? AppColors.green : AppColors.border),
+              border: Border.all(
+                  color: _hasGps
+                      ? AppColors.green
+                      : (_gpsFailed ? AppColors.red : AppColors.border)),
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
@@ -401,6 +417,22 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   ]),
                 ),
 
+              // GPS failure hint
+              if (_gpsFailed) ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    const Icon(Icons.error_outline, size: 14, color: AppColors.red),
+                    const SizedBox(width: 6),
+                    Text('定位失败，无法更新位置',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.red)),
+                  ]),
+                ),
+              ],
+
               // Get GPS button
               SizedBox(
                 width: double.infinity,
@@ -432,8 +464,8 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               ]),
               Slider(
                 value: _radius,
-                min: 50, max: 2000,
-                divisions: 79,
+                min: 50, max: 5000,
+                divisions: 99,
                 activeColor: AppColors.accent,
                 inactiveColor: AppColors.border,
                 onChanged: (v) => setState(() => _radius = v),
@@ -442,7 +474,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 Text('50m (tight)', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
                 Text('Workers must be within this distance to check in',
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-                Text('2000m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                Text('5000m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               ]),
             ]),
           ),
@@ -559,7 +591,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     if (project == null) return const Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text('Project not found')));
     final p = project!;
     final completed = tasks.where((t) => t['status'] == 'completed').length;
-    final radius = (p['fence_radius'] as num?)?.toInt() ?? 500;
+    final radius = (p['fence_radius'] as num?)?.toInt() ?? 5000;
     final lat = (p['center_lat'] as num?)?.toDouble() ?? 0.0;
     final lng = (p['center_lng'] as num?)?.toDouble() ?? 0.0;
 

@@ -27,7 +27,7 @@ class Project(Base):
     # ✅ GPS geofence (used for check-in)
     center_lat = Column(Float, nullable=False, server_default="3.1390")
     center_lng = Column(Float, nullable=False, server_default="101.6869")
-    fence_radius = Column(Float, nullable=False, server_default="500.0")  # unit: meters
+    fence_radius = Column(Float, nullable=False, server_default="5000.0")  # unit: meters
     supervisor = relationship("Supervisor", back_populates="projects")
     workers = relationship("Worker", back_populates="project")
     tasks = relationship("Task", back_populates="project")

@@ -36,7 +36,7 @@ try:
             supervisor_id=sup.supervisor_id,
             center_lat=3.1390,
             center_lng=101.6869,
-            fence_radius=500.0,
+            fence_radius=5000.0,
         )
         db.add(project)
         db.commit()
@@ -68,7 +68,7 @@ try:
             supervisor_id=sup.supervisor_id,
             center_lat=3.1073,
             center_lng=101.6067,
-            fence_radius=300.0,
+            fence_radius=5000.0,
         )
         db.add(project2)
         db.commit()

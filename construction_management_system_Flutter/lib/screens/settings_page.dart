@@ -233,7 +233,7 @@ class _GeofenceTabState extends State<_GeofenceTab> {
         ]),
       ),
       ...projects.map((p) {
-        final ctrl = TextEditingController(text: (p['fence_radius'] ?? 500).toStringAsFixed(0));
+        final ctrl = TextEditingController(text: (p['fence_radius'] ?? 5000).toStringAsFixed(0));
         return sectionCard(
           margin: const EdgeInsets.only(bottom: 10),
           child: Row(children: [

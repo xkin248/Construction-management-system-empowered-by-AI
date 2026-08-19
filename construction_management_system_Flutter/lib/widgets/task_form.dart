@@ -236,13 +236,13 @@ class _TaskFormState extends State<TaskForm> {
                         ])),
                   ]),
                   const SizedBox(height: 14),
-                  // ── Estimated Hours ──
-                  _fieldLabel('Estimated Hours'),
+                  // ── Estimated Days ──
+                  _fieldLabel('Estimated Days'),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _hours,
                     keyboardType: TextInputType.number,
-                    decoration: _inputDeco('e.g. 40'),
+                    decoration: _inputDeco('e.g. 10'),
                   ),
                   const SizedBox(height: 24),
                   // ── Submit ──
