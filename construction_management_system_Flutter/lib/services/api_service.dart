@@ -410,10 +410,11 @@ class ApiService {
       })).data);
 
   Future<List> getAiSessions() async =>
-      (await dio.get('/ai/sessions')).data as List;
+      (await dio.get('/ai/chat/sessions')).data as List;
 
   Future<List> getAiMessages(int sessionId) async =>
-      (await dio.get('/ai/messages/$sessionId')).data as List;
+      ((await dio.get('/ai/chat/sessions/$sessionId')).data as Map)['messages']
+          as List;
 
   // ───────── Notifications ─────────
   Future<List> getNotifications() async =>

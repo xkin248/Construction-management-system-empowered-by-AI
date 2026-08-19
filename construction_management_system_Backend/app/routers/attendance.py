@@ -165,34 +165,6 @@ def check_in(d: CheckInReq, db: Session = Depends(get_db)):
     return _to_out(a)
 
 
-@router.post("/checkin")
-def check_in_legacy(payload: dict, db: Session = Depends(get_db)):
-    worker_id = payload.get("worker_id")
-    project_id = payload.get("project_id")
-    if project_id is None and payload.get("project"):
-        project = db.query(Project).filter(Project.project_name == str(payload["project"]).strip()).first()
-        project_id = project.project_id if project else None
-    if worker_id is None or project_id is None:
-        raise HTTPException(400, "worker_id and project_id/project are required")
-
-    result = check_in(
-        CheckInReq(
-            worker_id=int(worker_id),
-            project_id=int(project_id),
-            lat=float(payload.get("lat")),
-            lng=float(payload.get("lng")),
-        ),
-        db,
-    )
-    return {
-        "ok": True,
-        "message": "Check-in recorded successfully",
-        "status": result.status,
-        "check_in": _format_hhmm(result.check_in_time),
-        "attendance_id": result.attendance_id,
-    }
-
-
 @router.post("/heartbeat", response_model=AttendanceOut)
 def heartbeat(d: HeartbeatReq, db: Session = Depends(get_db)):
     a = db.query(AttendanceLog).get(d.attendance_id)
@@ -245,39 +217,6 @@ def check_out(d: CheckOutReq, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(a)
     return _to_out(a)
-
-
-@router.post("/checkout")
-def check_out_legacy(payload: dict, db: Session = Depends(get_db)):
-    worker_id = payload.get("worker_id")
-    if worker_id is None:
-        raise HTTPException(400, "worker_id is required")
-
-    attendance = db.query(AttendanceLog).filter(
-        AttendanceLog.worker_id == int(worker_id),
-        AttendanceLog.check_in_time >= _today_start(),
-        AttendanceLog.status == "checked_in",
-    ).order_by(AttendanceLog.attendance_id.desc()).first()
-    if not attendance:
-        raise HTTPException(404, "No active check-in found for this worker today")
-
-    result = check_out(
-        CheckOutReq(
-            attendance_id=attendance.attendance_id,
-            lat=float(payload.get("lat") or attendance.last_heartbeat_lat or attendance.in_lat or 0),
-            lng=float(payload.get("lng") or attendance.last_heartbeat_lng or attendance.in_lng or 0),
-        ),
-        db,
-    )
-    hours = 0.0
-    if result.check_in_time and result.check_out_time:
-        hours = round((result.check_out_time - result.check_in_time).total_seconds() / 3600, 1)
-    return {
-        "ok": True,
-        "check_out": _format_hhmm(result.check_out_time),
-        "hours": hours,
-        "status": result.status,
-    }
 
 
 @router.get("/worker/{wid}/today", response_model=Optional[AttendanceOut])

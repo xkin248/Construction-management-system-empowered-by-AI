@@ -5,8 +5,8 @@ from typing import List, Optional
 import os
 
 from app.database import get_db
-from app.models import File as DBFile, FileLink, Project, Supervisor
-from app.schemas import FileOut, FileUpdate, FileLinkCreate, FileLinkOut
+from app.models import File as DBFile, Project, Supervisor
+from app.schemas import FileOut, FileUpdate
 from app.file_service import (
     save_upload_file, create_thumbnail, delete_file,
     UPLOAD_DIR, THUMBNAIL_DIR
@@ -65,22 +65,6 @@ def list_files(
     return query.order_by(DBFile.created_at.desc()).all()
 
 
-@router.get("/files/{file_id}", response_model=FileOut)
-def get_file(
-    file_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    file = db.query(DBFile).options(
-        joinedload(DBFile.uploader),
-        joinedload(DBFile.project)
-    ).filter(DBFile.file_id == file_id).first()
-
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-    return file
-
-
 @router.get("/files/{file_id}/download")
 def download_file(
     file_id: int,
@@ -98,25 +82,6 @@ def download_file(
         path=file.file_path,
         filename=file.original_name,
         media_type=file.mime_type
-    )
-
-
-@router.get("/files/{file_id}/thumbnail")
-def get_thumbnail(
-    file_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    if not file.thumbnail_path or not os.path.exists(file.thumbnail_path):
-        raise HTTPException(status_code=404, detail="Thumbnail not found")
-
-    return FileResponse(
-        path=file.thumbnail_path,
-        media_type="image/jpeg"
     )
 
 
@@ -161,68 +126,4 @@ def delete_file_endpoint(
     return {"status": "ok", "message": "File deleted successfully"}
 
 
-@router.post("/files/{file_id}/link", response_model=FileLinkOut)
-def link_file_to_entity(
-    file_id: int,
-    link: FileLinkCreate,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
 
-    if link.file_id != file_id:
-        raise HTTPException(status_code=400, detail="File ID mismatch")
-
-    existing_link = db.query(FileLink).filter(
-        FileLink.file_id == file_id,
-        FileLink.entity_type == link.entity_type,
-        FileLink.entity_id == link.entity_id
-    ).first()
-
-    if existing_link:
-        return existing_link
-
-    db_link = FileLink(
-        file_id=file_id,
-        entity_type=link.entity_type,
-        entity_id=link.entity_id
-    )
-    db.add(db_link)
-    db.commit()
-    db.refresh(db_link)
-    return db_link
-
-
-@router.get("/files/{file_id}/links", response_model=List[FileLinkOut])
-def get_file_links(
-    file_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return db.query(FileLink).filter(FileLink.file_id == file_id).all()
-
-
-@router.delete("/files/{file_id}/links/{link_id}")
-def unlink_file(
-    file_id: int,
-    link_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    link = db.query(FileLink).filter(
-        FileLink.link_id == link_id,
-        FileLink.file_id == file_id
-    ).first()
-
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-
-    db.delete(link)
-    db.commit()
-    return {"status": "ok", "message": "Link removed successfully"}

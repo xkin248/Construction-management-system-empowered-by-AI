@@ -1,7 +1,7 @@
 name: buildsmart
 description: AI Construction Management System
 publish_to: 'none'
-version: 1.8.6+114
+version: 1.8.7+115
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -14,8 +14,6 @@ dependencies:
   dio: ^5.8.0+1
   intl: ^0.20.2
   geolocator: ^13.0.2
-  webview_flutter: ^4.10.0
-  webview_flutter_web: ^0.2.3+2
   google_fonts: ^6.2.1
   flutter_markdown: ^0.7.6+2
   flutter_map: ^8.1.0

@@ -56,7 +56,3 @@ def resolve(iid: int, worker_id: int, note: str, db: Session = Depends(get_db)):
     r = db.query(DailyReport).filter(DailyReport.project_id==i.project_id, DailyReport.report_date==t).first()
     if r: r.issues_encountered = (r.issues_encountered or "") + f"\n🚨 {INCIDENT[i.incident_type]}：{note}"
     db.commit(); db.refresh(i); return i
-
-@router.get("/safety/my-tasks/{wid}", response_model=List[IssueOut])
-def my_tasks(wid: int, db: Session = Depends(get_db)):
-    return db.query(Issue).filter(Issue.handled_by==wid, Issue.status.in_(["open","in_progress"])).all()

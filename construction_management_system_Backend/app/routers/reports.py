@@ -28,12 +28,6 @@ def create_report(d: DailyReportCreate, db: Session = Depends(get_db)):
     r = DailyReport(**d.model_dump())
     db.add(r); db.commit(); db.refresh(r); return r
 
-@router.get("/daily-reports/{rid}", response_model=DailyReportOut)
-def get_report(rid: int, db: Session = Depends(get_db)):
-    r = db.query(DailyReport).get(rid)
-    if not r: raise HTTPException(404, "Daily report does not exist"); return r
-
-
 @router.get("/reports/export/{project_id}")
 def export_report(
     project_id: int,

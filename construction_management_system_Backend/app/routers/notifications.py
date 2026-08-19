@@ -192,25 +192,6 @@ def mark_all_read(
     return {"status": "ok", "message": "All notifications marked as read"}
 
 
-@router.delete("/notifications/{notification_id}")
-def delete_notification(
-    notification_id: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    notification = db.query(Notification).filter(
-        Notification.notification_id == notification_id,
-        Notification.supervisor_id == current_user.supervisor_id
-    ).first()
-    
-    if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
-    
-    db.delete(notification)
-    db.commit()
-    return {"status": "ok", "message": "Notification deleted"}
-
-
 @router.get("/notifications/settings", response_model=NotificationSettingOut)
 def get_notification_settings(
     db: Session = Depends(get_db),

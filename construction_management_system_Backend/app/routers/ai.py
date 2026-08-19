@@ -11,13 +11,12 @@ from app.models import (
 from app.schemas import (
     AIChatSessionOut, AIChatMessageOut,
     AIChatRequest, AITaskAnalysisRequest, AITaskAnalysisResponse,
-    AIDailyReportRequest, AISafetyAnalysisRequest,
     AIAutoAssignRequest, AIAutoAssignResponse,
     SiteProgressPrediction
 )
 from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
-    chat_with_ai, analyze_task, generate_daily_report, analyze_safety_risk,
+    chat_with_ai, analyze_task,
     auto_assign_tasks, compute_project_progress, predict_site_progress
 )
 
@@ -153,26 +152,6 @@ def task_analysis(
         same_project_only=request.same_project_only,
     )
     return AITaskAnalysisResponse(**result)
-
-
-@router.post("/ai/reports/generate")
-def generate_report(
-    request: AIDailyReportRequest,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    report_content = generate_daily_report(db, request.project_id, request.report_date)
-    return {"report": report_content}
-
-
-@router.post("/ai/safety/analyze")
-def safety_analysis(
-    request: AISafetyAnalysisRequest,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    analysis = analyze_safety_risk(request.issue_description)
-    return {"analysis": analysis}
 
 
 @router.post("/ai/tasks/auto-assign", response_model=AIAutoAssignResponse)

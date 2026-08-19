@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import AttendanceLog, Project, Task, TaskWorker, Worker
+from app.models import Project, Task, TaskWorker, Worker
 from app.schemas import (
     AIMatchResult, TaskOut,
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
@@ -40,14 +40,6 @@ def _recalc_project_progress(db: Session, project_id: int) -> None:
     if (project.progress or 0.0) != new_progress:
         project.progress = new_progress
         db.add(project)
-
-AVATAR_COLORS = ["#f97316", "#3b82f6", "#22c55e", "#8b5cf6", "#ef4444", "#06b6d4"]
-
-
-def _today_start() -> datetime:
-    today = date.today()
-    return datetime(today.year, today.month, today.day)
-
 
 def _normalize_status(value: Optional[str], progress: Optional[float] = None) -> str:
     if value:
@@ -171,64 +163,7 @@ def _task_load_options():
     )
 
 
-def _score_worker(task: Task, worker: Worker, attendance: Optional[AttendanceLog]) -> tuple[int, str]:
-    text = " ".join(filter(None, [task.task_name, task.description])).lower()
-    trade = (worker.trade or "").strip().lower()
-    score = 45
-    reasons: list[str] = []
 
-    if trade and trade in text:
-        score += 35
-        reasons.append(f"Trade matches task needs: {worker.trade}")
-    elif trade:
-        score += 12
-        reasons.append(f"Worker trade available: {worker.trade}")
-    else:
-        reasons.append("Trade not set, scored by availability only")
-
-    worker_status = "Absent"
-    if attendance and attendance.status in ("checked_in", "checked_out"):
-        if attendance.check_in_time and attendance.check_in_time.strftime("%H:%M") > "07:30":
-            worker_status = "Late"
-            score += 5
-            reasons.append("Worker is on site today but arrived late")
-        else:
-            worker_status = "Present"
-            score += 15
-            reasons.append("Worker is on site today")
-    else:
-        reasons.append("Worker has no attendance log today")
-
-    if worker.has_safety_training:
-        score += 3
-    if worker.is_safety_officer:
-        score += 2
-
-    return min(score, 99), "; ".join(reasons[:3])
-
-
-def _worker_status_payload(worker: Worker, attendance: Optional[AttendanceLog]) -> str:
-    if not attendance or attendance.status not in ("checked_in", "checked_out"):
-        return "Absent"
-    if attendance.check_in_time and attendance.check_in_time.strftime("%H:%M") > "07:30":
-        return "Late"
-    return "Present"
-
-
-def _worker_skills(worker: Worker) -> list[str]:
-    skills = []
-    if worker.trade:
-        skills.append(worker.trade.title())
-    if worker.has_safety_training:
-        skills.append("Safety Trained")
-    if worker.is_safety_officer:
-        skills.append("Safety Officer")
-    return skills or ["General"]
-
-
-def _worker_initials(name: str) -> str:
-    parts = [p[:1].upper() for p in name.split() if p.strip()]
-    return "".join(parts[:2]) or "NA"
 
 
 def _serialize_task(task: Task) -> Dict[str, Any]:
@@ -239,57 +174,7 @@ def _serialize_task(task: Task) -> Dict[str, Any]:
     return data
 
 
-def _candidate_payload(task: Task, worker: Worker, attendance: Optional[AttendanceLog], index: int) -> Dict[str, Any]:
-    score, reason = _score_worker(task, worker, attendance)
-    return {
-        "worker_id": worker.worker_id,
-        "worker_name": worker.name,
-        "worker_role": worker.trade or "General Worker",
-        "worker_status": _worker_status_payload(worker, attendance),
-        "worker_rating": round(3.8 + min(score, 95) / 100, 1),
-        "worker_skills": _worker_skills(worker),
-        "worker_avatar_color": AVATAR_COLORS[index % len(AVATAR_COLORS)],
-        "worker_initials": _worker_initials(worker.name),
-        "match_score": score,
-        "reason": reason,
-    }
 
-
-def _attendance_map(db: Session, project_id: int) -> Dict[int, AttendanceLog]:
-    rows = db.query(AttendanceLog).filter(
-        AttendanceLog.project_id == project_id,
-        AttendanceLog.check_in_time >= _today_start(),
-    ).order_by(AttendanceLog.attendance_id.desc()).all()
-    result: Dict[int, AttendanceLog] = {}
-    for row in rows:
-        result.setdefault(row.worker_id, row)
-    return result
-
-
-def _task_candidates(task: Task, db: Session) -> List[Dict[str, Any]]:
-    workers = db.query(Worker).order_by(Worker.worker_id.asc()).all()
-    attendance_by_worker = _attendance_map(db, task.project_id)
-    candidates = [
-        _candidate_payload(task, worker, attendance_by_worker.get(worker.worker_id), idx)
-        for idx, worker in enumerate(workers)
-    ]
-    candidates.sort(key=lambda item: item["match_score"], reverse=True)
-    return candidates
-
-
-def _assignment_payload(task: Task, db: Session) -> Dict[str, Any]:
-    assigned_name = task.assigned_worker.name if task.assigned_worker else None
-    return {
-        "task": {
-            "id": task.task_id,
-            "title": task.task_name,
-            "project": task.project.project_name if task.project else f"Project {task.project_id}",
-            "priority": (task.priority or "medium").title(),
-            "status": (task.status or "pending").replace("_", " ").title(),
-            "assigned_to": assigned_name,
-        },
-        "candidates": _task_candidates(task, db),
-    }
 
 
 @router.get("/projects/{pid}/tasks", response_model=List[TaskOut])
@@ -412,66 +297,7 @@ def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)
     return results
 
 
-@router.get("/ai-assign")
-def list_ai_assignments(db: Session = Depends(get_db)):
-    tasks = db.query(Task).options(*_task_load_options()).order_by(Task.task_id.asc()).all()
-    return [_assignment_payload(task, db) for task in tasks]
 
-
-@router.post("/ai-assign/{task_id}")
-def assign_worker(task_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)):
-    task = db.query(Task).options(*_task_load_options()).get(task_id)
-    if not task:
-        raise HTTPException(404, "Task does not exist")
-
-    worker_id = payload.get("worker_id")
-    if worker_id is None:
-        raise HTTPException(400, "worker_id is required")
-    worker = _validate_worker(db, task.project_id, worker_id)
-    candidates = _task_candidates(task, db)
-    chosen = next((item for item in candidates if item["worker_id"] == worker.worker_id), None)
-    if not chosen:
-        raise HTTPException(400, "Unable to score the selected worker for this task")
-
-    _set_task_workers(db, task, [worker.worker_id])
-    _notify_workers_assigned(db, task, [worker.worker_id])
-    task.ai_confidence = round(chosen["match_score"] / 100, 2)
-    if task.status == "pending":
-        task.status = "in_progress"
-    db.commit()
-    db.refresh(task)
-    return {
-        "ok": True,
-        "task_id": task.task_id,
-        "worker_id": worker.worker_id,
-        "worker_name": worker.name,
-        "match_score": chosen["match_score"],
-    }
-
-
-@router.post("/ai-assign/all")
-def auto_assign_all(db: Session = Depends(get_db)):
-    tasks = db.query(Task).options(*_task_load_options()).filter(
-        Task.assigned_worker_id.is_(None),
-        Task.status.in_(["pending", "in_progress"]),
-    ).order_by(Task.task_id.asc()).all()
-
-    assigned = 0
-    for task in tasks:
-        candidates = _task_candidates(task, db)
-        if not candidates:
-            continue
-        # Assign up to 3 best-matched workers (multi-worker assignment).
-        best = candidates[:3]
-        task.task_workers = [TaskWorker(worker_id=item["worker_id"]) for item in best]
-        task.assigned_worker_id = best[0]["worker_id"]
-        task.ai_confidence = round(best[0]["match_score"] / 100, 2)
-        if task.status == "pending":
-            task.status = "in_progress"
-        assigned += 1
-
-    db.commit()
-    return {"ok": True, "assigned": assigned}
 
 
 # ══════════════════════════════════════════════════════════════════
