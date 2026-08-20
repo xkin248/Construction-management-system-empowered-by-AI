@@ -34,11 +34,13 @@ def task_analysis(
         if task:
             task_info["task_name"] = task.task_name
             task_info["description"] = task.description
+            task_info["trade"] = task.trade or ""
         else:
             raise HTTPException(status_code=404, detail="Task not found")
     else:
         task_info["task_name"] = request.task_name or ""
         task_info["description"] = request.description or ""
+        task_info["trade"] = request.trade or ""
 
     result = analyze_task(
         db, task_info, request.project_id,

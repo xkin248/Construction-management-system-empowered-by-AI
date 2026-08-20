@@ -293,6 +293,7 @@ class AITaskAnalysisRequest(BaseModel):
     task_id: Optional[int] = None
     task_name: Optional[str] = None
     description: Optional[str] = None
+    trade: Optional[str] = None
     project_id: int
     same_project_only: bool = False
 

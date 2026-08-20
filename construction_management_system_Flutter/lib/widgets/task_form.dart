@@ -25,6 +25,26 @@ class _TaskFormState extends State<TaskForm> {
   DateTime? _due;
   int? _projectId;
   String _priority = 'medium';
+  String? _trade;
+
+  static const _tradeOptions = [
+    'carpenter',
+    'electrical',
+    'plumbing',
+    'masonry',
+    'painting',
+    'welding',
+    'hvac',
+    'roofing',
+    'tiling',
+    'drywall',
+    'glazing',
+    'flooring',
+    'equipment',
+    'laborer',
+    'insulation',
+    'supervision',
+  ];
 
   List _projects = [];
   bool _loadingProjects = true;
@@ -41,6 +61,7 @@ class _TaskFormState extends State<TaskForm> {
     _hours = TextEditingController(
         text: t?['estimated_hours']?.toString() ?? '');
     _priority = t?['priority'] as String? ?? 'medium';
+    _trade = t?['trade'] as String?;
     _projectId = t?['project_id'] as int? ?? widget.initialProjectId;
     if (t?['due_date'] != null && t!['due_date'].toString().isNotEmpty) {
       _due = DateTime.tryParse(t['due_date'].toString());
@@ -77,6 +98,7 @@ class _TaskFormState extends State<TaskForm> {
         'description': _desc.text.trim(),
         'project_id': _projectId,
         'priority': _priority,
+        'trade': _trade,
         'due_date': _due?.toIso8601String().split('T').first,
         'estimated_hours': double.tryParse(_hours.text.trim()) ?? 0,
       };
@@ -151,6 +173,28 @@ class _TaskFormState extends State<TaskForm> {
                     controller: _desc,
                     maxLines: 2,
                     decoration: _inputDeco('Optional description...'),
+                  ),
+                  const SizedBox(height: 14),
+                  // — Trade (explicit choice beats AI guessing) —
+                  _fieldLabel('Trade'),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String?>(
+                    initialValue: _trade,
+                    isExpanded: true,
+                    decoration: _inputDeco(null),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Auto (AI detect)',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  color: AppColors.textMuted))),
+                      ..._tradeOptions.map((t) => DropdownMenuItem<String?>(
+                          value: t,
+                          child: Text(t[0].toUpperCase() + t.substring(1),
+                              style: GoogleFonts.outfit(fontSize: 13)))),
+                    ],
+                    onChanged: (v) => setState(() => _trade = v),
                   ),
                   const SizedBox(height: 14),
                   // ── Project ──

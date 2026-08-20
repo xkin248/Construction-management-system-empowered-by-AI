@@ -484,6 +484,28 @@ class _TaskCardState extends State<_TaskCard> {
                 valueColor: AlwaysStoppedAnimation(barColor),
               ),
             ),
+            // Trade badge
+            if (widget.task['trade'] != null) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 28),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    (widget.task['trade'] as String)[0].toUpperCase() +
+                        (widget.task['trade'] as String).substring(1),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.accent),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             // Worker + due date row
             Row(children: [

@@ -286,6 +286,7 @@ class ApiService {
       Map.from((await dio.post('/ai/tasks/analyze', data: {
         'task_name': taskInfo['task_name'] ?? '',
         'description': taskInfo['description'] ?? '',
+        'trade': taskInfo['trade'] ?? '',
         'project_id': projectId,
         'same_project_only': sameProjectOnly,
       })).data);
