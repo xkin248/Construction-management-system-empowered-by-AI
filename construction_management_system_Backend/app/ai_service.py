@@ -540,9 +540,17 @@ def auto_assign_tasks(
                 break
 
         if not dry_run and chosen_ids:
+            # SQLAlchemy flushes INSERTs before DELETEs within the same flush,
+            # so replacing the collection directly would re-insert a kept
+            # worker id and violate the unique (task_id, worker_id) constraint.
+            # Delete existing links first, expire the collection so the next
+            # load sees an empty DB, then attach the new ones.
+            for tw in list(t.task_workers):
+                db.delete(tw)
+            db.flush()
+            db.expire(t, ["task_workers"])
             t.task_workers = [TaskWorker(worker_id=wid) for wid in chosen_ids]
             t.assigned_worker_id = chosen_ids[0]
-            db.add(t)
 
         assignments.append({
             "task_id": t.task_id,
