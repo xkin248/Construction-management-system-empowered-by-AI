@@ -50,7 +50,7 @@ SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildS
 # Trade synonyms: canonical group -> keywords matched against task text / worker trade.
 TRADE_ALIASES: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
-    "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
+    "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
     "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土"],
     "painting": ["painting", "paint", "plaster", "emulsion", "primer", "油漆", "粉刷", "涂料"],
@@ -61,7 +61,7 @@ TRADE_ALIASES: Dict[str, List[str]] = {
     "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
     "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗"],
     "flooring": ["flooring", "floor", "linoleum", "carpet", "地板", "地毯"],
-    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "挖掘机", "推土机"],
+    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机"],
     "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
     "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查"],
@@ -70,7 +70,7 @@ TRADE_ALIASES: Dict[str, List[str]] = {
 # Seed keywords used by the dataset-trained semantic matcher (mirror of build_trade_matcher.py).
 SEED_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "carpentry", "木工", "橱柜"],
-    "electrical": ["electrician", "electrical", "wiring", "cable", "lighting", "db panel", "电工", "电线", "照明"],
+    "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "电工", "电线", "照明"],
     "plumbing": ["plumber", "plumbing", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
     "masonry": ["mason", "masonry", "brick", "block", "concrete", "wall", "plaster", "砌砖", "砖墙", "混凝土"],
     "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "油漆", "粉刷", "涂料"],
@@ -81,7 +81,7 @@ SEED_KEYWORDS: Dict[str, List[str]] = {
     "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
     "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装"],
     "flooring": ["floor", "flooring", "linoleum", "carpet", "wooden floor", "地板", "地毯"],
-    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "挖掘机", "推土机"],
+    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机"],
     "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
     "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "工地主任", "监工", "巡查"],
@@ -149,13 +149,23 @@ def _semantic_trade_scores(task_text: str) -> Dict[str, float]:
             len(q_tokens & set(_clean_text(" ".join(SEED_KEYWORDS.get(g, []))).split()))
             for g in names
         ])
-        entry_hits = np.array([
-            len(q_tokens - set(_clean_text(" ".join(SEED_KEYWORDS.get(g, []))).split()))
-            for g in names
-        ])
+        # NOTE: previously there was an `entry_hits` term using
+        # `q_tokens - seed_tokens`, which is an ANTI-metric that returned the same
+        # value for every trade and added a flat 0.35 floor to ALL trades. That
+        # destroyed score discrimination: e.g. "electric" scored 0.35 for every
+        # trade, and max() then picked the alphabetically-first 'carpenter',
+        # mis-assigning electrical tasks to carpenters. The model ships no entry
+        # vocab, so we drop that term entirely.
         n = max(len(q_tokens), 1)
-        final = sims_norm + 0.8 * np.minimum(seed_hits / n, 1.0) + 0.35 * np.minimum(entry_hits / n, 1.0)
-        return {g: float(s) for g, s in zip(names, final) if s > 0}
+        # Score = normalised TF-IDF similarity + seed-hit bonus. The bonus has two
+        # parts: a ratio term (proportion of query tokens that hit this trade's
+        # seeds) and a flat hit term (at least one seed hit always boosts). The flat
+        # term keeps short queries like "electric point" (1 seed hit / 2 tokens =
+        # 0.4 ratio) above the 0.5 output floor.
+        final = sims_norm + 0.6 * np.minimum(seed_hits / n, 1.0) + 0.4 * np.minimum(seed_hits, 1.0)
+        # Drop near-flat scores so a non-discriminating query does not produce a
+        # false "best trade". Keep only trades with a meaningful signal.
+        return {g: float(s) for g, s in zip(names, final) if s >= 0.5}
     except Exception:
         return {}
 
@@ -204,16 +214,20 @@ def analyze_task(
     description = task_info.get("description", "")
 
     task_text = f"{task_name} {description}".lower()
-    # Dataset-trained semantic trade detection (understands task meaning, not just keywords).
     semantic_scores = _semantic_trade_scores(task_text)
-    detected_trades = set()
-    if semantic_scores:
-        best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
-        if best_score > 0:
-            detected_trades = {best_trade}
-    # Legacy keyword fallback when the semantic model is unavailable.
+    # 1. Keyword detection first (TRADE_ALIASES substring match — reliable, no false positives).
+    detected_trades = _detect_trade_groups(task_text)
+    # 2. Semantic detection as a supplement — only when keywords found nothing AND
+    #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
+    #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
+    #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
     if not detected_trades:
-        detected_trades = _detect_trade_groups(task_text)
+        if semantic_scores:
+            best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
+            sorted_scores = sorted(semantic_scores.values(), reverse=True)
+            gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
+            if best_score >= 0.6 and gap >= 0.15:
+                detected_trades = {best_trade}
 
     suggested_workers = []
     matched_any = False
@@ -419,8 +433,11 @@ def _extract_json(text: str) -> Optional[Any]:
         return None
 
 
-def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5) -> Dict[str, Any]:
-    workers = db.query(Worker).all()
+def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5, same_project_only: bool = False) -> Dict[str, Any]:
+    if same_project_only:
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).all()
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
 
@@ -450,17 +467,20 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
                 )
             )
             parsed = _extract_json(getattr(resp, "text", "") or "")
+            base_for_trades = analyze_task(db, task_info, project_id, same_project_only=same_project_only)
             if isinstance(parsed, dict) and isinstance(parsed.get("suggested_workers"), list):
                 out = parsed
                 out["suggested_workers"] = out["suggested_workers"][:top_k]
                 out["semantic_used"] = True
+                out["matched_trades"] = base_for_trades.get("matched_trades") or []
                 return out
             if isinstance(parsed, list):
-                return {"suggested_workers": parsed[:top_k], "semantic_used": True}
+                return {"suggested_workers": parsed[:top_k], "semantic_used": True,
+                        "matched_trades": base_for_trades.get("matched_trades") or []}
         except Exception:
             pass
 
-    base = analyze_task(db, task_info, project_id)
+    base = analyze_task(db, task_info, project_id, same_project_only=same_project_only)
     base["suggested_workers"] = (base.get("suggested_workers") or [])[:top_k]
     return base
 
@@ -478,18 +498,37 @@ def auto_assign_tasks(
     q = q.filter(Task.status != "completed")
     tasks = q.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.task_id.asc()).all()
 
+    # Auto-assign matches against the whole worker pool (same as the analyze
+    # screen default) so tasks in projects without bound workers can still get
+    # matched. The trade matching itself guarantees the right trade wins.
     workers = db.query(Worker).all()
     worker_ids = {w.worker_id for w in workers}
 
     assignments = []
     for t in tasks:
-        # Skip tasks that already have a full assignment (legacy single-worker
-        # rows with only assigned_worker_id are still processed to backfill links).
-        if t.assigned_worker_id and t.task_workers:
-            continue
         task_info = {"task_name": t.task_name, "description": t.description or ""}
-        rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k))
+        rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=False)
         suggested = rec.get("suggested_workers") or []
+        matched_trades = set(rec.get("matched_trades") or [])
+
+        # Re-evaluate tasks that already have a full assignment: skip them only
+        # when the currently assigned workers actually match the task demand.
+        # A pre-existing AI mis-assignment (e.g. "electric" task assigned to a
+        # carpenter) must be corrected on the next auto-assign run, otherwise the
+        # wrong assignment stays forever. Legacy rows with only assigned_worker_id
+        # are always processed to backfill task_workers links.
+        if t.assigned_worker_id and t.task_workers:
+            current_ok = False
+            for tw in t.task_workers:
+                w = next((x for x in workers if x.worker_id == tw.worker_id), None)
+                if w is None:
+                    continue
+                wg = _worker_trade_group(w.trade)
+                if wg in matched_trades:
+                    current_ok = True
+                    break
+            if current_ok:
+                continue
 
         # Pick up to top_k valid workers, ordered by match score (multi-worker).
         chosen_ids: List[int] = []
