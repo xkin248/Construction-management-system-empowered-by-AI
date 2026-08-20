@@ -214,20 +214,41 @@ def analyze_task(
     description = task_info.get("description", "")
 
     task_text = f"{task_name} {description}".lower()
-    semantic_scores = _semantic_trade_scores(task_text)
-    # 1. Keyword detection first (TRADE_ALIASES substring match — reliable, no false positives).
-    detected_trades = _detect_trade_groups(task_text)
-    # 2. Semantic detection as a supplement — only when keywords found nothing AND
-    #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
-    #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
-    #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
+
+    # User-selected trade (task.trade) beats every guessing heuristic: when the
+    # supervisor explicitly picks a trade on the form, trust it 100% so a vague
+    # title like "hello" can no longer cause a random assignment.
+    explicit_trade = str(task_info.get("trade") or "").strip().lower()
+    detected_trades = set()
+    trade_source = "semantic"
+    if explicit_trade:
+        canonical = _worker_trade_group(explicit_trade)
+        if canonical:
+            detected_trades = {canonical}
+            trade_source = "user"
+        else:
+            # Fall back to the raw trade string so it still matches workers
+            # whose trade column contains that exact value.
+            detected_trades = {explicit_trade}
+            trade_source = "user"
+
     if not detected_trades:
-        if semantic_scores:
-            best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
-            sorted_scores = sorted(semantic_scores.values(), reverse=True)
-            gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
-            if best_score >= 0.6 and gap >= 0.15:
-                detected_trades = {best_trade}
+        semantic_scores = _semantic_trade_scores(task_text)
+        # 1. Keyword detection first (TRADE_ALIASES substring match — reliable, no false positives).
+        detected_trades = _detect_trade_groups(task_text)
+        # 2. Semantic detection as a supplement — only when keywords found nothing AND
+        #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
+        #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
+        #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
+        if not detected_trades:
+            if semantic_scores:
+                best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
+                sorted_scores = sorted(semantic_scores.values(), reverse=True)
+                gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
+                if best_score >= 0.6 and gap >= 0.15:
+                    detected_trades = {best_trade}
+    else:
+        semantic_scores = {canonical: 1.0 for canonical in detected_trades}
 
     suggested_workers = []
     matched_any = False
@@ -297,6 +318,7 @@ def analyze_task(
         "priority_suggestion": priority,
         "safety_notes": "请确保施工人员佩戴必要的安全防护装备，并遵守现场安全规定。",
         "matched_trades": sorted(detected_trades),
+        "trade_source": trade_source,
         "semantic_used": bool(semantic_scores),
         "notice": "" if matched_any or not detected_trades else "项目中暂无匹配工种（{}）的工人，以下为其他工种候选".format(
             "/".join(sorted(detected_trades))
@@ -506,7 +528,7 @@ def auto_assign_tasks(
 
     assignments = []
     for t in tasks:
-        task_info = {"task_name": t.task_name, "description": t.description or ""}
+        task_info = {"task_name": t.task_name, "description": t.description or "", "trade": t.trade or ""}
         rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=False)
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])

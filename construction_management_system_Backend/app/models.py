@@ -89,6 +89,7 @@ class Task(Base):
     project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
     priority = Column(String(50), default="medium")
     status = Column(String(50), default="pending")
+    trade = Column(String(100), nullable=True)  # canonical trade selected by the user (optional, beats semantic guessing)
     due_date = Column(Date, nullable=True)
     ai_confidence = Column(Float, nullable=True)
     assigned_worker = relationship("Worker", back_populates="tasks")

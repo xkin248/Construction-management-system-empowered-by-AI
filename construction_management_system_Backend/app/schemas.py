@@ -150,6 +150,7 @@ class TaskBase(BaseModel):
     project_id: int
     priority: Optional[str] = "medium"
     status: Optional[str] = "pending"
+    trade: Optional[str] = None  # canonical trade selected by the user (optional)
     due_date: Optional[date] = None
     ai_confidence: Optional[float] = Field(None, ge=0, le=1)
 class TaskCreate(TaskBase): pass

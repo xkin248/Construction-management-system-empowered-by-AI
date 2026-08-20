@@ -204,6 +204,7 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
         project_id=project.project_id,
         priority=str(payload.get("priority") or "medium").strip().lower(),
         status=status,
+        trade=str(payload.get("trade") or "").strip() or None,
         due_date=_parse_date(payload.get("due_date") or payload.get("due")),
         ai_confidence=(float(payload["ai_confidence"]) if payload.get("ai_confidence") is not None else None),
     )
@@ -241,6 +242,9 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
         task.status = _normalize_status(payload.get("status"), payload.get("progress"))
         if task.status != old_status:
             _recalc_project_progress(db, task.project_id)
+
+    if "trade" in payload:
+        task.trade = str(payload.get("trade") or "").strip() or None
 
     if "due_date" in payload or "due" in payload:
         task.due_date = _parse_date(payload.get("due_date") or payload.get("due"))
