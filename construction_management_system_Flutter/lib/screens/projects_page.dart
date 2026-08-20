@@ -75,17 +75,35 @@ class _FenceMap extends StatelessWidget {
 Future<Map<String, double>?> _getSiteGps() async {
   if (kIsWeb) return null;
   try {
+    // 1) Ensure the location service is ON — open system GPS settings if it is off
     bool svc = await Geolocator.isLocationServiceEnabled();
-    if (!svc) return null;
+    if (!svc) {
+      try {
+        await Geolocator.openLocationSettings();
+      } catch (_) {}
+      svc = await Geolocator.isLocationServiceEnabled();
+      if (!svc) return null;
+    }
     LocationPermission perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return null;
-    final pos = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
-    );
-    return {'lat': pos.latitude, 'lng': pos.longitude};
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
+      );
+      return {'lat': pos.latitude, 'lng': pos.longitude};
+    } catch (_) {
+      // Retry once after re-opening system location settings (fixes GPS toggled off)
+      try {
+        await Geolocator.openLocationSettings();
+      } catch (_) {}
+      final pos2 = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
+      );
+      return {'lat': pos2.latitude, 'lng': pos2.longitude};
+    }
   } catch (_) {
     return null;
   }
@@ -277,6 +295,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   bool _saving = false;
   bool _gpsLoading = false;
 
+  // ── Language switch (English / Bahasa Melayu) ──
+  String _lang = 'en';
+  String t(String en, String bm) => _lang == 'bm' ? bm : en;
+
   bool get _isEdit => widget.existing != null;
 
   @override
@@ -316,14 +338,14 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
         _gpsFailed = false;
         _gpsLoading = false;
       });
-      toast('Site location captured!');
+      toast(t('Site location captured!', 'Lokasi tapak berjaya ditangkap!'));
     } else {
       setState(() {
         _hasGps = false;
         _gpsFailed = true;
         _gpsLoading = false;
       });
-      toast('定位失败，无法更新位置');
+      toast(t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.'));
     }
   }
 
@@ -338,10 +360,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   }
 
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty) { toast('Project name is required'); return; }
-    if (_loc.text.trim().isEmpty)  { toast('Location address is required'); return; }
+    if (_name.text.trim().isEmpty) { toast(t('Project name is required', 'Nama projek diperlukan')); return; }
+    if (_loc.text.trim().isEmpty)  { toast(t('Location address is required', 'Alamat tapak diperlukan')); return; }
     if (!_hasGps) {
-      toast(_gpsFailed ? '定位失败，无法更新位置' : 'Please capture the site GPS location first');
+      toast(_gpsFailed ? t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.') : t('Please capture the site GPS location first', 'Sila tangkap lokasi GPS tapak dahulu'));
       return;
     }
 
@@ -367,16 +389,16 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
 
       if (!mounted) return;
       Navigator.pop(context);
-      toast(_isEdit ? 'Project updated!' : 'Project created!');
+      toast(_isEdit ? t('Project updated!', 'Projek dikemas kini!') : t('Project created!', 'Projek dicipta!'));
       widget.onSaved();
     } on DioException catch (e) {
-      toast(e.message ?? 'Failed to save project');
+      toast(e.message ?? t('Failed to save project', 'Gagal menyimpan projek'));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  String _fmtDate(DateTime? d) => d == null ? 'Not set'
+  String _fmtDate(DateTime? d) => d == null ? t('Not set', 'Tidak ditetapkan')
       : '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   @override
@@ -398,17 +420,33 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
             ),
           ),
-          Text(_isEdit ? 'Edit Project' : 'New Project',
-              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          Row(children: [
+            Expanded(
+              child: Text(_isEdit ? t('Edit Project', 'Sunting Projek') : t('New Project', 'Projek Baharu'),
+                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ),
+            // ── Language switch button ──
+            TextButton.icon(
+              onPressed: () => setState(() => _lang = _lang == 'en' ? 'bm' : 'en'),
+              icon: Icon(_lang == 'en' ? Icons.translate_rounded : Icons.language_rounded, size: 16),
+              label: Text(_lang == 'en' ? 'BM' : 'EN',
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 36),
+              ),
+            ),
+          ]),
           const SizedBox(height: 20),
 
           // ── Project Name ──────────────────────────────
-          Text('Project Name', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          Text(t('Project Name', 'Nama Projek'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           TextField(
             controller: _name,
             decoration: InputDecoration(
-              hintText: 'e.g. Penang Tower Block C',
+              hintText: t('e.g. Penang Tower Block C', 'cth. Menara Pulau Pinang Blok C'),
               hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
@@ -419,12 +457,12 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
           const SizedBox(height: 14),
 
           // ── Location Address ──────────────────────────
-          Text('Site Address', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          Text(t('Site Address', 'Alamat Tapak'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 6),
           TextField(
             controller: _loc,
             decoration: InputDecoration(
-              hintText: 'Full address of the construction site',
+              hintText: t('Full address of the construction site', 'Alamat penuh tapak pembinaan'),
               hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
               prefixIcon: const Icon(Icons.place_outlined, color: AppColors.textMuted, size: 18),
@@ -453,7 +491,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 Icon(Icons.gps_fixed_rounded, size: 16, color: _hasGps ? AppColors.green : AppColors.textSecondary),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text('Site Geofence',
+                  child: Text(t('Site Geofence', 'Geopagar Tapak'),
                       style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700,
                           color: _hasGps ? AppColors.green : AppColors.textPrimary)),
                 ),
@@ -461,7 +499,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(8)),
-                    child: Text('Set', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
+                    child: Text(t('Set', 'Tetap'), style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
                   ),
               ]),
               const SizedBox(height: 10),
@@ -498,7 +536,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 const Icon(Icons.touch_app_outlined, size: 13, color: AppColors.textMuted),
                 const SizedBox(width: 5),
                 Expanded(
-                  child: Text('Tap on the map to move the fence center',
+                  child: Text(t('Tap on the map to move the fence center', 'Ketik peta untuk menggerakkan pusat pagar'),
                       style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                 ),
               ]),
@@ -511,7 +549,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   child: Row(children: [
                     const Icon(Icons.error_outline, size: 14, color: AppColors.red),
                     const SizedBox(width: 6),
-                    Text('定位失败，无法更新位置',
+                    Text(t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.'),
                         style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -528,7 +566,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                   icon: _gpsLoading
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.my_location_rounded, size: 16),
-                  label: Text(_hasGps ? 'Re-capture Site Location' : 'Capture Site Location (Go to site first)',
+                  label: Text(_hasGps ? t('Re-capture Site Location', 'Tangkap Semula Lokasi Tapak') : t('Capture Site Location (Go to site first)', 'Tangkap Lokasi Tapak (Pergi ke tapak dahulu)'),
                       style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _hasGps ? AppColors.green : AppColors.accent,
@@ -541,7 +579,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
 
               // Radius slider
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Check-in Radius', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                Text(t('Check-in Radius', 'Jejari Daftar Masuk'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
@@ -558,8 +596,8 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 onChanged: (v) => setState(() => _radius = v),
               ),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('50m (tight)', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-                Text('Workers must be within this distance to check in',
+                Text(t('50m (tight)', '50m (ketat)'), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                Text(t('Workers must be within this distance to check in', 'Pekerja mesti berada dalam jarak ini untuk daftar masuk'),
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
                 Text('5000m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               ]),
@@ -571,7 +609,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
           Row(children: [
             Expanded(
               child: _DateButton(
-                label: 'Start Date',
+                label: t('Start Date', 'Tarikh Mula'),
                 value: _fmtDate(_start),
                 onTap: () => _pickDate(true),
               ),
@@ -579,7 +617,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
             const SizedBox(width: 10),
             Expanded(
               child: _DateButton(
-                label: 'End Date',
+                label: t('End Date', 'Tarikh Tamat'),
                 value: _fmtDate(_end),
                 onTap: () => _pickDate(false),
               ),
@@ -598,7 +636,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
             ),
             child: _saving
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Text(_isEdit ? 'Save Changes' : 'Create Project',
+                : Text(_isEdit ? t('Save Changes', 'Simpan Perubahan') : t('Create Project', 'Cipta Projek'),
                     style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         ]),
