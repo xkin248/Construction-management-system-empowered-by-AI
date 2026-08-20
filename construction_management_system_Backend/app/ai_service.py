@@ -1,8 +1,10 @@
 import os
 import json
 import re
+from collections import defaultdict
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 
 try:
@@ -10,6 +12,15 @@ try:
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
+
+try:
+    import joblib
+    import numpy as np
+    from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+    from sklearn.metrics.pairwise import cosine_similarity
+    SEMANTIC_AVAILABLE = True
+except ImportError:
+    SEMANTIC_AVAILABLE = False
 
 from app.database import get_db
 from app.models import Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue, PredictionHistory
@@ -38,14 +49,115 @@ SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildS
 
 # Trade synonyms: canonical group -> keywords matched against task text / worker trade.
 TRADE_ALIASES: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
+    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
     "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
     "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土"],
     "painting": ["painting", "paint", "plaster", "emulsion", "primer", "油漆", "粉刷", "涂料"],
-    "welding": ["welding", "weld", "steel", "metal", "焊接", "钢结构", "金属"],
+    "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属"],
     "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风"],
+    "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面"],
+    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "瓷砖", "地砖"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
+    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗"],
+    "flooring": ["flooring", "floor", "linoleum", "carpet", "地板", "地毯"],
+    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "挖掘机", "推土机"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
+    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查"],
 }
+
+# Seed keywords used by the dataset-trained semantic matcher (mirror of build_trade_matcher.py).
+SEED_KEYWORDS: Dict[str, List[str]] = {
+    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "carpentry", "木工", "橱柜"],
+    "electrical": ["electrician", "electrical", "wiring", "cable", "lighting", "db panel", "电工", "电线", "照明"],
+    "plumbing": ["plumber", "plumbing", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
+    "masonry": ["mason", "masonry", "brick", "block", "concrete", "wall", "plaster", "砌砖", "砖墙", "混凝土"],
+    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "油漆", "粉刷", "涂料"],
+    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构"],
+    "hvac": ["hvac", "air conditioning", "ventilation", "ahu", "duct", "暖通", "空调", "通风"],
+    "roofing": ["roofer", "roofing", "roof", "shingle", "屋顶", "屋面"],
+    "tiling": ["tile", "tiler", "tiling", "terrazzo", "ceramic", "瓷砖", "地砖"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
+    "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装"],
+    "flooring": ["floor", "flooring", "linoleum", "carpet", "wooden floor", "地板", "地毯"],
+    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "挖掘机", "推土机"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
+    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "工地主任", "监工", "巡查"],
+}
+
+# Standard estimated task duration (workdays) per canonical trade, used by
+# dataset-augmented progress prediction.
+TRADE_DURATION: Dict[str, float] = {
+    "carpenter": 2.0, "electrical": 1.5, "plumbing": 1.5, "masonry": 2.0,
+    "painting": 1.5, "welding": 2.0, "hvac": 1.5, "roofing": 2.0,
+    "tiling": 1.5, "drywall": 1.5, "glazing": 1.5, "flooring": 1.5,
+    "equipment": 1.0, "laborer": 1.0, "insulation": 1.0, "supervision": 0.5,
+}
+
+_SEMANTIC_STOP = (
+    set("the a an and or for with of to in on at by from into onto under over install installing new fix apply lay test check do make set up build construction project work task done ready please need want using use".split())
+    | (set(ENGLISH_STOP_WORDS) if SEMANTIC_AVAILABLE else set())
+)
+
+_TRADE_MATCHER: Any = None
+
+
+def _load_trade_matcher():
+    """Lazily load the dataset-trained task->trade semantic matcher (joblib)."""
+    global _TRADE_MATCHER
+    if _TRADE_MATCHER is not None:
+        return _TRADE_MATCHER or None
+    if not SEMANTIC_AVAILABLE:
+        _TRADE_MATCHER = False
+        return None
+    try:
+        p = Path(__file__).resolve().parent.parent / "data" / "trade_matcher.joblib"
+        _TRADE_MATCHER = joblib.load(p)
+    except Exception:
+        _TRADE_MATCHER = False
+    return _TRADE_MATCHER or None
+
+
+def _clean_text(text: str) -> str:
+    t = re.sub(r"[^a-zA-Z0-9\u4e00-\u9fff ]+", " ", str(text).lower())
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _semantic_trade_scores(task_text: str) -> Dict[str, float]:
+    """Return {canonical_trade: score(0-1)} using the dataset-trained model.
+    Score combines TF-IDF cosine similarity (normalised) with direct
+    seed/entry keyword hits. Empty dict if the model is unavailable.
+    """
+    matcher = _load_trade_matcher()
+    if not matcher:
+        return {}
+    try:
+        vec = matcher["vectorizer"]
+        names = matcher["trade_names"]
+        X = matcher["trade_vectors"]
+        q_text = _clean_text(task_text)
+        q_tokens = set(q_text.split()) - _SEMANTIC_STOP
+        if not q_tokens:
+            return {}
+        q = vec.transform([q_text])
+        sims = cosine_similarity(q, X)[0]
+        denom = float(sims.max() - sims.min())
+        sims_norm = (sims - sims.min()) / denom if denom > 1e-9 else np.zeros_like(sims)
+        seed_hits = np.array([
+            len(q_tokens & set(_clean_text(" ".join(SEED_KEYWORDS.get(g, []))).split()))
+            for g in names
+        ])
+        entry_hits = np.array([
+            len(q_tokens - set(_clean_text(" ".join(SEED_KEYWORDS.get(g, []))).split()))
+            for g in names
+        ])
+        n = max(len(q_tokens), 1)
+        final = sims_norm + 0.8 * np.minimum(seed_hits / n, 1.0) + 0.35 * np.minimum(entry_hits / n, 1.0)
+        return {g: float(s) for g, s in zip(names, final) if s > 0}
+    except Exception:
+        return {}
 
 
 def _detect_trade_groups(task_text: str) -> set:
@@ -92,7 +204,16 @@ def analyze_task(
     description = task_info.get("description", "")
 
     task_text = f"{task_name} {description}".lower()
-    detected_trades = _detect_trade_groups(task_text)
+    # Dataset-trained semantic trade detection (understands task meaning, not just keywords).
+    semantic_scores = _semantic_trade_scores(task_text)
+    detected_trades = set()
+    if semantic_scores:
+        best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
+        if best_score > 0:
+            detected_trades = {best_trade}
+    # Legacy keyword fallback when the semantic model is unavailable.
+    if not detected_trades:
+        detected_trades = _detect_trade_groups(task_text)
 
     suggested_workers = []
     matched_any = False
@@ -102,15 +223,16 @@ def analyze_task(
 
         wgroup = _worker_trade_group(worker.trade)
         if wgroup in detected_trades:
-            score += 30
+            strength = semantic_scores.get(wgroup, 0.5)
+            score += int(20 + 30 * strength)
             matched_any = True
-            reasons.append(f"工种匹配：{worker.trade}")
-        elif wgroup and detected_trades:
-            score -= 10
-            reasons.append(f"工种不匹配：{worker.trade}")
+            reasons.append("工种语义匹配：{}（匹配度 {:.0%}）".format(worker.trade, strength))
+        elif wgroup:
+            score -= 15
+            reasons.append("工种不符任务需求：{}".format(worker.trade))
         elif worker.trade:
-            score += 10
-            reasons.append(f"可用工种：{worker.trade}")
+            score += 5
+            reasons.append("可用工种：{}".format(worker.trade))
 
         attendance_today = db.query(AttendanceLog).filter(
             AttendanceLog.worker_id == worker.worker_id,
@@ -146,12 +268,22 @@ def analyze_task(
     elif any(keyword in task_text_low for keyword in ["清洁", "整理", "cleaning"]):
         priority = "low"
 
+    # Dataset-informed duration estimate: sum standard duration of detected trades.
+    if detected_trades:
+        est_days = max(TRADE_DURATION.get(g, 1.5) for g in detected_trades)
+        duration_estimate = "根据任务类型（{}）的行业标准工时，预计需要 {:.0f}-{:.0f} 天".format(
+            "/".join(sorted(detected_trades)), max(1, est_days - 0.5), est_days + 1
+        )
+    else:
+        duration_estimate = "根据任务复杂度，预计需要 1-3 天"
+
     return {
         "suggested_workers": suggested_workers[:5],
-        "estimated_duration": "根据任务复杂度，预计需要 1-3 天",
+        "estimated_duration": duration_estimate,
         "priority_suggestion": priority,
         "safety_notes": "请确保施工人员佩戴必要的安全防护装备，并遵守现场安全规定。",
         "matched_trades": sorted(detected_trades),
+        "semantic_used": bool(semantic_scores),
         "notice": "" if matched_any or not detected_trades else "项目中暂无匹配工种（{}）的工人，以下为其他工种候选".format(
             "/".join(sorted(detected_trades))
         ),
@@ -321,9 +453,10 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
             if isinstance(parsed, dict) and isinstance(parsed.get("suggested_workers"), list):
                 out = parsed
                 out["suggested_workers"] = out["suggested_workers"][:top_k]
+                out["semantic_used"] = True
                 return out
             if isinstance(parsed, list):
-                return {"suggested_workers": parsed[:top_k]}
+                return {"suggested_workers": parsed[:top_k], "semantic_used": True}
         except Exception:
             pass
 
@@ -378,7 +511,7 @@ def auto_assign_tasks(
             "assigned_worker_id": chosen_ids[0] if chosen_ids else None,
             "assigned_worker_ids": chosen_ids,
             "suggested_workers": suggested,
-            "ai_used": bool(get_gemini_model()),
+            "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
         })
 
     if not dry_run:
@@ -650,6 +783,31 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
 
     remaining_tasks = total_tasks - completed
     estimated_weeks_remaining = (remaining_tasks / weekly_velocity) if weekly_velocity > 0 else 999
+
+    # Dataset-augmented estimate: standard workdays per trade for remaining tasks,
+    # divided by workforce size (5 workdays/week).
+    semantic_remaining_days = 0.0
+    remaining_trade_mix: Dict[str, int] = defaultdict(int)
+    workers_sem = get_project_workers(db, project_id)
+    total_workers_sem = len(workers_sem)
+    for t in all_tasks:
+        if t.status == "completed":
+            continue
+        tt = f"{t.task_name} {t.description or ''}".lower()
+        scores = _semantic_trade_scores(tt)
+        trade = max(scores, key=scores.get) if scores else None
+        semantic_remaining_days += TRADE_DURATION.get(trade, 1.5)
+        if trade:
+            remaining_trade_mix[trade] += 1
+    if total_workers_sem > 0:
+        semantic_weeks = semantic_remaining_days / max(total_workers_sem, 1) / 5.0
+    else:
+        semantic_weeks = 999.0
+    # Blend velocity estimate with semantic workload estimate (50/50) when both sane.
+    if estimated_weeks_remaining < 900 and semantic_weeks < 900:
+        estimated_weeks_remaining = 0.5 * estimated_weeks_remaining + 0.5 * semantic_weeks
+    elif semantic_weeks < 900:
+        estimated_weeks_remaining = semantic_weeks
     rule_based_completion_date = today + timedelta(weeks=estimated_weeks_remaining)
 
     # ── Attendance trend ──
@@ -855,6 +1013,8 @@ Output format (strict JSON):
             "weekly_tasks_completed": round(weekly_velocity, 2),
             "remaining_tasks": remaining_tasks,
             "estimated_weeks_remaining": round(estimated_weeks_remaining, 1),
+            "semantic_remaining_workdays": round(semantic_remaining_days, 1),
+            "remaining_trade_mix": dict(remaining_trade_mix),
         },
         "attendance_trend": {
             "avg_daily_7d": avg_daily_att_7,
