@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/notification.dart';
@@ -604,9 +605,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     if (_repPid == null) { toast('Please select a project first'); return; }
     try {
       final path = await ApiService().exportReport(_repPid!, 'daily_reports');
-      toast('Daily reports exported to $path');
       if (Platform.isWindows) {
+        toast('Daily reports exported to $path');
         await Process.run('start', [path], runInShell: true);
+      } else {
+        await SharePlus.instance.share(ShareParams(
+          files: [XFile(path)],
+          text: 'Daily Reports export',
+        ));
       }
     } catch (e) {
       toast('Export failed: $e');

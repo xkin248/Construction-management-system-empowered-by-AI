@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/task_form.dart';
@@ -55,9 +56,14 @@ class _TasksPageState extends State<TasksPage> {
     if (pid == null) { toast('Select a project first'); return; }
     try {
       final path = await ApiService().exportReport(pid!, 'tasks');
-      toast('Tasks exported to $path');
       if (Platform.isWindows) {
+        toast('Tasks exported to $path');
         await Process.run('start', [path], runInShell: true);
+      } else {
+        await SharePlus.instance.share(ShareParams(
+          files: [XFile(path)],
+          text: 'Tasks export',
+        ));
       }
     } catch (e) {
       toast('Export failed: $e');
@@ -630,6 +636,7 @@ class TaskDetailPage extends StatefulWidget {
 class _TaskDetailPageState extends State<TaskDetailPage> {
   bool _loadingAI = false;
   List _aiWorkers = [];          // AI-suggested workers
+  String _aiNotice = '';         // no-match warning from backend
   List _assignedWorkers = [];    // currently-assigned workers (mutable)
   List _projectWorkers = [];     // all workers in the project
   bool _sameProjectOnly = false; // restrict AI to same-project workers
@@ -663,7 +670,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       final result = await ApiService().aiAnalyzeTask(_task, projectId,
           sameProjectOnly: _sameProjectOnly);
       final suggestions = (result['suggested_workers'] as List?) ?? [];
-      setState(() { _aiWorkers = suggestions; });
+      setState(() {
+        _aiWorkers = suggestions;
+        _aiNotice = (result['notice'] as String?) ?? '';
+      });
     } catch (e) {
       toast('AI error: $e');
     } finally {
@@ -804,6 +814,20 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 const SizedBox(height: 12),
                 // AI suggestions (if loaded)
                 if (_aiWorkers.isNotEmpty) ...[
+                  if (_aiNotice.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(_aiNotice,
+                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                     child: Row(children: [

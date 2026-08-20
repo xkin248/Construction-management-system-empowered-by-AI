@@ -36,6 +36,37 @@ SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildS
 请用简洁、专业、实用的语言回答问题。如果涉及具体数据，请基于提供的上下文信息进行分析。"""
 
 
+# Trade synonyms: canonical group -> keywords matched against task text / worker trade.
+TRADE_ALIASES: Dict[str, List[str]] = {
+    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
+    "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
+    "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
+    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土"],
+    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "油漆", "粉刷", "涂料"],
+    "welding": ["welding", "weld", "steel", "metal", "焊接", "钢结构", "金属"],
+    "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风"],
+}
+
+
+def _detect_trade_groups(task_text: str) -> set:
+    """Return canonical trade groups whose keywords appear in task text."""
+    return {
+        group for group, keywords in TRADE_ALIASES.items()
+        if any(kw in task_text for kw in keywords)
+    }
+
+
+def _worker_trade_group(trade: str) -> Optional[str]:
+    """Map a worker trade string to its canonical group, if any."""
+    if not trade:
+        return None
+    t = trade.lower().strip()
+    for group, keywords in TRADE_ALIASES.items():
+        if t in keywords or t == group:
+            return group
+    return None
+
+
 def get_gemini_model():
     if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
         return None
@@ -60,20 +91,26 @@ def analyze_task(
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
 
+    task_text = f"{task_name} {description}".lower()
+    detected_trades = _detect_trade_groups(task_text)
+
     suggested_workers = []
+    matched_any = False
     for worker in workers:
         score = 50
         reasons = []
 
-        if worker.trade:
-            trade_lower = worker.trade.lower()
-            task_text = f"{task_name} {description}".lower()
-            if trade_lower in task_text:
-                score += 30
-                reasons.append(f"工种匹配：{worker.trade}")
-            else:
-                score += 10
-                reasons.append(f"可用工种：{worker.trade}")
+        wgroup = _worker_trade_group(worker.trade)
+        if wgroup in detected_trades:
+            score += 30
+            matched_any = True
+            reasons.append(f"工种匹配：{worker.trade}")
+        elif wgroup and detected_trades:
+            score -= 10
+            reasons.append(f"工种不匹配：{worker.trade}")
+        elif worker.trade:
+            score += 10
+            reasons.append(f"可用工种：{worker.trade}")
 
         attendance_today = db.query(AttendanceLog).filter(
             AttendanceLog.worker_id == worker.worker_id,
@@ -103,17 +140,21 @@ def analyze_task(
     suggested_workers.sort(key=lambda x: x["score"], reverse=True)
 
     priority = "medium"
-    task_text = f"{task_name} {description}".lower()
-    if any(keyword in task_text for keyword in ["安全", "紧急", "critical", "urgent", "foundation", "结构"]):
+    task_text_low = task_text
+    if any(keyword in task_text_low for keyword in ["安全", "紧急", "critical", "urgent", "foundation", "结构"]):
         priority = "high"
-    elif any(keyword in task_text for keyword in ["清洁", "整理", "cleaning"]):
+    elif any(keyword in task_text_low for keyword in ["清洁", "整理", "cleaning"]):
         priority = "low"
 
     return {
         "suggested_workers": suggested_workers[:5],
         "estimated_duration": "根据任务复杂度，预计需要 1-3 天",
         "priority_suggestion": priority,
-        "safety_notes": "请确保施工人员佩戴必要的安全防护装备，并遵守现场安全规定。"
+        "safety_notes": "请确保施工人员佩戴必要的安全防护装备，并遵守现场安全规定。",
+        "matched_trades": sorted(detected_trades),
+        "notice": "" if matched_any or not detected_trades else "项目中暂无匹配工种（{}）的工人，以下为其他工种候选".format(
+            "/".join(sorted(detected_trades))
+        ),
     }
 
 
