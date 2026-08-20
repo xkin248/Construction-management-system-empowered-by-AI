@@ -132,7 +132,11 @@ class _DashboardPageState extends State<DashboardPage> {
     }));
     final ts = now.millisecondsSinceEpoch;
     await prefs.setInt(_kPredTsKey, ts);
-    await prefs.setString(_kPredCacheKey, jsonEncode(preds));
+    try {
+      await prefs.setString(_kPredCacheKey, jsonEncode(preds));
+    } catch (_) {
+      // 序列化失败时跳过缓存持久化，前端仍正常显示预测数据
+    }
     if (mounted) {
       setState(() {
         _predictions = preds;
@@ -180,10 +184,15 @@ class _DashboardPageState extends State<DashboardPage> {
       return s != 'completed' && s != 'done';
     }).toList();
 
-    return RefreshIndicator(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isPhone = constraints.maxWidth < 600;
+        final hPad = isPhone ? 14.0 : 20.0;
+        final vPad = isPhone ? 14.0 : 20.0;
+        return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
           // ── KPI Cards Row ──
           _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late, absent),
@@ -254,6 +263,8 @@ class _DashboardPageState extends State<DashboardPage> {
         ],
       ),
     );
+      },
+    );
   }
 
   // ── KPI row builder ──
@@ -305,31 +316,40 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _kpiCard({required String label, required String value, String? sub, required IconData icon, required Color iconColor, Color? valueColor}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Text(label,
                 maxLines: 2,
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           ),
+          const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 16, color: iconColor),
+            child: Icon(icon, size: 15, color: iconColor),
           ),
         ]),
-        const SizedBox(height: 10),
-        Text(value,
-            style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
+        const SizedBox(height: 8),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(value,
+              style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
+        ),
         if (sub != null) ...[
           const SizedBox(height: 3),
-          Text(sub, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          Text(sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
         ],
       ]),
     );
@@ -402,7 +422,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Weekly Attendance Chart Card ──
   Widget _weeklyAttCard(List<double> data, List<String> labels) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(14),
@@ -410,19 +430,26 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Weekly Attendance',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            Text('All projects combined',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-          ]),
+          Flexible(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Weekly Attendance',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              Text('All projects combined',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+            ]),
+          ),
           TextButton(
             onPressed: () {},
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
             child: Text('View All →',
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
           ),
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         LabeledBarChart(values: data, labels: labels, height: 140, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue),
       ]),
     );
@@ -471,8 +498,15 @@ class _DashboardPageState extends State<DashboardPage> {
       ]);
 
   Widget _sectionHeader(String title, {String? sub}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        Text(title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        if (sub != null)
+          Text(sub,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
       ]);
 
   Widget _projectProductivityRow(Map p) {
@@ -758,37 +792,33 @@ class _DashboardPageState extends State<DashboardPage> {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(insights,
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, height: 1.45)),
           ),
 
-        // ── Actual vs Scheduled Progress ──
-        Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Actual Progress', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-              const SizedBox(height: 2),
-              Text('${currentProgress.toStringAsFixed(1)}%',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: gapColor)),
-            ]),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(scheduled != null ? 'Scheduled Today' : 'Predicted (30 days)',
-                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-              const SizedBox(height: 2),
-              Text('${(scheduled ?? predProgress).toStringAsFixed(1)}%',
-                  style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: gapColor.withValues(alpha: 0.75))),
-            ]),
-          ),
-          const SizedBox(width: 12),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text('AI Confidence', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-            const SizedBox(height: 2),
-            Text('${confidence.toStringAsFixed(0)}%',
-                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.green)),
-          ]),
-        ]),
+        // ── Actual vs Scheduled Progress (responsive) ──
+        LayoutBuilder(builder: (ctx, cs) {
+          final narrow = cs.maxWidth < 320;
+          final statItems = [
+            _statCell('Actual', '${currentProgress.toStringAsFixed(1)}%', gapColor),
+            _statCell(scheduled != null ? 'Scheduled' : 'Predicted 30d',
+                '${(scheduled ?? predProgress).toStringAsFixed(1)}%', gapColor.withValues(alpha: 0.75)),
+            _statCell('AI Conf.', '${confidence.toStringAsFixed(0)}%', AppColors.green),
+          ];
+          if (narrow) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: statItems.map((w) => Padding(padding: const EdgeInsets.only(bottom: 6), child: w)).toList(),
+            );
+          }
+          return Row(
+            children: statItems
+                .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
+                .toList()
+              ..removeLast(),
+          );
+        }),
         const SizedBox(height: 8),
 
         // ── Progress gap badge ──
@@ -836,33 +866,51 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
         const SizedBox(height: 10),
 
-        // ── Date rows ──
-        Row(children: [
-          _dateChip('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
-          const SizedBox(width: 10),
-          _dateChip('AI Predicted', _fmtDate(predictedDate), trendColor),
-          const Spacer(),
-          if (estDays != null) ...[
-            _dateChip(
-              estDays > 0 ? '≈ Days Left' : 'Overdue',
-              estDays > 0 ? '$estDays days' : '${-estDays} days',
-              estDays > 0 ? AppColors.textSecondary : AppColors.red,
-            ),
-            const SizedBox(width: 10),
+        // ── Date rows (Wrap to prevent overflow on narrow phones) ──
+        Wrap(
+          spacing: 14,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _dateChip('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
+            _dateChip('AI Predicted', _fmtDate(predictedDate), trendColor),
+            if (estDays != null)
+              _dateChip(
+                estDays > 0 ? '≈ Days Left' : 'Overdue',
+                estDays > 0 ? '$estDays days' : '${-estDays} days',
+                estDays > 0 ? AppColors.textSecondary : AppColors.red,
+              ),
+            if (confidence >= 80)
+              const Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
+            else if (confidence >= 60)
+              const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
           ],
-          if (confidence >= 80)
-            const Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
-          else if (confidence >= 60)
-            const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
-        ]),
+        ),
       ]),
     );
   }
 
   Widget _dateChip(String label, String value, Color color) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-      Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+      Text(label, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+      Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+    ]);
+  }
+
+  /// Compact stat cell used inside the AI prediction card's responsive stats row.
+  Widget _statCell(String label, String value, Color color) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+      const SizedBox(height: 2),
+      FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(value,
+            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+      ),
     ]);
   }
 

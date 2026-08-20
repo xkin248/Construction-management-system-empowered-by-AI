@@ -266,8 +266,12 @@ class _NarrowLayout extends StatelessWidget {
             child: const Center(child: Icon(Icons.construction_rounded, color: Colors.white, size: 15)),
           ),
           const SizedBox(width: 8),
-          Text('BuildSmart',
-              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('BuildSmart',
+                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            Text(_titles[idx.clamp(0, _titles.length - 1)],
+                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+          ]),
         ]),
         actions: [
           Stack(children: [
@@ -311,7 +315,7 @@ class _NarrowLayout extends StatelessWidget {
         ),
         child: SafeArea(
           child: SizedBox(
-            height: 64,
+            height: 68,
             child: Row(
               children: List.generate(_bottomNavItems.length, (i) {
                 final item = _bottomNavItems[i];
