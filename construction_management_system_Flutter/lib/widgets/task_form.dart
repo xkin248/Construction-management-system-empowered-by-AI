@@ -183,7 +183,7 @@ class _TaskFormState extends State<TaskForm> {
                     isExpanded: true,
                     decoration: _inputDeco(null),
                     items: [
-                      const DropdownMenuItem<String?>(
+                      DropdownMenuItem<String?>(
                           value: null,
                           child: Text('Auto (AI detect)',
                               style: GoogleFonts.outfit(
