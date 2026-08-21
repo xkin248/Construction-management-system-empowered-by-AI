@@ -61,12 +61,18 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   }
 
   Future<void> _register() async {
+    // All fields are required — no optional fields on this form.
     if (_name.text.trim().isEmpty) { toast('Please enter your full name'); return; }
     if (_email.text.trim().isEmpty) { toast('Please enter your email'); return; }
     if (_pwd.text.isEmpty || _pwd.text.length < 6) {
       toast('Password must be at least 6 characters'); return;
     }
     if (_pwd.text != _pwd2.text) { toast('Passwords do not match'); return; }
+    if (_phone.text.trim().isEmpty) { toast('Please enter your phone number'); return; }
+    if (_ic.text.trim().isEmpty) { toast('Please enter your IC number'); return; }
+    if (_selectedSkill == null || _selectedSkill!.isEmpty) {
+      toast('Please select your trade / skill'); return;
+    }
 
     setState(() => ld = true);
     try {
@@ -74,8 +80,8 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
         name:     _name.text.trim(),
         email:    _email.text.trim(),
         password: _pwd.text,
-        phone:    _phone.text.trim().isEmpty ? null : _phone.text.trim(),
-        icNumber: _ic.text.trim().isEmpty    ? null : _ic.text.trim(),
+        phone:    _phone.text.trim(),
+        icNumber: _ic.text.trim(),
         trade:    _selectedSkill,
       );
       toast('✅ Worker account registered! You can now log in.');
@@ -263,7 +269,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     // ── Phone + IC (stacked on narrow) ──
                                     isNarrow
                                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            _label('Phone (optional)'),
+                                            _label('Phone (required)'),
                                             const SizedBox(height: 7),
                                             _field(
                                               controller: _phone,
@@ -286,7 +292,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                           ])
                                         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label('Phone (optional)'),
+                                              _label('Phone (required)'),
                                               const SizedBox(height: 7),
                                               _field(
                                                 controller: _phone,

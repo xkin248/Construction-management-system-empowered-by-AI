@@ -13,7 +13,6 @@ class WorkersPage extends StatefulWidget {
 class _WorkersPageState extends State<WorkersPage> {
   bool ld = true;
   List workers = [];
-  List projects = [];
   String _searchQuery = '';
 
   @override
@@ -25,9 +24,7 @@ class _WorkersPageState extends State<WorkersPage> {
   Future<void> _load() async {
     setState(() => ld = true);
     try {
-      final results = await Future.wait([ApiService().getWorkers(), ApiService().getProjects()]);
-      workers = results[0];
-      projects = results[1];
+      workers = await ApiService().getWorkers();
     } catch (e) {
       toast('Failed to load workers: $e');
     } finally {
@@ -49,7 +46,6 @@ class _WorkersPageState extends State<WorkersPage> {
     final phone = TextEditingController();
     final email = TextEditingController();
     final password = TextEditingController();
-    int? pid = projects.isNotEmpty ? projects.first['project_id'] : null;
 
     showModalBottomSheet(
       context: context,
@@ -78,15 +74,6 @@ class _WorkersPageState extends State<WorkersPage> {
               const SizedBox(height: 12),
               TextField(controller: role, decoration: const InputDecoration(labelText: 'Trade / Role', hintText: 'e.g. Electrician')),
               const SizedBox(height: 12),
-              if (projects.isNotEmpty)
-                DropdownButtonFormField<int>(
-                  initialValue: pid,
-                  decoration: const InputDecoration(labelText: 'Assigned Project'),
-                  items: projects.map<DropdownMenuItem<int>>((p) =>
-                      DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
-                  onChanged: (v) => setD(() => pid = v),
-                ),
-              const SizedBox(height: 12),
               TextField(controller: phone, keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(labelText: 'Phone', hintText: '+60 12-345 6789')),
               const SizedBox(height: 12),
@@ -101,19 +88,18 @@ class _WorkersPageState extends State<WorkersPage> {
                   if (name.text.trim().isEmpty) { toast("Enter the worker's name"); return; }
                   try {
                     if (email.text.trim().isNotEmpty && password.text.isNotEmpty) {
-                      // Register as authenticated worker
+                      // Register as authenticated worker (project auto-assigned by backend)
                       await ApiService().registerWorker(
                         name: name.text.trim(),
                         email: email.text.trim().toLowerCase(),
                         password: password.text,
                         phone: phone.text.trim().isEmpty ? null : phone.text.trim(),
                         trade: role.text.trim().isEmpty ? null : role.text.trim(),
-                        projectId: pid,
                       );
                     } else {
                       await ApiService().createWorker({
                         'name': name.text.trim(), 'trade': role.text.trim(),
-                        'project_id': pid, 'phone': phone.text.trim(),
+                        'phone': phone.text.trim(),
                       });
                     }
                     if (ctx.mounted) Navigator.pop(ctx);

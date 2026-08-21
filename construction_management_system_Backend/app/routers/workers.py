@@ -53,7 +53,12 @@ def list_workers(project_id: Optional[int] = None, db: Session = Depends(get_db)
 def create_worker(d: WorkerCreate, db: Session = Depends(get_db)):
     if d.project_id and not db.query(Project).get(d.project_id):
         raise HTTPException(404, "Project does not exist")
-    w = Worker(**d.model_dump())
+    data = d.model_dump()
+    # Auto-assign project when none was chosen: fall back to the first project.
+    if data.get("project_id") is None:
+        first_p = db.query(Project).order_by(Project.project_id.asc()).first()
+        data["project_id"] = first_p.project_id if first_p else None
+    w = Worker(**data)
     db.add(w)
     db.commit()
     db.refresh(w)

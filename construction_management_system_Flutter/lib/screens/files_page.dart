@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
@@ -101,9 +102,10 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   void _openUpload() {
-    final pathCtrl = TextEditingController();
     int? pid = _selectedProjectId;
     String cat = _selectedCategory == 'all' ? 'documents' : _selectedCategory;
+    String? pickedPath;
+    String? pickedName;
 
     showModalBottomSheet(
       context: context,
@@ -139,13 +141,39 @@ class _FilesPageState extends State<FilesPage> {
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary)),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: pathCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'File Path',
-                    hintText: 'C:\\Users\\...\\document.pdf',
-                    prefixIcon: Icon(Icons.folder_open_rounded,
-                        size: 20, color: AppColors.textMuted),
+                // Pick file from system file picker (mobile friendly)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final res = await FilePicker.platform.pickFiles();
+                    if (res == null || res.files.isEmpty) return;
+                    final f = res.files.single;
+                    if (f.path == null) {
+                      toast('Could not resolve file path');
+                      return;
+                    }
+                    setD(() {
+                      pickedPath = f.path;
+                      pickedName = f.name;
+                    });
+                  },
+                  icon: const Icon(Icons.folder_open_rounded,
+                      size: 20, color: AppColors.accent),
+                  label: Text(
+                    pickedName ?? 'Pick a file...',
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        color: pickedName != null
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.accent,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 16),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -184,17 +212,12 @@ class _FilesPageState extends State<FilesPage> {
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
-                    final p = pathCtrl.text.trim();
-                    if (p.isEmpty) {
-                      toast('Please enter a file path');
-                      return;
-                    }
-                    if (!File(p).existsSync()) {
-                      toast('File not found at: $p');
+                    if (pickedPath == null || pickedPath!.isEmpty) {
+                      toast('Please pick a file first');
                       return;
                     }
                     try {
-                      await ApiService().uploadFile(p,
+                      await ApiService().uploadFile(File(pickedPath!),
                           pid: pid, category: cat);
                       if (ctx.mounted) Navigator.pop(ctx);
                       toast('File uploaded!');

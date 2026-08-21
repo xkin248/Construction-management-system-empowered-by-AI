@@ -335,19 +335,6 @@ class ApiService {
   Future<Map> submitReport(Map d) async =>
       Map.from((await dio.post('/daily-reports', data: d)).data);
 
-  /// Downloads the project export (.xlsx) and returns the local file path.
-  Future<String> exportReport(int projectId, String type) async {
-    final dir = Directory('${Directory.systemTemp.path}/buildsmart');
-    if (!dir.existsSync()) dir.createSync(recursive: true);
-    final savePath = '${dir.path}/${type}_$projectId.xlsx';
-    await dio.download(
-      '/reports/export/$projectId?type=$type',
-      savePath,
-      options: Options(responseType: ResponseType.bytes),
-    );
-    return savePath;
-  }
-
   Future<Map> reportSafety({
     required String t,
     required int w,
@@ -382,10 +369,10 @@ class ApiService {
     return (await dio.get('/files', queryParameters: params)).data as List;
   }
 
-  Future<Map> uploadFile(String filePath, {int? pid, String? category}) async {
-    final fileName = filePath.split(RegExp(r'[/\\]')).last;
+  Future<Map> uploadFile(File file, {int? pid, String? category}) async {
+    final fileName = file.path.split(RegExp(r'[/\\]')).last;
     final formData = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'file': await MultipartFile.fromFile(file.path, filename: fileName),
       if (pid != null && pid > 0) 'project_id': pid,
       if (category != null && category != 'all') 'file_category': category,
     });

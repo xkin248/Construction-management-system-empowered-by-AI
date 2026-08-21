@@ -159,6 +159,8 @@ class _DashboardPageState extends State<DashboardPage> {
     final present = (attSummary['present'] ?? 0) as int;
     final late = (attSummary['late'] ?? 0) as int;
     final absent = (attSummary['absent'] ?? 0) as int;
+    final totalAtt = (attSummary['total'] ?? totalWorkers) as int;
+    final todayRate = totalAtt > 0 ? ((present + late) / totalAtt * 100).round() : 0;
 
     // Weekly attendance data from backend (Mon-Sun, 本周每日出勤人数)
     final weeklyData = _weeklyAtt
@@ -195,7 +197,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
           // ── KPI Cards Row ──
-          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late, absent),
+          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent),
           const SizedBox(height: 20),
 
           // ── Charts Row ──
@@ -268,15 +270,15 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // ── KPI row builder ──
-  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, present, late, absent) {
+  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent) {
     return LayoutBuilder(builder: (ctx, cs) {
       final isWide = cs.maxWidth > 600;
       final cards = [
         _kpiCard(
-          label: 'Workers On Site',
-          value: '$onSite/$totalWorkers',
-          sub: '$late late • $absent absent',
-          icon: Icons.groups_rounded,
+          label: 'Today Attendance Rate',
+          value: '$todayRate%',
+          sub: '$onSite/$totalWorkers on site · $late late · $absent absent',
+          icon: Icons.fact_check_rounded,
           iconColor: AppColors.accent,
         ),
         _kpiCard(

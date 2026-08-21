@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../widgets/task_form.dart';
@@ -49,24 +47,6 @@ class _TasksPageState extends State<TasksPage> {
       tasks = newPid == null ? [] : await ApiService().getTasks(newPid);
     } finally {
       if (mounted) setState(() => ld = false);
-    }
-  }
-
-  Future<void> _exportTasks() async {
-    if (pid == null) { toast('Select a project first'); return; }
-    try {
-      final path = await ApiService().exportReport(pid!, 'tasks');
-      if (Platform.isWindows) {
-        toast('Tasks exported to $path');
-        await Process.run('start', [path], runInShell: true);
-      } else {
-        await SharePlus.instance.share(ShareParams(
-          files: [XFile(path)],
-          text: 'Tasks export',
-        ));
-      }
-    } catch (e) {
-      toast('Export failed: $e');
     }
   }
 
@@ -151,11 +131,6 @@ class _TasksPageState extends State<TasksPage> {
         titleSpacing: 16,
         title: Text('Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
         actions: [
-          IconButton(
-            onPressed: _exportTasks,
-            icon: const Icon(Icons.download_rounded, size: 20),
-            tooltip: 'Export',
-          ),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
@@ -492,7 +467,7 @@ class _TaskCardState extends State<_TaskCard> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.12),
+                    color: AppColors.accent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(

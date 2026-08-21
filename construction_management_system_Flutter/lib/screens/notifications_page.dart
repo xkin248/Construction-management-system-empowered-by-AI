@@ -1,10 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../models/notification.dart';
@@ -373,17 +371,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
               ),
             ]),
           ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: _exportReport,
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('Export Report'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              side: const BorderSide(color: AppColors.accent),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-          ),
           const SizedBox(height: 20),
           Text('Recent Reports',
               style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
@@ -598,24 +585,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
       _loadReports();
     } on DioException catch (e) {
       toast(e.message ?? 'Submission failed');
-    }
-  }
-
-  Future<void> _exportReport() async {
-    if (_repPid == null) { toast('Please select a project first'); return; }
-    try {
-      final path = await ApiService().exportReport(_repPid!, 'daily_reports');
-      if (Platform.isWindows) {
-        toast('Daily reports exported to $path');
-        await Process.run('start', [path], runInShell: true);
-      } else {
-        await SharePlus.instance.share(ShareParams(
-          files: [XFile(path)],
-          text: 'Daily Reports export',
-        ));
-      }
-    } catch (e) {
-      toast('Export failed: $e');
     }
   }
 

@@ -154,6 +154,13 @@ def register_worker(d: WorkerAuthCreate, db=Depends(get_db)):
         if db.query(Supervisor).filter(Supervisor.email == email_lower).first():
             raise HTTPException(400, "This email is already registered as a supervisor")
 
+        # Auto-assign project: keep the provided one if bound at registration,
+        # otherwise fall back to the first available project.
+        project_id = d.project_id
+        if project_id is None:
+            first_p = db.query(Project).order_by(Project.project_id.asc()).first()
+            project_id = first_p.project_id if first_p else None
+
         w = Worker(
             name=d.name.strip(),
             email=email_lower,
@@ -161,7 +168,7 @@ def register_worker(d: WorkerAuthCreate, db=Depends(get_db)):
             phone=d.phone,
             ic_number=d.ic_number,
             trade=d.trade,
-            project_id=d.project_id,
+            project_id=project_id,
             role=d.role,
             has_safety_training=False,
             is_safety_officer=False,

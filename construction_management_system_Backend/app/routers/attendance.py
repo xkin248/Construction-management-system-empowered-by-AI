@@ -310,26 +310,7 @@ def worker_self_check_in(
             f"Duplicate check-in is not allowed.",
         )
 
-    # ── Check-in time window enforcement ──
-    cfg = _load_attendance_config(db)
-    now_local = datetime.now(KL_TZ)
-    now_time = now_local.time()
-    if not _in_time_window(now_time, cfg["check_in_start"], cfg["check_in_end"]):
-        raise HTTPException(
-            400,
-            f"Check-in is only allowed between "
-            f"{cfg['check_in_start'].strftime('%H:%M')} and "
-            f"{cfg['check_in_end'].strftime('%H:%M')}. "
-            f"Current time: {now_time.strftime('%H:%M')}",
-        )
-
-    # ── Break time check (e.g. 12:00-13:00, no attendance allowed) ──
-    if _in_break(now_time, cfg["break_start"], cfg["break_end"]):
-        raise HTTPException(
-            400,
-            f"Break time ({cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}) - "
-            f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
-        )
+    # ── Time window & break checks removed: attendance allowed at any time ──
 
     # ── Geofence validation ──
     verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
@@ -386,21 +367,7 @@ def worker_self_check_out(
     if not p:
         raise HTTPException(404, "Project not found")
 
-    # ── Check-out time window ──
-    cfg = _load_attendance_config(db)
-    now_local = datetime.now(KL_TZ)
-    now_time = now_local.time()
-    if not _in_time_window(now_time, cfg["check_out_start"], cfg["check_out_end"]):
-        # Allow check-out but warn — use informational header instead of blocking
-        pass
-
-    # ── Break time check (e.g. 12:00-13:00, no attendance allowed) ──
-    if _in_break(now_time, cfg["break_start"], cfg["break_end"]):
-        raise HTTPException(
-            400,
-            f"Break time ({cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}) - "
-            f"attendance is not allowed. Current time: {now_time.strftime('%H:%M')}",
-        )
+    # ── Check-out time window & break checks removed: allowed at any time ──
 
     _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
 
