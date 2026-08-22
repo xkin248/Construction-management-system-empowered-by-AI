@@ -1,0 +1,61 @@
+name: 🌐 Deploy BuildSmart Web to GitHub Pages
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build Flutter Web & Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── Flutter Setup ─────────────────────────────────────────
+      - name: 🐦 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # ── Dependencies ──────────────────────────────────────────
+      - name: 📦 Install Flutter Dependencies
+        working-directory: construction_management_system_Flutter
+        run: flutter pub get
+
+      # ── Build ─────────────────────────────────────────────────
+      # BASE_URL default is the production backend; --base-href is required
+      # for project-page hosting (https://<user>.github.io/<repo>/).
+      - name: 🔨 Build Web (release)
+        working-directory: construction_management_system_Flutter
+        run: flutter build web --release --base-href=/${{ github.event.repository.name }}/
+
+      # ── Deploy to GitHub Pages ────────────────────────────────
+      - name: ⚙️ Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: 📤 Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: construction_management_system_Flutter/build/web
+
+      - name: 🚀 Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
