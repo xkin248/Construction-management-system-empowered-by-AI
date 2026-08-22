@@ -312,8 +312,11 @@ def worker_self_check_in(
 
     # ── Time window & break checks removed: attendance allowed at any time ──
 
-    # ── Geofence validation ──
-    verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    # ── Geofence validation (skipped when the project has no fence configured) ──
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        verified, dist = True, 0.0
 
     a = AttendanceLog(
         worker_id=user.id,
@@ -369,7 +372,10 @@ def worker_self_check_out(
 
     # ── Check-out time window & break checks removed: allowed at any time ──
 
-    _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        dist = 0.0
 
     attendance.check_out_time = datetime.utcnow()
     attendance.out_lat = d.lat
@@ -403,6 +409,7 @@ def worker_today_authenticated(
         return {
             "checked_in": False,
             "attendance": None,
+            "window_enforced": False,
             "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
             "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
             "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
@@ -415,6 +422,7 @@ def worker_today_authenticated(
         "checked_out": a.status == "checked_out",
         "status": a.status,
         "hours_today": hours,
+        "window_enforced": False,
         "attendance": _to_out(a),
         "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
         "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",

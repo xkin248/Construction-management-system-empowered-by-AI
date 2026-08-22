@@ -457,19 +457,29 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
     }
     setState(() { _loading = true; _statusMsg = 'Getting your location...'; });
     try {
+      // This tab is a supervisor-shell page; only worker accounts have a
+      // worker profile and can check in through the authenticated endpoint.
+      final me = await ApiService().me();
+      final wid = me['worker_id'] as int? ?? 0;
+      final userType = (me['user_type'] as String? ?? '').toLowerCase();
+      if (wid == 0 || userType != 'worker') {
+        toast('Supervisor account has no worker profile');
+        setState(() {
+          _loading = false;
+          _statusMsg = 'Site Supervisor 账号没有 Worker 档案，无法在此打卡。请使用 Worker 账号登录后，在 My Dashboard 页面打卡。';
+        });
+        return;
+      }
       final pos = await GeoHelper.getCurrentPosition();
       if (pos == null) {
         setState(() { _statusMsg = 'Location permission denied'; _loading = false; });
         return;
       }
-      final me = await ApiService().me();
-      final wid = me['worker_id'] as int? ?? 0;
-      if (wid == 0) {
-        toast('No worker profile linked to your account');
-        setState(() { _loading = false; _statusMsg = 'No worker profile found'; });
-        return;
-      }
-      final r = await ApiService().checkIn(wid: wid, pid: _selectedProject ?? 1, lat: pos['lat']!, lng: pos['lng']!);
+      final r = await ApiService().workerCheckIn(
+        projectId: _selectedProject ?? 1,
+        lat: pos['lat']!,
+        lng: pos['lng']!,
+      );
       setState(() {
         _checkedIn = true;
         _attendanceId = r['attendance_id'];
@@ -490,7 +500,7 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
     try {
       final pos = await GeoHelper.getCurrentPosition();
       if (pos == null) { setState(() { _loading = false; }); return; }
-      await ApiService().checkOut(aid: _attendanceId!, lat: pos['lat']!, lng: pos['lng']!);
+      await ApiService().workerCheckOut(lat: pos['lat']!, lng: pos['lng']!);
       setState(() {
         _checkedIn = false;
         _attendanceId = null;

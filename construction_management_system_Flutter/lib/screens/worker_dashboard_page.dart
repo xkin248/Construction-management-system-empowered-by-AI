@@ -26,6 +26,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String _checkOutWindow = '15:00 - 17:00';
   String _breakWindow = '12:00 - 13:00';
   String _workHours = '08:00 - 17:00';
+  bool _windowEnforced = false;
   String _statusMsg = 'Tap the button below to check in with GPS geofencing';
   String _deviceType = 'web';
   String _deviceInfo = 'BuildSmart Web Client';
@@ -123,6 +124,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           _checkInWindow = r['check_in_window']?.toString() ?? _checkInWindow;
           _checkOutWindow = r['check_out_window']?.toString() ?? _checkOutWindow;
           _breakWindow = r['break_window']?.toString() ?? _breakWindow;
+          _windowEnforced = r['window_enforced'] == true;
           final inWin = _checkInWindow.split(' - ');
           final outWin = _checkOutWindow.split(' - ');
           if (inWin.isNotEmpty && outWin.length > 1) {
@@ -520,10 +522,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
         Row(children: [
           const SizedBox(width: 4),
-          Text('Check-in: $_checkInWindow',
+          Text(_windowEnforced ? 'Check-in: $_checkInWindow' : 'Check-in: Anytime',
               style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
           const Spacer(),
-          Text('Check-out: $_checkOutWindow',
+          Text(_windowEnforced ? 'Check-out: $_checkOutWindow' : 'Check-out: Anytime',
               style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
         ]),
@@ -542,7 +544,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 Text('Work Hours',
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(_workHours,
+                Text(_windowEnforced ? _workHours : 'Anytime',
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
               ]),
               Container(width: 1, height: 30, color: AppColors.border),

@@ -407,6 +407,11 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
     final checkedOut = att?['checked_out'] ?? false;
     final attRec = att?['attendance'] as Map?;
     final hours = att?['hours_today'] ?? 0;
+    final windowEnabled = att?['window_enforced'] == true;
+    final statusRaw = (attRec?['status'] ?? '').toString().toUpperCase();
+    final statusNote = statusRaw == 'REJECTED'
+        ? '（被拒绝：可能超出工地 GPS 围栏范围，请靠近工地后重试）'
+        : '';
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -436,7 +441,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                 _row('Check Out', attRec['check_out_time']?.toString().substring(11, 16) ?? '—',
                     attRec['check_out_time'] != null ? AppColors.blue : AppColors.textMuted),
                 const Divider(height: 16, color: AppColors.border),
-                _row('Status', (attRec['status'] ?? '—').toString().toUpperCase(),
+                _row('Status', statusRaw + statusNote,
                     checkedIn ? AppColors.green : checkedOut ? AppColors.blue : AppColors.red),
                 if (attRec['device_info'] != null && attRec['device_info'].toString().isNotEmpty) ...[
                   const Divider(height: 16, color: AppColors.border),
@@ -456,9 +461,18 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
               Text('⏰ Check-in Windows',
                   style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 8),
-              _row('Check In', att?['check_in_window'] ?? '08:00 - 10:30', AppColors.green),
-              const SizedBox(height: 6),
-              _row('Check Out', att?['check_out_window'] ?? '15:00 - 17:00', AppColors.blue),
+              if (!windowEnabled) ...[
+                _row('Check In', 'Anytime', AppColors.green),
+                const SizedBox(height: 6),
+                _row('Check Out', 'Anytime', AppColors.blue),
+                const SizedBox(height: 6),
+                const Text('打卡时间不限时段（已放开时间窗口限制）',
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+              ] else ...[
+                _row('Check In', att?['check_in_window'] ?? '08:00 - 10:30', AppColors.green),
+                const SizedBox(height: 6),
+                _row('Check Out', att?['check_out_window'] ?? '15:00 - 17:00', AppColors.blue),
+              ],
             ]),
           ),
         ],
