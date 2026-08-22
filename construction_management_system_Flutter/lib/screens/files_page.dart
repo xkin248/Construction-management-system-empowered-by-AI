@@ -154,6 +154,18 @@ class _FilesPageState extends State<FilesPage> {
                     setD(() {
                       pickedPath = f.path;
                       pickedName = f.name;
+                      // When the user is on the "All" category, infer the
+                      // upload category from the file extension so images land
+                      // in Photos and remain visible under that chip.
+                      if (_selectedCategory == 'all') {
+                        final dot = f.name.lastIndexOf('.');
+                        final ext = dot >= 0 ? f.name.substring(dot + 1).toLowerCase() : '';
+                        const imageExts = [
+                          'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+                          'heic', 'heif', 'svg', 'tiff',
+                        ];
+                        cat = imageExts.contains(ext) ? 'photos' : 'documents';
+                      }
                     });
                   },
                   icon: const Icon(Icons.folder_open_rounded,
@@ -196,6 +208,7 @@ class _FilesPageState extends State<FilesPage> {
                   ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
+                  key: ValueKey(cat),
                   initialValue: cat,
                   decoration: const InputDecoration(
                       labelText: 'Category',
@@ -276,6 +289,34 @@ class _FilesPageState extends State<FilesPage> {
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary)),
             const SizedBox(height: 12),
+            if (file.isImage) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  (file.thumbnailPath != null && file.thumbnailPath!.isNotEmpty)
+                      ? ApiService().thumbnailUrl(file.thumbnailPath)
+                      : ApiService().downloadUrl(file.fileId),
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (c, child, prog) => prog == null
+                      ? child
+                      : Container(
+                          height: 220,
+                          color: AppColors.bgMain,
+                          child: const Center(child: CircularProgressIndicator()),
+                        ),
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 220,
+                    color: AppColors.bgMain,
+                    child: const Center(
+                        child: Icon(Icons.broken_image_outlined,
+                            size: 40, color: AppColors.textMuted)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             _detailRow('Type', file.mimeType),
             _detailRow('Category', file.categoryLabel),
             _detailRow('Size', file.sizeFormatted),

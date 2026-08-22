@@ -27,6 +27,17 @@ async def upload_file(
     file_path, stored_name, file_size, mime_type = await save_upload_file(file)
     thumbnail_path = create_thumbnail(file_path, stored_name, mime_type)
 
+    # Infer a meaningful category when the client did not pass an explicit one
+    # ("attachment" is the API default). This keeps files visible under the
+    # right front-end category chips instead of only appearing in "All".
+    if file_category == "attachment" or not file_category:
+        if mime_type and mime_type.startswith("image/"):
+            file_category = "photos"
+        elif mime_type in ("application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"):
+            file_category = "documents"
+        else:
+            file_category = "attachment"
+
     db_file = DBFile(
         original_name=file.filename or "unknown",
         stored_name=stored_name,
