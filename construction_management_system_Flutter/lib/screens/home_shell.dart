@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
@@ -70,6 +71,9 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int idx = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  // Shared across wide/narrow layouts so page states survive breakpoint
+  // switches (rotation / resize / split-screen) instead of being recreated.
+  final _pagesKey = GlobalKey();
   String _currentProject = '';
   Map<String, dynamic> _user = {};
   bool _userLoaded = false;
@@ -136,9 +140,14 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext c) {
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final isWide = constraints.maxWidth >= 900;
+        final isWide = constraints.maxWidth >= AppBreakpoints.navigation;
+        // Single IndexedStack instance shared by both layouts: keeps page
+        // state (filters, scroll positions, loaded data) across breakpoint
+        // switches and avoids rebuilding + re-fetching on rotation/resize.
+        final pages = IndexedStack(key: _pagesKey, index: idx, children: _pages);
         if (isWide) {
           return _WideLayout(
+            pages: pages,
             idx: idx,
             currentProject: _currentProject,
             user: _user,
@@ -148,6 +157,7 @@ class _HomeShellState extends State<HomeShell> {
           );
         }
         return _NarrowLayout(
+          pages: pages,
           scaffoldKey: _scaffoldKey,
           idx: idx,
           currentProject: _currentProject,
@@ -164,6 +174,7 @@ class _HomeShellState extends State<HomeShell> {
 
 // ──────────────── Wide (Sidebar) Layout ────────────────
 class _WideLayout extends StatelessWidget {
+  final Widget pages;
   final int idx;
   final String currentProject;
   final Map<String, dynamic> user;
@@ -172,6 +183,7 @@ class _WideLayout extends StatelessWidget {
   final ValueChanged<String> onProjectChanged;
 
   const _WideLayout({
+    required this.pages,
     required this.idx,
     required this.currentProject,
     required this.user,
@@ -195,7 +207,7 @@ class _WideLayout extends StatelessWidget {
                   user: user,
                   onProjectChanged: onProjectChanged,
                 ),
-                Expanded(child: IndexedStack(index: idx, children: _pages)),
+                Expanded(child: pages),
               ],
             ),
           ),
@@ -207,6 +219,7 @@ class _WideLayout extends StatelessWidget {
 
 // ──────────────── Narrow (Bottom Nav) Layout ─────────
 class _NarrowLayout extends StatelessWidget {
+  final Widget pages;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final int idx;
   final String currentProject;
@@ -217,6 +230,7 @@ class _NarrowLayout extends StatelessWidget {
   final ValueChanged<String> onProjectChanged;
 
   const _NarrowLayout({
+    required this.pages,
     required this.scaffoldKey,
     required this.idx,
     required this.currentProject,
@@ -306,7 +320,7 @@ class _NarrowLayout extends StatelessWidget {
           ),
         ],
       ),
-      body: IndexedStack(index: idx, children: _pages),
+      body: pages,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.bgCard,
@@ -354,7 +368,9 @@ class _BottomNavBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return Tooltip(
+      message: item.label,
+      child: InkWell(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -383,6 +399,7 @@ class _BottomNavBtn extends StatelessWidget {
             ),
           ),
         ]),
+      ),
       ),
     );
   }

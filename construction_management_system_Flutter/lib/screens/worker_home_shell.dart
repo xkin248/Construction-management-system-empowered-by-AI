@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import 'login_page.dart';
 import 'worker_dashboard_page.dart';
@@ -40,6 +41,9 @@ class WorkerHomeShell extends StatefulWidget {
 class _WorkerHomeShellState extends State<WorkerHomeShell> {
   int idx = 0;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  // Shared across wide/narrow layouts so page states survive breakpoint
+  // switches (rotation / resize / split-screen) instead of being recreated.
+  final _pagesKey = GlobalKey();
 
   Future<void> _logout() async {
     final sp = await SharedPreferences.getInstance();
@@ -59,15 +63,20 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
   Widget build(BuildContext c) {
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final isWide = constraints.maxWidth >= 700;
+        final isWide = constraints.maxWidth >= AppBreakpoints.navigation;
+        // Single IndexedStack instance shared by both layouts: keeps page
+        // state across breakpoint switches and avoids rebuilding + refetch.
+        final pages = IndexedStack(key: _pagesKey, index: idx, children: _workerPages);
         if (isWide) {
           return _WideLayout(
+            pages: pages,
             idx: idx,
             onNav: (i) => _go(i),
             onLogout: _logout,
           );
         }
         return _NarrowLayout(
+          pages: pages,
           scaffoldKey: _scaffoldKey,
           idx: idx,
           onNav: _go,
@@ -80,11 +89,13 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
 
 // ──────────────── Wide (Sidebar) Layout ────────────────
 class _WideLayout extends StatelessWidget {
+  final Widget pages;
   final int idx;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
 
   const _WideLayout({
+    required this.pages,
     required this.idx,
     required this.onNav,
     required this.onLogout,
@@ -100,7 +111,7 @@ class _WideLayout extends StatelessWidget {
             child: Column(
               children: [
                 _WorkerTopBar(title: _workerTitles[idx]),
-                Expanded(child: IndexedStack(index: idx, children: _workerPages)),
+                Expanded(child: pages),
               ],
             ),
           ),
@@ -112,12 +123,14 @@ class _WideLayout extends StatelessWidget {
 
 // ──────────────── Narrow (Bottom Nav) Layout ────────────────
 class _NarrowLayout extends StatelessWidget {
+  final Widget pages;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final int idx;
   final ValueChanged<int> onNav;
   final VoidCallback onLogout;
 
   const _NarrowLayout({
+    required this.pages,
     required this.scaffoldKey,
     required this.idx,
     required this.onNav,
@@ -160,7 +173,7 @@ class _NarrowLayout extends StatelessWidget {
           onLogout: onLogout,
         ),
       ),
-      body: IndexedStack(index: idx, children: _workerPages),
+      body: pages,
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.bgCard,
@@ -177,7 +190,11 @@ class _NarrowLayout extends StatelessWidget {
             type: BottomNavigationBarType.fixed,
             elevation: 0,
             items: _workerMenu
-                .map((e) => BottomNavigationBarItem(icon: Icon(e.icon), label: e.label))
+                .map((e) => BottomNavigationBarItem(
+                      icon: Icon(e.icon),
+                      label: e.label,
+                      tooltip: e.label,
+                    ))
                 .toList(),
           ),
         ),
