@@ -764,19 +764,25 @@ class _TaskTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
-                const SizedBox(width: 4),
-                Text(part,
-                    style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
-              ]),
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(part,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+              ),
             ),
             const SizedBox(width: 8),
             statusPill(status),
-            const Spacer(),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
