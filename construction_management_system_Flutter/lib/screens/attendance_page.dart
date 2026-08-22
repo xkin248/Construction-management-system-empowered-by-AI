@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../widgets/charts.dart';
 
@@ -105,59 +106,106 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ── KPI Summary ──
-          _buildKpiRow(total, present, late, absent),
-          const SizedBox(height: 16),
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: SizedBox(
+            width: double.infinity,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // ── KPI Summary ──
+                _buildKpiRow(total, present, late, absent),
+                const SizedBox(height: 16),
 
-          // ── Attendance Rate Bar ──
-          _buildAttendanceRateCard(present, late, absent),
-          const SizedBox(height: 16),
+                // ── Attendance Rate Bar ──
+                _buildAttendanceRateCard(present, late, absent),
 
-          // ── Project Geofence Cards ──
-          if (projects.isNotEmpty) ...[
-            _sectionLabel("Today's Attendance Rate — All Projects"),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 130,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: projects.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (_, i) => _ProjectGeofenceCard(project: projects[i]),
-              ),
+                // ── Check-in window notice ──
+                if (summary['window_enforced'] == true) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(children: [
+                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.warning),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Check-in window is enforced — workers must check in within the configured time window',
+                          style: GoogleFonts.outfit(fontSize: 13, color: AppColors.warning, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
+                const SizedBox(height: 16),
+
+                // ── Project Geofence Cards ──
+                if (projects.isNotEmpty) ...[
+                  _sectionLabel("Today's Attendance Rate — All Projects"),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 130,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: projects.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (_, i) => _ProjectGeofenceCard(project: projects[i]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ── Search + Filter ──
+                _buildFilterRow(),
+                const SizedBox(height: 10),
+
+                // ── Worker Table ──
+                _buildWorkerTable(filtered),
+              ],
             ),
-            const SizedBox(height: 16),
-          ],
-
-          // ── Search + Filter ──
-          _buildFilterRow(),
-          const SizedBox(height: 10),
-
-          // ── Worker Table ──
-          _buildWorkerTable(filtered),
-        ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildKpiRow(int total, int present, int late, int absent) {
     final pct = total > 0 ? (present / total * 100).toInt() : 0;
-    return Column(children: [
-      Row(children: [
-        Expanded(child: _statMini('Total Workers', '$total', sub: 'registered')),
-        const SizedBox(width: 10),
-        Expanded(child: _statMini('Present', '$present', sub: '$pct% attendance', valueColor: AppColors.green)),
-      ]),
-      const SizedBox(height: 10),
-      Row(children: [
-        Expanded(child: _statMini('Late', '$late', sub: 'after check-in window', valueColor: AppColors.yellow)),
-        const SizedBox(width: 10),
-        Expanded(child: _statMini('Absent', '$absent', sub: 'not on site', valueColor: AppColors.red)),
-      ]),
-    ]);
+    return LayoutBuilder(builder: (ctx, constraints) {
+      if (constraints.maxWidth >= AppBreakpoints.phone) {
+        // Tablet / desktop: single row of 4 KPI cards
+        return Row(children: [
+          Expanded(child: _statMini('Total Workers', '$total', sub: 'registered')),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _statMini('Present', '$present', sub: '$pct% attendance', valueColor: AppColors.green)),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _statMini('Late', '$late', sub: 'after check-in window', valueColor: AppColors.yellow)),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _statMini('Absent', '$absent', sub: 'not on site', valueColor: AppColors.red)),
+        ]);
+      }
+      // Phone: two compact rows
+      return Column(children: [
+        Row(children: [
+          Expanded(child: _statMini('Total Workers', '$total', sub: 'registered')),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _statMini('Present', '$present', sub: '$pct% attendance', valueColor: AppColors.green)),
+        ]),
+        const SizedBox(height: AppSpacing.sm),
+        Row(children: [
+          Expanded(child: _statMini('Late', '$late', sub: 'after check-in window', valueColor: AppColors.yellow)),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(child: _statMini('Absent', '$absent', sub: 'not on site', valueColor: AppColors.red)),
+        ]),
+      ]);
+    });
   }
 
   Widget _statMini(String label, String value, {String? sub, Color? valueColor}) {
@@ -275,15 +323,33 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
         child: Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted))),
       );
     }
-    return Column(
-      children: filtered.map((w) => _WorkerAttCard(worker: w)).toList(),
-    );
+    return LayoutBuilder(builder: (ctx, constraints) {
+      if (constraints.maxWidth < AppBreakpoints.phone) {
+        return Column(
+          children: filtered.map((w) => _WorkerAttCard(worker: w)).toList(),
+        );
+      }
+      // Tablet / desktop: two-column grid
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          mainAxisSpacing: AppSpacing.sm,
+          crossAxisSpacing: AppSpacing.sm,
+          childAspectRatio: 1.6,
+        ),
+        itemCount: filtered.length,
+        itemBuilder: (_, i) => _WorkerAttCard(worker: filtered[i], inGrid: true),
+      );
+    });
   }
 }
 
 class _WorkerAttCard extends StatelessWidget {
   final Map worker;
-  const _WorkerAttCard({required this.worker});
+  final bool inGrid;
+  const _WorkerAttCard({required this.worker, this.inGrid = false});
 
   String _fmtTime(String? iso) {
     if (iso == null) return '—';
@@ -304,7 +370,7 @@ class _WorkerAttCard extends StatelessWidget {
     final hours = worker['hours_today'];
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.bgCard,

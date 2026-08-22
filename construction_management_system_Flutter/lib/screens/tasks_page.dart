@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../widgets/task_form.dart';
 
@@ -167,46 +168,75 @@ class _TasksPageState extends State<TasksPage> {
         label: const Text('New Task'),
         backgroundColor: AppColors.accent,
       ),
-      body: Column(children: [
-        // ── Summary Cards ──
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Row(children: [
-            Expanded(child: _summaryCard('In Progress', '$inProgress', AppColors.blue)),
-            const SizedBox(width: 12),
-            Expanded(child: _summaryCard('Completed', '$completed', AppColors.green)),
-            const SizedBox(width: 12),
-            Expanded(child: _summaryCard('Pending', '$pending', AppColors.yellow)),
-          ]),
-        ),
-        const SizedBox(height: 14),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(children: [
+              // ── Summary Cards ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Row(children: [
+                  Expanded(child: _summaryCard('In Progress', '$inProgress', AppColors.blue)),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: _summaryCard('Completed', '$completed', AppColors.green)),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: _summaryCard('Pending', '$pending', AppColors.yellow)),
+                ]),
+              ),
+              const SizedBox(height: 14),
 
-        // ── Search + Filters ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _buildFilterRow(),
-        ),
-        const SizedBox(height: 12),
+              // ── Search + Filters ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: _buildFilterRow(),
+              ),
+              const SizedBox(height: AppSpacing.md),
 
-        // ── Task List ──
-        Expanded(
-          child: ld
-              ? const Center(child: CircularProgressIndicator())
-              : _filtered.isEmpty
-                  ? Center(child: Text('No tasks yet', style: GoogleFonts.outfit(color: AppColors.textMuted)))
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
-                        itemCount: _filtered.length,
-                        itemBuilder: (ctx, i) => _TaskCard(
-                          task: _filtered[i],
-                          onChanged: _load,
-                        ),
-                      ),
-                    ),
+              // ── Task List ──
+              Expanded(
+                child: ld
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filtered.isEmpty
+                        ? Center(child: Text('No tasks yet', style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                        : RefreshIndicator(
+                            onRefresh: _load,
+                            child: LayoutBuilder(builder: (ctx, constraints) {
+                              final wide = constraints.maxWidth >= AppBreakpoints.phone;
+                              if (!wide) {
+                                return ListView.builder(
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                                  itemCount: _filtered.length,
+                                  itemBuilder: (ctx, i) => _TaskCard(
+                                    task: _filtered[i],
+                                    onChanged: _load,
+                                  ),
+                                );
+                              }
+                              return GridView.builder(
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: AppSpacing.md,
+                                  crossAxisSpacing: AppSpacing.md,
+                                  childAspectRatio: constraints.maxWidth >= 900 ? 1.9 : 1.45,
+                                ),
+                                itemCount: _filtered.length,
+                                itemBuilder: (ctx, i) => _TaskCard(
+                                  task: _filtered[i],
+                                  onChanged: _load,
+                                  inGrid: true,
+                                ),
+                              );
+                            }),
+                          ),
+              ),
+            ]),
+          ),
         ),
-      ]),
+      ),
     );
   }
 
@@ -299,7 +329,8 @@ class _TasksPageState extends State<TasksPage> {
 class _TaskCard extends StatefulWidget {
   final Map task;
   final VoidCallback? onChanged;
-  const _TaskCard({required this.task, this.onChanged});
+  final bool inGrid;
+  const _TaskCard({required this.task, this.onChanged, this.inGrid = false});
 
   @override
   State<_TaskCard> createState() => _TaskCardState();
@@ -421,7 +452,7 @@ class _TaskCardState extends State<_TaskCard> {
         isCompleted ? AppColors.green : isInProgress ? AppColors.blue : AppColors.yellow;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: widget.inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,

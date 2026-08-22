@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import 'attendance_geo_helper.dart';
 
@@ -338,21 +339,41 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _loadAll,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildWelcomeCard(),
-          const SizedBox(height: 16),
-          _buildCheckInCard(),
-          const SizedBox(height: 16),
-          _buildAIBanner(),
-          const SizedBox(height: 12),
-          _buildTaskBoard(),
-        ],
-      ),
-    );
+    return LayoutBuilder(builder: (ctx, constraints) {
+      final isWide = constraints.maxWidth >= AppBreakpoints.phone;
+      return Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: SizedBox(
+            width: double.infinity,
+            child: RefreshIndicator(
+              onRefresh: _loadAll,
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                children: [
+                  if (isWide)
+                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Expanded(child: _buildWelcomeCard()),
+                      const SizedBox(width: AppSpacing.lg),
+                      Expanded(child: _buildCheckInCard()),
+                    ])
+                  else ...[
+                    _buildWelcomeCard(),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildCheckInCard(),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildAIBanner(),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildTaskBoard(isWide: isWide),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 
   Widget _buildWelcomeCard() {
@@ -631,7 +652,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     );
   }
 
-  Widget _buildTaskBoard() {
+  Widget _buildTaskBoard({bool isWide = false}) {
     if (_loadingTasks) {
       return sectionCard(
         padding: const EdgeInsets.all(24),
@@ -683,10 +704,22 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             ]),
           )
         else
-          ...tasks.asMap().entries.map((e) => _TaskTile(
-                idx: e.key,
-                task: Map<String, dynamic>.from(e.value as Map),
-              )),
+          LayoutBuilder(builder: (ctx, c) {
+            final tiles = tasks.asMap().entries.map((e) => _TaskTile(
+                  idx: e.key,
+                  task: Map<String, dynamic>.from(e.value as Map),
+                  inGrid: isWide,
+                )).toList();
+            if (!isWide) return Column(children: tiles);
+            final w = c.maxWidth;
+            return Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.sm,
+              children: tiles
+                  .map((t) => SizedBox(width: (w - AppSpacing.md) / 2, child: t))
+                  .toList(),
+            );
+          }),
       ]),
     );
   }
@@ -695,7 +728,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 class _TaskTile extends StatelessWidget {
   final int idx;
   final Map<String, dynamic> task;
-  const _TaskTile({required this.idx, required this.task});
+  final bool inGrid;
+  const _TaskTile({required this.idx, required this.task, this.inGrid = false});
 
   Color _priorityColor(String? p) {
     switch (p?.toLowerCase()) {
@@ -720,7 +754,7 @@ class _TaskTile extends StatelessWidget {
     final projectName = task['project_name']?.toString() ?? '';
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: idx.isEven ? AppColors.bgMain.withValues(alpha: 0.4) : Colors.white,
         borderRadius: BorderRadius.circular(12),

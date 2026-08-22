@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../models/notification.dart';
 import 'projects_page.dart';
@@ -277,12 +278,21 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            _buildNotificationsTab(),
-            _buildReportsTab(),
-            _buildIssuesTab(),
-          ],
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+            child: SizedBox(
+              width: double.infinity,
+              child: TabBarView(
+                children: [
+                  _buildNotificationsTab(),
+                  _buildReportsTab(),
+                  _buildIssuesTab(),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

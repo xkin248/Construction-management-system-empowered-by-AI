@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 
 class WorkersPage extends StatefulWidget {
@@ -131,83 +132,109 @@ class _WorkersPageState extends State<WorkersPage> {
           onPressed: _openAddWorker,
           icon: const Icon(Icons.add),
           label: const Text('Add Worker')),
-      body: Column(children: [
-        // Search bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-          child: TextField(
-            onChanged: (v) => setState(() => _searchQuery = v),
-            decoration: InputDecoration(
-              hintText: 'Search workers by name or trade...',
-              hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-              filled: true, fillColor: AppColors.bgCard,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
-            ),
-          ),
-        ),
-        Expanded(
-          child: ld
-          ? const Center(child: CircularProgressIndicator())
-          : _filtered.isEmpty
-              ? Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted)))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-                    itemCount: _filtered.length,
-                    itemBuilder: (ctx, i) {
-                      final w = _filtered[i];
-                      return sectionCard(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: Row(children: [
-                          initialsAvatar(w['name'] ?? '?', radius: 22),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Row(children: [
-                                Expanded(child: Text(w['name'] ?? '-',
-                                    style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14.5),
-                                    overflow: TextOverflow.ellipsis)),
-                                statusPill(w['today_status'] ?? 'absent'),
-                              ]),
-                              const SizedBox(height: 2),
-                              Text(w['trade'] ?? 'General Worker',
-                                  style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
-                              if (w['project'] != null) ...[
-                                const SizedBox(height: 4),
-                                Row(children: [
-                                  const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
-                                  const SizedBox(width: 3),
-                                  Expanded(child: Text(w['project']['project_name'] ?? '',
-                                      style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
-                                      overflow: TextOverflow.ellipsis)),
-                                ]),
-                              ],
-                              if (w['check_in_time'] != null || w['hours_today'] != null) ...[
-                                const SizedBox(height: 6),
-                                Text(
-                                  [
-                                    if (w['check_in_time'] != null) 'In ${_fmtTime(w['check_in_time'])}',
-                                    if (w['check_out_time'] != null) 'Out ${_fmtTime(w['check_out_time'])}',
-                                    if (w['hours_today'] != null) '${w['hours_today']}h',
-                                  ].join(' · '),
-                                  style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
-                                ),
-                              ],
-                            ]),
-                          ),
-                        ]),
-                      );
-                    },
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(children: [
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: TextField(
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search workers by name or trade...',
+                    hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                    filled: true, fillColor: AppColors.bgCard,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
                   ),
                 ),
-        ),     // Expanded
-      ]),      // Column
+              ),
+              Expanded(
+                child: ld
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: LayoutBuilder(builder: (ctx, constraints) {
+                          if (constraints.maxWidth < AppBreakpoints.phone) {
+                            return ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                              itemCount: _filtered.length,
+                              itemBuilder: (ctx, i) => _workerCard(_filtered[i]),
+                            );
+                          }
+                          // Tablet / desktop: two-column grid
+                          return GridView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: AppSpacing.sm,
+                              crossAxisSpacing: AppSpacing.sm,
+                              childAspectRatio: 1.6,
+                            ),
+                            itemCount: _filtered.length,
+                            itemBuilder: (ctx, i) => _workerCard(_filtered[i], inGrid: true),
+                          );
+                        }),
+                      ),
+              ),     // Expanded
+            ]),      // Column
+          ),
+        ),
+      ),
     );         // Scaffold
+  }
+
+  Widget _workerCard(Map w, {bool inGrid = false}) {
+    return sectionCard(
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
+      child: Row(children: [
+        initialsAvatar(w['name'] ?? '?', radius: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(w['name'] ?? '-',
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14.5),
+                  overflow: TextOverflow.ellipsis)),
+              statusPill(w['today_status'] ?? 'absent'),
+            ]),
+            const SizedBox(height: 2),
+            Text(w['trade'] ?? 'General Worker',
+                style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
+            if (w['project'] != null) ...[
+              const SizedBox(height: 4),
+              Row(children: [
+                const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
+                const SizedBox(width: 3),
+                Expanded(child: Text(w['project']['project_name'] ?? '',
+                    style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+                    overflow: TextOverflow.ellipsis)),
+              ]),
+            ],
+            if (w['check_in_time'] != null || w['hours_today'] != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                [
+                  if (w['check_in_time'] != null) 'In ${_fmtTime(w['check_in_time'])}',
+                  if (w['check_out_time'] != null) 'Out ${_fmtTime(w['check_out_time'])}',
+                  if (w['hours_today'] != null) '${w['hours_today']}h',
+                ].join(' · '),
+                style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
+              ),
+            ],
+          ]),
+        ),
+      ]),
+    );
   }
 
   String _fmtTime(String iso) {
