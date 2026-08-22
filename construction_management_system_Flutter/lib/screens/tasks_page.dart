@@ -31,8 +31,10 @@ class _TasksPageState extends State<TasksPage> {
     try {
       projects = await ApiService().getProjects();
       if (projects.isNotEmpty) {
-        pid ??= projects.first['project_id'];
-        tasks = await ApiService().getTasks(pid!);
+        // Default to ALL projects so a supervisor sees every task instead of
+        // only the first project's tasks. A project filter dropdown is still
+        // available when more than one project exists.
+        tasks = await _loadTasks(pid);
       }
     } catch (e) {
       toast('Failed to load tasks: $e');
@@ -41,10 +43,23 @@ class _TasksPageState extends State<TasksPage> {
     }
   }
 
+  // Loads tasks for one project (pid != null) or merges tasks from ALL
+  // projects (pid == null). Previously a supervisor without a project
+  // switcher only ever saw the first project's tasks.
+  Future<List> _loadTasks(int? targetPid) async {
+    if (targetPid != null) {
+      return await ApiService().getTasks(targetPid);
+    }
+    final all = await Future.wait(
+      projects.map((p) => ApiService().getTasks(p['project_id'] as int)),
+    );
+    return all.expand((t) => t).toList();
+  }
+
   Future<void> _switchProject(int? newPid) async {
     setState(() { pid = newPid; ld = true; });
     try {
-      tasks = newPid == null ? [] : await ApiService().getTasks(newPid);
+      tasks = await _loadTasks(newPid);
     } finally {
       if (mounted) setState(() => ld = false);
     }
@@ -184,7 +199,10 @@ class _TasksPageState extends State<TasksPage> {
                       child: ListView.builder(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
                         itemCount: _filtered.length,
-                        itemBuilder: (ctx, i) => _TaskCard(task: _filtered[i]),
+                        itemBuilder: (ctx, i) => _TaskCard(
+                          task: _filtered[i],
+                          onChanged: _load,
+                        ),
                       ),
                     ),
         ),
@@ -239,7 +257,8 @@ class _TasksPageState extends State<TasksPage> {
             const SizedBox(width: 8),
             _dropdown(
               projects.map<String>((p) => p['project_name'] as String).toList()..insert(0, 'All'),
-              'All', (v) {
+              pid == null ? 'All' : (projects.where((p) => p['project_id'] == pid).isEmpty ? 'All' : projects.firstWhere((p) => p['project_id'] == pid)['project_name'] as String),
+              (v) {
                 if (v == 'All') {
                   _switchProject(null);
                 } else {
@@ -279,7 +298,8 @@ class _TasksPageState extends State<TasksPage> {
 // ──────────────── Task Card ────────────────
 class _TaskCard extends StatefulWidget {
   final Map task;
-  const _TaskCard({required this.task});
+  final VoidCallback? onChanged;
+  const _TaskCard({required this.task, this.onChanged});
 
   @override
   State<_TaskCard> createState() => _TaskCardState();
@@ -412,8 +432,11 @@ class _TaskCardState extends State<_TaskCard> {
         // ── Navigable section (header + progress + worker/due) ──
         InkWell(
           borderRadius: BorderRadius.circular(10),
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => TaskDetailPage(task: widget.task))),
+          onTap: () async {
+            final changed = await Navigator.push<bool>(context,
+                MaterialPageRoute(builder: (_) => TaskDetailPage(task: widget.task)));
+            if (changed == true) widget.onChanged?.call();
+          },
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Title row
             Row(children: [
@@ -696,7 +719,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       }
       setState(() => _assignedWorkers = selected);
       toast('${selected.length} worker(s) assigned');
-      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context, true);
     } catch (e) {
       toast('Failed to assign: $e');
     }
