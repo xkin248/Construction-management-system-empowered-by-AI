@@ -251,7 +251,10 @@ class _TasksPageState extends State<TasksPage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(value, style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w800, color: color)),
         const SizedBox(height: 2),
-        Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+        Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
