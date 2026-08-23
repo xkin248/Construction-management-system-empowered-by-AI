@@ -55,7 +55,7 @@ TRADE_ALIASES: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
     "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
-    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
     "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
     "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
     "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
@@ -78,7 +78,7 @@ TASK_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
     "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
     "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
-    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
     "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料", "mengecat", "pengecat"],
     "welding": ["welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
     "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
@@ -98,7 +98,7 @@ SEED_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
     "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
     "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
-    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
     "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
     "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
     "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
@@ -232,6 +232,15 @@ def _worker_trade_group(trade: str) -> Optional[str]:
     for group, keywords in TRADE_ALIASES.items():
         if t in keywords or t == group:
             return group
+    # Bahasa Melayu installer/operator prefixes: strip "pemasang ", "tukang ",
+    # "pengendali " and re-match against aliases (e.g. "pemasang jubin" -> tiling).
+    for prefix in ("pemasang ", "tukang ", "pengendali "):
+        if t.startswith(prefix):
+            stripped = t[len(prefix):].strip()
+            if stripped:
+                for group, keywords in TRADE_ALIASES.items():
+                    if stripped in keywords or stripped == group:
+                        return group
     return None
 
 
