@@ -47,13 +47,16 @@ SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildS
 请用简洁、专业、实用的语言回答问题。如果涉及具体数据，请基于提供的上下文信息进行分析。"""
 
 
-# Trade synonyms: canonical group -> keywords matched against task text / worker trade.
+# Trade synonyms: canonical group -> keywords matched against worker trade strings.
+# Used ONLY for mapping a worker's stored trade label to a canonical group.
+# (Task text detection uses TASK_KEYWORDS below — narrower, avoids false positives
+# like "wall"/"water"/"floor" matching the wrong trade.)
 TRADE_ALIASES: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
     "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
     "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土"],
-    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "油漆", "粉刷", "涂料"],
+    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料"],
     "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属"],
     "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风"],
     "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面"],
@@ -67,24 +70,47 @@ TRADE_ALIASES: Dict[str, List[str]] = {
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查"],
 }
 
+# Strict keywords for TASK text detection (title+description). Deliberately
+# narrower than TRADE_ALIASES: generic words like "wall"/"floor"/"water" alone
+# must NOT decide a trade, otherwise "paint walls" -> masonry or "tile floor" ->
+# flooring. Ambiguous multi-hit cases are resolved by the semantic matcher.
+TASK_KEYWORDS: Dict[str, List[str]] = {
+    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜"],
+    "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明"],
+    "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水"],
+    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土"],
+    "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料"],
+    "welding": ["welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构"],
+    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风"],
+    "roofing": ["roofing", "roofer", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面"],
+    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板"],
+    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗"],
+    "flooring": ["flooring", "floor", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯"],
+    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工"],
+    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "监工", "巡查"],
+}
+
 # Seed keywords used by the dataset-trained semantic matcher (mirror of build_trade_matcher.py).
 SEED_KEYWORDS: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "carpentry", "木工", "橱柜"],
-    "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "电工", "电线", "照明"],
-    "plumbing": ["plumber", "plumbing", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
-    "masonry": ["mason", "masonry", "brick", "block", "concrete", "wall", "plaster", "砌砖", "砖墙", "混凝土"],
-    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "油漆", "粉刷", "涂料"],
-    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构"],
-    "hvac": ["hvac", "air conditioning", "ventilation", "ahu", "duct", "暖通", "空调", "通风"],
-    "roofing": ["roofer", "roofing", "roof", "shingle", "屋顶", "屋面"],
-    "tiling": ["tile", "tiler", "tiling", "terrazzo", "ceramic", "瓷砖", "地砖"],
-    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
+    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜"],
+    "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明"],
+    "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水"],
+    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土"],
+    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料"],
+    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构"],
+    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风"],
+    "roofing": ["roofer", "roofing", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面"],
+    "tiling": ["tile", "tiler", "tiling", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板"],
     "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装"],
-    "flooring": ["floor", "flooring", "linoleum", "carpet", "wooden floor", "地板", "地毯"],
-    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
-    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
-    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "工地主任", "监工", "巡查"],
+    "flooring": ["floor", "flooring", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯"],
+    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工"],
+    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "工地主任", "监工", "巡查"],
 }
 
 # Standard estimated task duration (workdays) per canonical trade, used by
@@ -171,11 +197,30 @@ def _semantic_trade_scores(task_text: str) -> Dict[str, float]:
 
 
 def _detect_trade_groups(task_text: str) -> set:
-    """Return canonical trade groups whose keywords appear in task text."""
+    """Return canonical trade groups whose TASK keywords appear in task text."""
     return {
-        group for group, keywords in TRADE_ALIASES.items()
+        group for group, keywords in TASK_KEYWORDS.items()
         if any(kw in task_text for kw in keywords)
     }
+
+
+def _resolve_detected_trades(task_text: str, detected: set, semantic_scores: Dict[str, float]) -> set:
+    """Resolve ambiguous multi-hit keyword detection with the semantic matcher.
+
+    When several trades match task keywords (e.g. "tile bathroom floor with
+    ceramic" hits both tiling and flooring), prefer the trade with the highest
+    semantic score so we do not fall back to alphabetical order. If the semantic
+    matcher is unavailable or gives no strong preference, keep all hits.
+    """
+    if len(detected) <= 1 or not semantic_scores:
+        return detected
+    best = max(detected, key=lambda g: semantic_scores.get(g, 0.0))
+    best_score = semantic_scores.get(best, 0.0)
+    runner_up = sorted((semantic_scores.get(g, 0.0) for g in detected), reverse=True)
+    runner_up = runner_up[1] if len(runner_up) > 1 else 0.0
+    if best_score >= 0.55 and (best_score - runner_up) >= 0.10:
+        return {best}
+    return detected
 
 
 def _worker_trade_group(trade: str) -> Optional[str]:
@@ -218,8 +263,10 @@ def analyze_task(
     # Trade is no longer accepted from the task form: the required role is
     # decided purely from title + description via keyword & semantic matching.
     semantic_scores = _semantic_trade_scores(task_text)
-    # 1. Keyword detection first (TRADE_ALIASES substring match — reliable, no false positives).
+    # 1. Keyword detection first (TASK_KEYWORDS substring match — reliable, no false positives).
     detected_trades = _detect_trade_groups(task_text)
+    # 1b. Ambiguous multi-hit: resolve with semantic scores when possible.
+    detected_trades = _resolve_detected_trades(task_text, detected_trades, semantic_scores)
     # 2. Semantic detection as a supplement — only when keywords found nothing AND
     #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
     #    This prevents the old bug where "electric" scored 0.35 for ALL trades and

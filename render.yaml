@@ -26,3 +26,5 @@ services:
         sync: false
       - key: GEMINI_MODEL
         value: gemini-1.5-flash
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
