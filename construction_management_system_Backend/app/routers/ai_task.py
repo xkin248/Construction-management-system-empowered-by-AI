@@ -329,17 +329,33 @@ TRADE_INSTRUCTIONS: Dict[str, str] = {
     "general": "Cooperate with trades; maintain housekeeping; use PPE at all times.",
 }
 
-def _ai_infer_part_section(task: Task, worker: Worker) -> str:
+def _ai_infer_part_section(task: Task, worker: Worker, used: Optional[set] = None) -> str:
     trade = (worker.trade or "general").strip().lower()
     parts = TRADE_TO_PARTS.get(trade, TRADE_TO_PARTS["general"])
-    idx = (task.task_id or 0) % max(len(parts), 1)
-    base = parts[idx]
+    n = max(len(parts), 1)
+    idx = (task.task_id or 0) % n
     tname = task.task_name.lower()
-    if "floor" in tname:
-        base = f"Floor {task.task_id % 10 + 1} — " + base
-    elif "wall" in tname or "column" in tname:
-        base = "Grid " + chr(65 + (task.task_id % 6)) + " — " + base
-    return base
+
+    def _build(i: int) -> str:
+        base = parts[i % n]
+        if "floor" in tname:
+            return f"Floor {task.task_id % 10 + 1} — " + base
+        if "wall" in tname or "column" in tname:
+            return "Grid " + chr(65 + (task.task_id % 6)) + " — " + base
+        return base
+
+    section = _build(idx)
+    if used is not None:
+        # Deduplicate: avoid showing the same part_section twice on one
+        # worker's board by probing the trade's parts list in order.
+        if section in used:
+            for offset in range(1, n + 1):
+                cand = _build(idx + offset)
+                if cand not in used:
+                    section = cand
+                    break
+        used.add(section)
+    return section
 
 def _ai_work_instructions(task: Task, worker: Worker) -> str:
     trade = (worker.trade or "general").strip().lower()
@@ -412,6 +428,7 @@ def worker_task_board(
     now = datetime.utcnow()
 
     task_items: List[WorkerTaskItem] = []
+    used_sections: set = set()
     for t in query:
         link = next((l for l in t.task_workers if l.worker_id == user.id), None)
         task_items.append(WorkerTaskItem(
@@ -425,7 +442,7 @@ def worker_task_board(
             due_date=t.due_date,
             ai_confidence=t.ai_confidence,
             assigned_at=link.assigned_at if link else None,
-            part_section=_ai_infer_part_section(t, worker),
+            part_section=_ai_infer_part_section(t, worker, used_sections),
             work_instructions=_ai_work_instructions(t, worker),
         ))
 

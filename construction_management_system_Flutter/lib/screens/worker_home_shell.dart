@@ -452,14 +452,14 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                 const Text('No attendance record for today yet. Check in from the Dashboard.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 14))
               else ...[
-                _row('Check In', attRec['check_in_time']?.toString().substring(11, 16) ?? '—',
+                _row('Check In', _fmtTime(attRec['check_in_time']),
                     attRec['check_in_time'] != null ? AppColors.green : AppColors.textMuted),
                 const Divider(height: 16, color: AppColors.border),
-                _row('Check Out', attRec['check_out_time']?.toString().substring(11, 16) ?? '—',
-                    attRec['check_out_time'] != null ? AppColors.blue : AppColors.textMuted),
+                _row('Check Out', _fmtTime(attRec['check_out_time'] ?? attRec['checked_out_time']),
+                    (attRec['check_out_time'] ?? attRec['checked_out_time']) != null ? AppColors.blue : AppColors.textMuted),
                 const Divider(height: 16, color: AppColors.border),
                 _row('Status', statusRaw + statusNote,
-                    checkedIn ? AppColors.green : checkedOut ? AppColors.blue : AppColors.red),
+                    checkedOut ? AppColors.blue : checkedIn ? AppColors.green : AppColors.red),
                 if (attRec['device_info'] != null && attRec['device_info'].toString().isNotEmpty) ...[
                   const Divider(height: 16, color: AppColors.border),
                   _row('Device', attRec['device_info'].toString().substring(0, attRec['device_info'].toString().length > 40 ? 40 : attRec['device_info'].toString().length),
@@ -501,4 +501,14 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
         Text(label, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
         Text(value, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
       ]);
+
+  /// Extract HH:mm from backend time strings without crashing on short /
+  /// unexpected formats (ISO "2026-08-23T19:29:58+08:00" or "19:29:58").
+  String _fmtTime(Object? v) {
+    if (v == null) return '—';
+    final s = v.toString();
+    if (s.length >= 16) return s.substring(11, 16);
+    if (s.length >= 5) return s.substring(0, 5);
+    return s;
+  }
 }

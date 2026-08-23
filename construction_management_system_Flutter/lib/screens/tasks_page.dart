@@ -549,7 +549,7 @@ class _TaskCardState extends State<_TaskCard> {
                 Flexible(
                   child: Text(
                     workers.length > 1
-                        ? '${workers.first['name'] ?? ''} +${workers.length - 1}'
+                        ? '${workers.first['name'] ?? ''} +${workers.length - 1} more'
                         : (workers.first['name'] ?? ''),
                     style: GoogleFonts.outfit(
                         fontSize: 14,

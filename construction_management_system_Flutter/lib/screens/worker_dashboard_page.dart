@@ -104,11 +104,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       if (_projects.isNotEmpty && _selectedProjectId == null) {
         final sp = await SharedPreferences.getInstance();
         final savedPid = sp.getInt('project_id');
-        if (savedPid != null) {
-          _selectedProjectId = savedPid;
-        } else {
-          _selectedProjectId = _projects.first['project_id'] as int;
-        }
+        final exists = savedPid != null &&
+            _projects.any((p) => p['project_id'] == savedPid);
+        _selectedProjectId = exists ? savedPid : _projects.first['project_id'] as int;
       }
     } catch (_) {}
   }
@@ -135,11 +133,13 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           if (att != null) {
             _attendanceId = att['attendance_id'] as int?;
             final ci = att['check_in_time'];
-            if (ci != null) {
-              final t = ci.toString().substring(11, 16);
+            final co = att['check_out_time'] ?? att['checked_out_time'];
+            final t = _checkedOut ? (co ?? ci) : ci;
+            if (t != null) {
+              final tt = _fmtTime(t);
               _statusMsg = _checkedOut
-                  ? '👋 Checked out — completed today at $t'
-                  : '✅ Currently checked in — arrived at $t';
+                  ? '👋 Checked out — completed today at $tt'
+                  : '✅ Currently checked in — arrived at $tt';
             }
           }
         });
@@ -249,6 +249,22 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     }
   }
 
+  /// Returns [lat, lng] of the currently selected project, falling back to
+  /// the first project, then to the default site center.
+  List<double> _projectCenter() {
+    if (_projects.isEmpty) return [3.1390, 101.6869];
+    var proj = _projects.first;
+    if (_selectedProjectId != null) {
+      final idx =
+          _projects.indexWhere((p) => p['project_id'] == _selectedProjectId);
+      if (idx >= 0) proj = _projects[idx];
+    }
+    return [
+      (proj['center_lat'] as num? ?? 3.1390).toDouble(),
+      (proj['center_lng'] as num? ?? 101.6869).toDouble(),
+    ];
+  }
+
   void _simulateGpsCheckIn() async {
     setState(() {
       _checkInLoading = true;
@@ -256,12 +272,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     });
     await Future.delayed(const Duration(milliseconds: 500));
     try {
-      final defaultLat = _projects.isNotEmpty
-          ? (_projects.first['center_lat'] as num? ?? 3.1390).toDouble()
-          : 3.1390;
-      final defaultLng = _projects.isNotEmpty
-          ? (_projects.first['center_lng'] as num? ?? 101.6869).toDouble()
-          : 101.6869;
+      final c = _projectCenter();
+      final defaultLat = c[0];
+      final defaultLng = c[1];
       final r = await ApiService().workerCheckIn(
         projectId: _selectedProjectId!,
         lat: defaultLat,
@@ -298,12 +311,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       _statusMsg = 'Processing check-out...';
     });
     try {
-      final defaultLat = _projects.isNotEmpty
-          ? (_projects.first['center_lat'] as num? ?? 3.1390).toDouble()
-          : 3.1390;
-      final defaultLng = _projects.isNotEmpty
-          ? (_projects.first['center_lng'] as num? ?? 101.6869).toDouble()
-          : 101.6869;
+      final c = _projectCenter();
+      final defaultLat = c[0];
+      final defaultLng = c[1];
       final r = await ApiService().workerCheckOut(
         lat: defaultLat,
         lng: defaultLng,
@@ -314,7 +324,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         _checkedIn = false;
         _checkedOut = true;
         _attendanceId = null;
-        final t = r['check_out_time']?.toString().substring(11, 16) ?? _fmtNow();
+        final t = _fmtTime(r['check_out_time']);
         _statusMsg = '👋 Checked out at $t. Thank you for today!';
         _checkInLoading = false;
       });
@@ -335,6 +345,16 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String _fmtNow() {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// Extract HH:mm from backend time strings without crashing on short /
+  /// unexpected formats (ISO "2026-08-23T19:29:58+08:00" or "19:29:58").
+  String _fmtTime(Object? v) {
+    if (v == null) return '—';
+    final s = v.toString();
+    if (s.length >= 16) return s.substring(11, 16);
+    if (s.length >= 5) return s.substring(0, 5);
+    return s;
   }
 
   @override
@@ -763,17 +783,17 @@ class _TaskTile extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Flexible(
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                child: Row(children: [
                   const Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
                   const SizedBox(width: 4),
-                  Flexible(
+                  Expanded(
                     child: Text(part,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
                   ),
@@ -800,6 +820,8 @@ class _TaskTile extends StatelessWidget {
           ]),
           const SizedBox(height: 8),
           Text(task['task_name']?.toString() ?? 'Unnamed Task',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           if (task['description']?.toString().isNotEmpty ?? false) ...[
             const SizedBox(height: 4),
