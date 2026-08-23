@@ -19,7 +19,12 @@ class Settings(BaseSettings):
     class Config: env_file = ".env"; extra = "ignore"
 
 settings = Settings()
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
+if settings.DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+else:
+    # Fail fast when the DB is unreachable so the app doesn't hang during startup
+    # (Render kills the deploy after the port-scan timeout when uvicorn never binds).
+    connect_args = {"connect_timeout": 10}
 engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
