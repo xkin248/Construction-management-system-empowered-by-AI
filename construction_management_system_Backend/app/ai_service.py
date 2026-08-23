@@ -52,22 +52,22 @@ SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildS
 # (Task text detection uses TASK_KEYWORDS below — narrower, avoids false positives
 # like "wall"/"water"/"floor" matching the wrong trade.)
 TRADE_ALIASES: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木"],
-    "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明"],
-    "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水"],
-    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土"],
-    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料"],
-    "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属"],
-    "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风"],
-    "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面"],
-    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "瓷砖", "地砖"],
-    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板"],
-    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗"],
-    "flooring": ["flooring", "floor", "linoleum", "carpet", "地板", "地毯"],
-    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工"],
-    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热"],
-    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查"],
+    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
+    "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
+    "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
+    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
+    "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
+    "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
+    "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面", "bumbung", "atap"],
+    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "瓷砖", "地砖", "jubin", "mozek"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
+    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗", "kaca", "tingkap"],
+    "flooring": ["flooring", "floor", "linoleum", "carpet", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
+    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan"],
+    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
 
 # Strict keywords for TASK text detection (title+description). Deliberately
@@ -75,42 +75,42 @@ TRADE_ALIASES: Dict[str, List[str]] = {
 # must NOT decide a trade, otherwise "paint walls" -> masonry or "tile floor" ->
 # flooring. Ambiguous multi-hit cases are resolved by the semantic matcher.
 TASK_KEYWORDS: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜"],
-    "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明"],
-    "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水"],
-    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土"],
-    "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料"],
-    "welding": ["welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构"],
-    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风"],
-    "roofing": ["roofing", "roofer", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面"],
-    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖"],
-    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板"],
-    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗"],
-    "flooring": ["flooring", "floor", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯"],
-    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工"],
-    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热"],
-    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "监工", "巡查"],
+    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
+    "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
+    "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
+    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料", "mengecat", "pengecat"],
+    "welding": ["welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
+    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
+    "roofing": ["roofing", "roofer", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面", "bumbung", "atap"],
+    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖", "jubin", "mozek"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
+    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗", "kaca", "tingkap"],
+    "flooring": ["flooring", "floor", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
+    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan"],
+    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
 
 # Seed keywords used by the dataset-trained semantic matcher (mirror of build_trade_matcher.py).
 SEED_KEYWORDS: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜"],
-    "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明"],
-    "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水"],
-    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土"],
-    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料"],
-    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构"],
-    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风"],
-    "roofing": ["roofer", "roofing", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面"],
-    "tiling": ["tile", "tiler", "tiling", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖"],
-    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板"],
-    "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装"],
-    "flooring": ["floor", "flooring", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯"],
-    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工"],
-    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热"],
-    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "工地主任", "监工", "巡查"],
+    "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
+    "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
+    "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
+    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit"],
+    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
+    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
+    "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
+    "roofing": ["roofer", "roofing", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面", "bumbung", "atap"],
+    "tiling": ["tile", "tiler", "tiling", "terrazzo", "ceramic", "grout", "backsplash", "瓷砖", "地砖", "jubin", "mozek"],
+    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "partition", "ceiling board", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
+    "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装", "kaca", "tingkap"],
+    "flooring": ["floor", "flooring", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
+    "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "sign", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan"],
+    "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca"],
+    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "工地主任", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
 
 # Standard estimated task duration (workdays) per canonical trade, used by
@@ -124,6 +124,7 @@ TRADE_DURATION: Dict[str, float] = {
 
 _SEMANTIC_STOP = (
     set("the a an and or for with of to in on at by from into onto under over install installing new fix apply lay test check do make set up build construction project work task done ready please need want using use".split())
+    | set("yang dan di ke dari ini itu untuk dengan pada atau adalah tidak saya anda kami pasang memasang baiki membaiki periksa memeriksa kerja bekerja projek tugas siap perlu mahu guna menggunakan buat membuat baru letak meletakkan uji menguji pengujian kawasan bangunan semua akan sudah boleh ada tanpa selepas sebelum antara dalam jadual sila mohon bantu".split())
     | (set(ENGLISH_STOP_WORDS) if SEMANTIC_AVAILABLE else set())
 )
 
