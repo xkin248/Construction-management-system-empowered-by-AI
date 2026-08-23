@@ -112,7 +112,9 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _openNewTask() async {
-    if (pid == null) { toast('Create a project first'); return; }
+    if (projects.isEmpty) { toast('Create a project first'); return; }
+    // pid may be null (viewing ALL projects); TaskForm falls back to the
+    // first project and still lets the user switch projects inside the form.
     final created = await showDialog<bool>(
       context: context,
       builder: (_) => TaskForm(initialProjectId: pid),

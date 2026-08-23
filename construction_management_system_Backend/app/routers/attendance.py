@@ -458,7 +458,10 @@ def weekly_attendance_stats(
     """
     today_local = date.today()
     monday = today_local - timedelta(days=today_local.weekday())
-    start = datetime(monday.year, monday.month, monday.day)
+    # Use aware datetimes: Supabase/Postgres stores timestamptz (aware UTC),
+    # comparing with naive datetimes raises TypeError. KL_TZ keeps "week"
+    # aligned to the business timezone (UTC+8).
+    start = datetime(monday.year, monday.month, monday.day, tzinfo=KL_TZ)
     end = start + timedelta(days=7)
 
     q = db.query(AttendanceLog).filter(
