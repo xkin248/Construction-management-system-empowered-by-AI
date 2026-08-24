@@ -147,14 +147,14 @@ class _NarrowLayout extends StatelessWidget {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.menu_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.menu_rounded, color: AppColors.textPrimary),
           onPressed: () => scaffoldKey.currentState?.openDrawer(),
         ),
         title: Text(_workerTitles[idx],
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red),
+            icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red),
             tooltip: 'Log out',
             onPressed: onLogout,
           ),
@@ -175,7 +175,7 @@ class _NarrowLayout extends StatelessWidget {
       ),
       body: pages,
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.bgCard,
           border: Border(top: BorderSide(color: AppColors.border)),
           boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
@@ -297,7 +297,7 @@ class _WorkerSidebarContent extends StatelessWidget {
                     ]),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
+                    icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
                     tooltip: 'Log out',
                     onPressed: onLogout,
                   ),
@@ -362,7 +362,7 @@ class _WorkerTopBar extends StatelessWidget {
     return Container(
       height: 58,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -372,7 +372,7 @@ class _WorkerTopBar extends StatelessWidget {
               style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
         IconButton(
-          icon: const Icon(Icons.info_outline, color: AppColors.textSecondary, size: 20),
+          icon: Icon(Icons.info_outline, color: AppColors.textSecondary, size: 20),
           tooltip: 'About Worker Portal',
           onPressed: () {
             showDialog(context: context, builder: (_) => AlertDialog(
@@ -402,7 +402,18 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_onDarkChanged);
     _load();
+  }
+
+  void _onDarkChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_onDarkChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -449,24 +460,24 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                   style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 12),
               if (attRec == null)
-                const Text('No attendance record for today yet. Check in from the Dashboard.',
+                Text('No attendance record for today yet. Check in from the Dashboard.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 14))
               else ...[
                 _row('Check In', _fmtTime(attRec['check_in_time']),
                     attRec['check_in_time'] != null ? AppColors.green : AppColors.textMuted),
-                const Divider(height: 16, color: AppColors.border),
+                Divider(height: 16, color: AppColors.border),
                 _row('Check Out', _fmtTime(attRec['check_out_time'] ?? attRec['checked_out_time']),
                     (attRec['check_out_time'] ?? attRec['checked_out_time']) != null ? AppColors.blue : AppColors.textMuted),
-                const Divider(height: 16, color: AppColors.border),
+                Divider(height: 16, color: AppColors.border),
                 _row('Status', statusRaw + statusNote,
                     checkedOut ? AppColors.blue : checkedIn ? AppColors.green : AppColors.red),
                 if (attRec['device_info'] != null && attRec['device_info'].toString().isNotEmpty) ...[
-                  const Divider(height: 16, color: AppColors.border),
+                  Divider(height: 16, color: AppColors.border),
                   _row('Device', attRec['device_info'].toString().substring(0, attRec['device_info'].toString().length > 40 ? 40 : attRec['device_info'].toString().length),
                       AppColors.textSecondary),
                 ],
                 if (attRec['ip_address'] != null && attRec['ip_address'].toString().isNotEmpty) ...[
-                  const Divider(height: 16, color: AppColors.border),
+                  Divider(height: 16, color: AppColors.border),
                   _row('IP Address', attRec['ip_address'].toString(), AppColors.textSecondary),
                 ],
               ]
@@ -483,7 +494,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                 const SizedBox(height: 6),
                 _row('Check Out', 'Anytime', AppColors.blue),
                 const SizedBox(height: 6),
-                const Text('Clock-in is allowed at any time (time window restrictions removed)',
+                Text('Clock-in is allowed at any time (time window restrictions removed)',
                     style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               ] else ...[
                 _row('Check In', att?['check_in_window'] ?? '08:00 - 10:30', AppColors.green),
@@ -498,7 +509,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   }
 
   Widget _row(String label, String value, Color color) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Text(label, style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
         Text(value, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.w700)),
       ]);
 

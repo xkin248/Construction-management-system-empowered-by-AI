@@ -81,8 +81,19 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_onDarkChanged);
     _guardWorkerEntry();
     _loadUser();
+  }
+
+  void _onDarkChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_onDarkChanged);
+    super.dispose();
   }
 
   /// Role guard: worker accounts must never enter the supervisor HomeShell.
@@ -290,13 +301,13 @@ class _NarrowLayout extends StatelessWidget {
         actions: [
           Stack(children: [
             IconButton(
-              icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
+              icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
             ),
             Positioned(
               right: 8, top: 8,
               child: Container(width: 8, height: 8,
-                  decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
+                  decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
             ),
           ]),
           GestureDetector(
@@ -310,7 +321,7 @@ class _NarrowLayout extends StatelessWidget {
                       child: Text(initStr,
                           style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
                     )
-                  : const CircleAvatar(
+                  : CircleAvatar(
                       radius: 16,
                       backgroundColor: AppColors.sidebarHover,
                       child: SizedBox(width: 12, height: 12,
@@ -322,7 +333,7 @@ class _NarrowLayout extends StatelessWidget {
       ),
       body: pages,
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.bgCard,
           border: Border(top: BorderSide(color: AppColors.border)),
           boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
@@ -425,7 +436,7 @@ class _MoreSheet extends StatelessWidget {
     ];
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -456,7 +467,7 @@ class _MoreSheet extends StatelessWidget {
               ])),
             ]),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           // Menu items
           ...moreItems.map((item) => ListTile(
             leading: Container(
@@ -469,7 +480,7 @@ class _MoreSheet extends StatelessWidget {
             ),
             title: Text(item['label'] as String,
                 style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            trailing: Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             onTap: () {
               Navigator.pop(context);
               final targetIdx = item['idx'] as int;
@@ -486,12 +497,12 @@ class _MoreSheet extends StatelessWidget {
               }
             },
           )),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           ListTile(
             leading: Container(
               width: 38, height: 38,
               decoration: BoxDecoration(color: AppColors.redLight, borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.logout_rounded, size: 20, color: AppColors.red),
+              child: Icon(Icons.logout_rounded, size: 20, color: AppColors.red),
             ),
             title: Text('Log Out',
                 style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.red)),
@@ -605,7 +616,7 @@ class _SidebarContent extends StatelessWidget {
                 ]),
               ),
               IconButton(
-                icon: const Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
+                icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red, size: 19),
                 tooltip: 'Log out',
                 onPressed: onLogout,
               ),
@@ -667,7 +678,7 @@ class _NavTile extends StatelessWidget {
                 Container(
                   width: 8, height: 8,
                   margin: const EdgeInsets.only(left: 2),
-                  decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
                 ),
             ]),
           ),
@@ -699,7 +710,7 @@ class _TopBar extends StatelessWidget {
     return Container(
       height: 62,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
@@ -715,19 +726,19 @@ class _TopBar extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Search projects, workers...',
               hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
-              prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
+              prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
               filled: true,
               fillColor: AppColors.bgMain,
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border)),
+                  borderSide: BorderSide(color: AppColors.border)),
               enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border)),
+                  borderSide: BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
+                  borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
             ),
           ),
         ),
@@ -736,13 +747,13 @@ class _TopBar extends StatelessWidget {
         const SizedBox(width: 12),
         Stack(children: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
+            icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
           ),
           Positioned(
             right: 8, top: 8,
             child: Container(width: 8, height: 8,
-                decoration: const BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
+                decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
           ),
         ]),
         GestureDetector(
@@ -783,12 +794,12 @@ class _ProjectChipState extends State<_ProjectChip> {
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
+          Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
           const SizedBox(width: 5),
           Text(widget.currentProject.isEmpty ? 'All Projects' : widget.currentProject,
               style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(width: 4),
-          const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
+          Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
         ]),
       ),
     );

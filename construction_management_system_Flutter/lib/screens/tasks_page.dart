@@ -76,7 +76,7 @@ class _TasksPageState extends State<TasksPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: AppColors.purpleLight, borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.smart_toy_outlined, color: AppColors.purple, size: 20),
+            child: Icon(Icons.smart_toy_outlined, color: AppColors.purple, size: 20),
           ),
           const SizedBox(width: 10),
           Text('AI Auto-Assign', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
@@ -153,7 +153,7 @@ class _TasksPageState extends State<TasksPage> {
             padding: const EdgeInsets.only(right: 8),
             child: TextButton.icon(
               onPressed: _aiAutoAssignAll,
-              icon: const Icon(Icons.smart_toy_outlined, size: 17, color: AppColors.purple),
+              icon: Icon(Icons.smart_toy_outlined, size: 17, color: AppColors.purple),
               label: Text('AI Assign', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple)),
               style: TextButton.styleFrom(
                 backgroundColor: AppColors.purpleLight,
@@ -271,12 +271,12 @@ class _TasksPageState extends State<TasksPage> {
           decoration: InputDecoration(
             hintText: 'Search tasks...',
             hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
-            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
             filled: true, fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent)),
           ),
         ),
       ),
@@ -367,7 +367,7 @@ class _TaskCardState extends State<_TaskCard> {
   Widget _dueLabel() {
     if (_dueDate == null || _dueDate!.isEmpty) {
       return Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.calendar_today_outlined,
+        Icon(Icons.calendar_today_outlined,
             size: 12, color: AppColors.textMuted),
         const SizedBox(width: 4),
         Text('No due date',
@@ -439,16 +439,16 @@ class _TaskCardState extends State<_TaskCard> {
     final isCompleted = _status == 'completed';
 
     final leadIcon = isCompleted
-        ? const _SpinningOrIcon(
+        ? _SpinningOrIcon(
             icon: Icons.check_circle_rounded,
             color: AppColors.green,
             spin: false)
         : isInProgress
-            ? const _SpinningOrIcon(
+            ? _SpinningOrIcon(
                 icon: Icons.settings_rounded,
                 color: AppColors.blue,
                 spin: true)
-            : const _SpinningOrIcon(
+            : _SpinningOrIcon(
                 icon: Icons.radio_button_unchecked_rounded,
                 color: AppColors.textMuted,
                 spin: false);
@@ -792,7 +792,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           maxChildSize: 0.95,
           minChildSize: 0.4,
           builder: (_, sc) => Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.bgCard,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
@@ -898,7 +898,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                             }
                           });
                         },
-                        style: TextButton.styleFrom(foregroundColor: AppColors.purple, padding: const EdgeInsets.symmetric(horizontal: 8), minimumSize: const Size(0, 32)),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.purple, padding: EdgeInsets.symmetric(horizontal: 8), minimumSize: Size(0, 32)),
                         child: Text('Add All', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
                       ),
                     ]),
@@ -946,7 +946,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 // Save bar (replaces the entire assignment)
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.bgCard,
                     border: Border(top: BorderSide(color: AppColors.border)),
                   ),
@@ -1011,7 +1011,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         // Progress card
         sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.trending_up_rounded, size: 16, color: AppColors.blue),
+            Icon(Icons.trending_up_rounded, size: 16, color: AppColors.blue),
             const SizedBox(width: 8),
             Text('Progress', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
             const Spacer(),
@@ -1020,7 +1020,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           const SizedBox(height: 10),
           ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(
             value: progress / 100, minHeight: 10, backgroundColor: AppColors.blueLight,
-            valueColor: const AlwaysStoppedAnimation(AppColors.blue),
+            valueColor: AlwaysStoppedAnimation(AppColors.blue),
           )),
         ])),
 
@@ -1030,7 +1030,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             Container(
               padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(color: AppColors.yellowLight, borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.event_outlined, size: 16, color: AppColors.yellow),
+              child: Icon(Icons.event_outlined, size: 16, color: AppColors.yellow),
             ),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1042,7 +1042,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         // Assigned worker card
         sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textMuted),
+            Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 6),
             Text('Assigned Worker', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
           ]),
@@ -1057,7 +1057,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   Text(w['name'] ?? '-', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15)),
                   Text(w['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
                 ])),
-                const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+                Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
               ]),
             )),
             const SizedBox(height: 6),
@@ -1068,7 +1068,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 Container(
                   width: 44, height: 44,
                   decoration: BoxDecoration(color: AppColors.border, shape: BoxShape.circle),
-                  child: const Icon(Icons.person_add_outlined, color: AppColors.textMuted, size: 20),
+                  child: Icon(Icons.person_add_outlined, color: AppColors.textMuted, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Text('No worker assigned yet', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13)),
@@ -1089,7 +1089,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.purple,
-                side: const BorderSide(color: AppColors.purple),
+                side: BorderSide(color: AppColors.purple),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),

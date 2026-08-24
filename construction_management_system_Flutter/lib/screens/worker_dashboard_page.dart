@@ -409,7 +409,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: AppColors.green.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 6))],
+        boxShadow: [BoxShadow(color: AppColors.green.withValues(alpha: 0.18), blurRadius: 18, offset: Offset(0, 6))],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,7 +503,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             return Padding(
               padding: const EdgeInsets.only(bottom: 2),
               child: Row(children: [
-                const Icon(Icons.radar_rounded, size: 13, color: AppColors.green),
+                Icon(Icons.radar_rounded, size: 13, color: AppColors.green),
                 const SizedBox(width: 5),
                 Text(
                   'You must be within ${r}m of the site to check in',
@@ -676,7 +676,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     if (_loadingTasks) {
       return sectionCard(
         padding: const EdgeInsets.all(24),
-        child: const Column(children: [
+        child: Column(children: [
           SizedBox(height: 18),
           Center(child: CircularProgressIndicator()),
           SizedBox(height: 12),
@@ -699,7 +699,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               Text(_lastUpdated.substring(11, 16),
                   style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
             IconButton(
-              icon: const Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
+              icon: Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
               tooltip: 'Refresh tasks',
               onPressed: _loadTaskBoard,
             ),
@@ -712,7 +712,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               Container(
                 width: 56, height: 56,
                 decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.assignment_outlined, size: 26, color: AppColors.accent),
+                child: Icon(Icons.assignment_outlined, size: 26, color: AppColors.accent),
               ),
               const SizedBox(height: 12),
               Text('No tasks assigned yet',
@@ -789,7 +789,7 @@ class _TaskTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
-                  const Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
+                  Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(part,
@@ -855,7 +855,7 @@ class _TaskTile extends StatelessWidget {
                 border: Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.lightbulb_circle_rounded, size: 16, color: AppColors.blue),
+                Icon(Icons.lightbulb_circle_rounded, size: 16, color: AppColors.blue),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(instructions,

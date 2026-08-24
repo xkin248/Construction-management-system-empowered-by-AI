@@ -128,7 +128,7 @@ class _TaskFormState extends State<TaskForm> {
                               color: AppColors.textPrimary)),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close,
+                      icon: Icon(Icons.close,
                           size: 20, color: AppColors.textMuted),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -294,15 +294,15 @@ class _TaskFormState extends State<TaskForm> {
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderSide: BorderSide(color: AppColors.border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.border)),
+            borderSide: BorderSide(color: AppColors.border)),
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.accent)),
+            borderSide: BorderSide(color: AppColors.accent)),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: AppColors.red)),
+            borderSide: BorderSide(color: AppColors.red)),
       );
 }

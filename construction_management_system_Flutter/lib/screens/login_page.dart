@@ -31,7 +31,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_onDarkChanged);
     _anim.forward();
+  }
+
+  void _onDarkChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _login() async {
@@ -84,6 +89,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    AppColors.darkMode.removeListener(_onDarkChanged);
     _email.dispose();
     _pwd.dispose();
     _anim.dispose();

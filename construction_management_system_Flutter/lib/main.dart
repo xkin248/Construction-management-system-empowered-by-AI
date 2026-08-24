@@ -76,16 +76,52 @@ class ErrorApp extends StatelessWidget {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    AppColors.isDark = _systemIsDark();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    final dark = _systemIsDark();
+    if (AppColors.isDark != dark) {
+      setState(() => AppColors.isDark = dark);
+    }
+  }
+
+  bool _systemIsDark() =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+
+  @override
   Widget build(BuildContext context) {
+    // Keep the switch in sync even if the observer callback was missed.
+    AppColors.isDark = _systemIsDark();
     return MaterialApp(
       title: 'BuildSmart Construction Management',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: scaffoldMessengerKey,
       theme: buildAppTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: ThemeMode.system,
+      // Root pages listen to AppColors.darkMode themselves and rebuild in
+      // place, so the Navigator subtree must NOT be keyed here (that would
+      // reset the route stack on every theme flip).
       home: const SplashGate(),
     );
   }
@@ -165,7 +201,10 @@ class _SplashGateState extends State<SplashGate> {
             const Text('AI Construction System',
                 style: TextStyle(color: Color(0xFF757E90), fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
             const SizedBox(height: 22),
-            const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.accent)),
+            SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.accent)),
           ]),
         ),
       );

@@ -115,7 +115,7 @@ class _FilesPageState extends State<FilesPage> {
         final pad = MediaQuery.of(ctx).viewInsets.bottom;
         return Container(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius:
                 BorderRadius.vertical(top: Radius.circular(24)),
@@ -168,7 +168,7 @@ class _FilesPageState extends State<FilesPage> {
                       }
                     });
                   },
-                  icon: const Icon(Icons.folder_open_rounded,
+                  icon: Icon(Icons.folder_open_rounded,
                       size: 20, color: AppColors.accent),
                   label: Text(
                     pickedName ?? 'Pick a file...',
@@ -183,7 +183,7 @@ class _FilesPageState extends State<FilesPage> {
                     foregroundColor: AppColors.accent,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 16),
-                    side: const BorderSide(color: AppColors.border),
+                    side: BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -192,7 +192,7 @@ class _FilesPageState extends State<FilesPage> {
                 if (_projects.isNotEmpty)
                   DropdownButtonFormField<int>(
                     initialValue: pid,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                         labelText: 'Project',
                         prefixIcon: Icon(Icons.apartment_rounded,
                             size: 20, color: AppColors.textMuted)),
@@ -210,7 +210,7 @@ class _FilesPageState extends State<FilesPage> {
                 DropdownButtonFormField<String>(
                   key: ValueKey(cat),
                   initialValue: cat,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                       labelText: 'Category',
                       prefixIcon: Icon(Icons.category_rounded,
                           size: 20, color: AppColors.textMuted)),
@@ -264,7 +264,7 @@ class _FilesPageState extends State<FilesPage> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(24)),
@@ -309,7 +309,7 @@ class _FilesPageState extends State<FilesPage> {
                   errorBuilder: (_, __, ___) => Container(
                     height: 220,
                     color: AppColors.bgMain,
-                    child: const Center(
+                    child: Center(
                         child: Icon(Icons.broken_image_outlined,
                             size: 40, color: AppColors.textMuted)),
                   ),
@@ -419,7 +419,7 @@ class _FilesPageState extends State<FilesPage> {
                   child: DropdownButton<int?>(
                     value: _selectedProjectId,
                     isExpanded: true,
-                    icon: const Padding(
+                    icon: Padding(
                       padding: EdgeInsets.only(right: 8),
                       child: Icon(Icons.expand_more_rounded,
                           color: AppColors.textSecondary),
@@ -563,7 +563,7 @@ class _FilesPageState extends State<FilesPage> {
                   color: AppColors.accentLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Icon(Icons.folder_open_rounded,
+                child: Icon(Icons.folder_open_rounded,
                     size: 34, color: AppColors.accent),
               ),
               const SizedBox(height: 16),

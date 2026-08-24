@@ -261,7 +261,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 style: TextButton.styleFrom(foregroundColor: AppColors.accent),
               ),
             IconButton(
-              icon: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+              icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
               tooltip: 'Notification settings',
               onPressed: _openSettings,
             ),
@@ -386,7 +386,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
           const SizedBox(height: 10),
           if (reports.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(20),
               child: Center(child: Text('No reports submitted yet',
                   style: TextStyle(color: AppColors.textMuted))),
@@ -401,7 +401,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         color: AppColors.accentLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
+                      child: Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -496,7 +496,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
           const SizedBox(height: 10),
           if (issues.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.all(20),
               child: Center(child: Text('No issues reported. Looking good!',
                   style: TextStyle(color: AppColors.textMuted))),
@@ -651,7 +651,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               color: AppColors.accentLight,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.notifications_none_rounded,
+            child: Icon(Icons.notifications_none_rounded,
                 size: 36, color: AppColors.accent),
           ),
           const SizedBox(height: 16),
@@ -692,7 +692,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               if (unread)
                 Container(
                   width: 4,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.accent,
                     borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(12),

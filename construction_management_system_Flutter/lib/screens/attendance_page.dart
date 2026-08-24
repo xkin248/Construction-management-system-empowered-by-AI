@@ -133,7 +133,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                       border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
-                      const Icon(Icons.schedule_rounded, size: 16, color: AppColors.warning),
+                      Icon(Icons.schedule_rounded, size: 16, color: AppColors.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -274,12 +274,12 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           decoration: InputDecoration(
             hintText: 'Search worker name...',
             hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
-            prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
             filled: true, fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
           ),
         ),
       ),
@@ -396,7 +396,7 @@ class _WorkerAttCard extends StatelessWidget {
         const SizedBox(height: 8),
         // Row 2: project
         Row(children: [
-          const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
+          Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
           const SizedBox(width: 4),
           Expanded(child: Text(project,
               style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
@@ -421,7 +421,7 @@ class _WorkerAttCard extends StatelessWidget {
             ),
           const SizedBox(width: 6),
           Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
+            Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
             const SizedBox(width: 3),
             Text('GPS', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
           ]),
@@ -462,7 +462,7 @@ class _ProjectGeofenceCard extends StatelessWidget {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.gps_fixed_rounded, size: 13, color: AppColors.green),
+          Icon(Icons.gps_fixed_rounded, size: 13, color: AppColors.green),
           const SizedBox(width: 5),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
@@ -626,7 +626,7 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(color: AppColors.yellowLight, borderRadius: BorderRadius.circular(10)),
                 child: Row(children: [
-                  const Icon(Icons.info_outline, color: AppColors.yellow, size: 18),
+                  Icon(Icons.info_outline, color: AppColors.yellow, size: 18),
                   const SizedBox(width: 8),
                   Expanded(child: Text('GPS check-in requires the mobile app',
                       style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w600))),

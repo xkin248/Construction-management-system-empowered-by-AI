@@ -60,7 +60,7 @@ class _FenceMap extends StatelessWidget {
                 point: center,
                 width: 42,
                 height: 42,
-                child: const Icon(Icons.location_on_rounded, color: AppColors.red, size: 38),
+                child: Icon(Icons.location_on_rounded, color: AppColors.red, size: 38),
               ),
             ]),
           ],
@@ -175,7 +175,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: projects.isEmpty
-                        ? ListView(children: const [
+                        ? ListView(children: [
                             Padding(
                               padding: EdgeInsets.all(40),
                               child: Center(
@@ -245,14 +245,14 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       color: AppColors.bgMain,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: const Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
+                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
                   ),
                 ),
               ]),
             ]),
             const SizedBox(height: 4),
             Row(children: [
-              const Icon(Icons.place_outlined, size: 13, color: AppColors.textMuted),
+              Icon(Icons.place_outlined, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 3),
               Expanded(child: Text(p['location_address'] ?? '-',
                   style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14),
@@ -265,7 +265,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(8)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
+                  Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
                   const SizedBox(width: 4),
                   Text('Geofence: ${radius}m radius',
                       style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
@@ -283,7 +283,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
               child: LinearProgressIndicator(
                 value: progress / 100,
                 minHeight: 7, backgroundColor: AppColors.border,
-                valueColor: const AlwaysStoppedAnimation(AppColors.green),
+                valueColor: AlwaysStoppedAnimation(AppColors.green),
               ),
             ),
             const SizedBox(height: 8),
@@ -434,7 +434,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
     final pad = MediaQuery.of(context).viewInsets.bottom;
     return Container(
       padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -477,8 +477,8 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               hintText: t('e.g. Penang Tower Block C', 'cth. Menara Pulau Pinang Blok C'),
               hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
@@ -493,9 +493,9 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               hintText: t('Full address of the construction site', 'Alamat penuh tapak pembinaan'),
               hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
-              prefixIcon: const Icon(Icons.place_outlined, color: AppColors.textMuted, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
+              prefixIcon: Icon(Icons.place_outlined, color: AppColors.textMuted, size: 18),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             ),
           ),
@@ -537,7 +537,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(children: [
-                    const Icon(Icons.location_on, size: 12, color: AppColors.green),
+                    Icon(Icons.location_on, size: 12, color: AppColors.green),
                     const SizedBox(width: 4),
                     Text(
                       'Lat: ${_lat.toStringAsFixed(5)},  Lng: ${_lng.toStringAsFixed(5)}',
@@ -561,7 +561,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               ),
               const SizedBox(height: 8),
               Row(children: [
-                const Icon(Icons.touch_app_outlined, size: 13, color: AppColors.textMuted),
+                Icon(Icons.touch_app_outlined, size: 13, color: AppColors.textMuted),
                 const SizedBox(width: 5),
                 Expanded(
                   child: Text(t('Tap on the map to move the fence center', 'Ketik peta untuk menggerakkan pusat pagar'),
@@ -575,7 +575,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(children: [
-                    const Icon(Icons.error_outline, size: 14, color: AppColors.red),
+                    Icon(Icons.error_outline, size: 14, color: AppColors.red),
                     const SizedBox(width: 6),
                     Text(t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.'),
                         style: GoogleFonts.outfit(
@@ -683,7 +683,7 @@ class _DateButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: AppColors.border),
         padding: const EdgeInsets.symmetric(vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -740,8 +740,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   @override
   Widget build(BuildContext c) {
-    if (ld) return const Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
-    if (project == null) return const Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text('Project not found')));
+    if (ld) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
+    if (project == null) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text('Project not found')));
     final p = project!;
     final completed = tasks.where((t) => t['status'] == 'completed').length;
     final radius = (p['fence_radius'] as num?)?.toInt() ?? 5000;
@@ -788,14 +788,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ]),
             const SizedBox(height: 6),
             Row(children: [
-              const Icon(Icons.place_outlined, size: 13, color: AppColors.textSidebarMuted),
+              Icon(Icons.place_outlined, size: 13, color: AppColors.textSidebarMuted),
               const SizedBox(width: 4),
               Expanded(child: Text(p['location_address'] ?? '-',
-                  style: const TextStyle(color: AppColors.textSidebarMuted, fontSize: 14))),
+                  style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 14))),
             ]),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
+              Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
               Text('${p['progress']?.toStringAsFixed(0) ?? 0}%',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ]),
@@ -805,7 +805,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               child: LinearProgressIndicator(
                 value: ((p['progress'] ?? 0) as num) / 100,
                 minHeight: 8, backgroundColor: AppColors.sidebarHover,
-                valueColor: const AlwaysStoppedAnimation(AppColors.green),
+                valueColor: AlwaysStoppedAnimation(AppColors.green),
               ),
             ),
           ]),
@@ -825,7 +825,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               Container(
                 width: 32, height: 32,
                 decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
-                child: const Icon(Icons.gps_fixed_rounded, size: 16, color: AppColors.green),
+                child: Icon(Icons.gps_fixed_rounded, size: 16, color: AppColors.green),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -839,7 +839,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               statusPill('active'),
             ]),
             const SizedBox(height: 12),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.border),
             const SizedBox(height: 12),
             _infoRow(Icons.radar_rounded, 'Radius', '$radius meters'),
             const SizedBox(height: 8),
@@ -1020,21 +1020,21 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         // ── Date comparison ──
         Row(children: [
           _datePill('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.textMuted)),
+          Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.textMuted)),
           _datePill('Predicted', _fmtDateStr(predictedDate), trendColor),
         ]),
 
         // ── Risk factors ──
         if (riskFactors.isNotEmpty) ...[
           const SizedBox(height: 14),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 12),
           Text('Risk Factors', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.red)),
           const SizedBox(height: 6),
           ...riskFactors.take(3).map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.error_outline, size: 14, color: AppColors.red),
+                  Icon(Icons.error_outline, size: 14, color: AppColors.red),
                   const SizedBox(width: 6),
                   Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
                 ]),
@@ -1049,7 +1049,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           ...recommendations.take(3).map((r) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.lightbulb_outline, size: 14, color: AppColors.blue),
+                  Icon(Icons.lightbulb_outline, size: 14, color: AppColors.blue),
                   const SizedBox(width: 6),
                   Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
                 ]),
@@ -1059,7 +1059,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         // ── Milestone chips ──
         if (milestones.isNotEmpty) ...[
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           const SizedBox(height: 10),
           Text('Predicted Progress Milestones', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
           const SizedBox(height: 8),

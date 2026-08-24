@@ -56,7 +56,7 @@ class _WorkersPageState extends State<WorkersPage> {
         final pad = MediaQuery.of(ctx).viewInsets.bottom;
         return Container(
           padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -147,12 +147,12 @@ class _WorkersPageState extends State<WorkersPage> {
                   decoration: InputDecoration(
                     hintText: 'Search workers by name or trade...',
                     hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.bgCard,
                     contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.accent, width: 1.4)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
                   ),
                 ),
               ),
@@ -213,7 +213,7 @@ class _WorkersPageState extends State<WorkersPage> {
             if (w['project'] != null) ...[
               const SizedBox(height: 4),
               Row(children: [
-                const Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
+                Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
                 const SizedBox(width: 3),
                 Expanded(child: Text(w['project']['project_name'] ?? '',
                     style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),

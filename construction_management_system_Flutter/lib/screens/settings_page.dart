@@ -158,7 +158,7 @@ class _NotificationsTabState extends State<_NotificationsTab> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
               const SizedBox(height: 2),
-              Text(sub, style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+              Text(sub, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
             ]),
           ),
           Switch(value: settings[key] == true, activeThumbColor: AppColors.accent, onChanged: (v) => _toggle(key, v)),
@@ -226,7 +226,7 @@ class _GeofenceTabState extends State<_GeofenceTab> {
     return ListView(padding: const EdgeInsets.all(16), children: [
       sectionCard(
         margin: const EdgeInsets.only(bottom: 14),
-        child: const Row(children: [
+        child: Row(children: [
           Icon(Icons.location_on_outlined, size: 16, color: AppColors.accent),
           SizedBox(width: 8),
           Expanded(child: Text('GPS geofencing automatically records attendance when workers enter or exit designated site boundaries.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary))),
@@ -240,7 +240,7 @@ class _GeofenceTabState extends State<_GeofenceTab> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(p['project_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                const Text('Geofence radius', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                Text('Geofence radius', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
               ]),
             ),
             SizedBox(
@@ -348,7 +348,7 @@ class _AttendanceTabState extends State<_AttendanceTab> {
     return ListView(padding: const EdgeInsets.all(16), children: [
       sectionCard(
         margin: const EdgeInsets.only(bottom: 14),
-        child: const Row(children: [
+        child: Row(children: [
           Icon(Icons.schedule_outlined, size: 16, color: AppColors.accent),
           SizedBox(width: 8),
           Expanded(child: Text('Attendance time windows control when workers may check in/out. Times use 24-hour HH:MM format.', style: TextStyle(fontSize: 14, color: AppColors.textSecondary))),
@@ -513,7 +513,7 @@ class _UsersTabState extends State<_UsersTab> {
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(u['full_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                    Text(u['email'] ?? '', style: const TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                    Text(u['email'] ?? '', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
                   ]),
                 ),
                 statusPill(u['role'] ?? 'site_supervisor', label: (u['role'] ?? '').toString().replaceAll('_', ' ')),

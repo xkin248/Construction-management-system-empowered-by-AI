@@ -57,7 +57,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 12),
                   Text(user?['full_name'] ?? '-', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
                   const SizedBox(height: 4),
-                  Text(user?['email'] ?? '', style: const TextStyle(color: AppColors.textMuted, fontSize: 14)),
+                  Text(user?['email'] ?? '', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
                   const SizedBox(height: 8),
                   statusPill(user?['role'] ?? 'site_supervisor', label: (user?['role'] ?? '').toString().replaceAll('_', ' ')),
                 ]),
@@ -67,13 +67,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 padding: EdgeInsets.zero,
                 child: Column(children: [
                   ListTile(
-                    leading: const Icon(Icons.phone_outlined, color: AppColors.textSecondary),
+                    leading: Icon(Icons.phone_outlined, color: AppColors.textSecondary),
                     title: const Text('Phone'),
-                    trailing: Text(user?['phone'] ?? '-', style: const TextStyle(color: AppColors.textMuted)),
+                    trailing: Text(user?['phone'] ?? '-', style: TextStyle(color: AppColors.textMuted)),
                   ),
                   const Divider(height: 1),
                   ListTile(
-                    leading: const Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+                    leading: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
                     title: const Text('App Settings'),
                     trailing: const Icon(Icons.chevron_right, size: 18),
                     onTap: () => toast('Use the Settings section from the menu'),
@@ -83,9 +83,9 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 20),
               OutlinedButton.icon(
                 onPressed: _logout,
-                icon: const Icon(Icons.logout, color: AppColors.red, size: 18),
-                label: const Text('Log Out', style: TextStyle(color: AppColors.red)),
-                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.redLight), minimumSize: const Size.fromHeight(46)),
+                icon: Icon(Icons.logout, color: AppColors.red, size: 18),
+                label: Text('Log Out', style: TextStyle(color: AppColors.red)),
+                style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.redLight), minimumSize: Size.fromHeight(46)),
               ),
             ]),
     );

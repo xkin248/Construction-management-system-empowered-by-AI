@@ -224,7 +224,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
           const SizedBox(height: 12),
           if (projects.isEmpty)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))
+            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))
           else
             ...projects.take(4).map((p) => _projectProductivityRow(p)),
           const SizedBox(height: 24),
@@ -233,7 +233,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
           const SizedBox(height: 12),
           if (upcoming.isEmpty)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming due projects', style: TextStyle(color: AppColors.textMuted))))
+            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming due projects', style: TextStyle(color: AppColors.textMuted))))
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
@@ -247,7 +247,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(height: 12),
           if (activeProjects.isEmpty)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No active projects', style: TextStyle(color: AppColors.textMuted))))
+            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No active projects', style: TextStyle(color: AppColors.textMuted))))
           else
             ...activeProjects.map((p) => _aiEstimatedBar(p)),
           const SizedBox(height: 24),
@@ -540,7 +540,7 @@ class _DashboardPageState extends State<DashboardPage> {
             value: progress / 100,
             minHeight: 6,
             backgroundColor: AppColors.border,
-            valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
         ),
       ]),
@@ -885,9 +885,9 @@ class _DashboardPageState extends State<DashboardPage> {
                 estDays > 0 ? AppColors.textSecondary : AppColors.red,
               ),
             if (confidence >= 80)
-              const Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
+              Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
             else if (confidence >= 60)
-              const Icon(Icons.info_outline, size: 16, color: AppColors.accent),
+              Icon(Icons.info_outline, size: 16, color: AppColors.accent),
           ],
         ),
       ]),

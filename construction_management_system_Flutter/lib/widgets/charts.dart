@@ -6,8 +6,8 @@ import '../theme/app_theme.dart';
 class SimpleBarChart extends StatelessWidget {
   final List<double> values;
   final double height;
-  final Color color;
-  const SimpleBarChart({super.key, required this.values, this.height = 120, this.color = AppColors.accent});
+  final Color? color;
+  const SimpleBarChart({super.key, required this.values, this.height = 120, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +23,7 @@ class SimpleBarChart extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Container(
                 height: h < 4 ? 4 : h,
-                decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.vertical(top: Radius.circular(4))),
+                decoration: BoxDecoration(color: color ?? AppColors.accent, borderRadius: const BorderRadius.vertical(top: Radius.circular(4))),
               ),
             ),
           );
@@ -38,16 +38,16 @@ class LabeledBarChart extends StatelessWidget {
   final List<double> values;
   final List<String> labels;
   final double height;
-  final Color color;
-  final Color highlightColor;
+  final Color? color;
+  final Color? highlightColor;
 
   const LabeledBarChart({
     super.key,
     required this.values,
     required this.labels,
     this.height = 140,
-    this.color = AppColors.blue,
-    this.highlightColor = AppColors.blue,
+    this.color,
+    this.highlightColor,
   });
 
   @override
@@ -82,7 +82,7 @@ class LabeledBarChart extends StatelessWidget {
                     child: Container(
                       height: h < 4 ? 4 : h,
                       decoration: BoxDecoration(
-                        color: isLast ? highlightColor : color,
+                        color: isLast ? (highlightColor ?? AppColors.blue) : (color ?? AppColors.blue),
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
                       ),
                     ),
@@ -119,8 +119,8 @@ class DualBarChart extends StatelessWidget {
   final List<double> seriesB;
   final List<String> labels;
   final double height;
-  final Color colorA;
-  final Color colorB;
+  final Color? colorA;
+  final Color? colorB;
 
   const DualBarChart({
     super.key,
@@ -128,8 +128,8 @@ class DualBarChart extends StatelessWidget {
     required this.seriesB,
     required this.labels,
     this.height = 140,
-    this.colorA = AppColors.blue,
-    this.colorB = AppColors.green,
+    this.colorA,
+    this.colorB,
   });
 
   @override
@@ -168,7 +168,7 @@ class DualBarChart extends StatelessWidget {
                             child: Container(
                               height: hA < 4 ? 4 : hA,
                               decoration: BoxDecoration(
-                                color: colorA.withValues(alpha: 0.7),
+                                color: (colorA ?? AppColors.blue).withValues(alpha: 0.7),
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                               ),
                             ),
@@ -178,7 +178,7 @@ class DualBarChart extends StatelessWidget {
                             child: Container(
                               height: hB < 4 ? 4 : hB,
                               decoration: BoxDecoration(
-                                color: colorB.withValues(alpha: 0.9),
+                                color: (colorB ?? AppColors.green).withValues(alpha: 0.9),
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                               ),
                             ),
