@@ -12,11 +12,21 @@ from sqlalchemy import inspect, text
 # New columns added to the settings table over time: {column: server_default}
 _SETTINGS_ADDITIONS = {
     "check_in_start": "08:00",
-    "check_in_end": "10:30",
-    "check_out_start": "15:00",
+    "check_in_end": "17:00",
+    "check_out_start": "08:00",
     "check_out_end": "17:00",
     "break_start": "12:00",
     "break_end": "13:00",
+}
+
+# Work-hour corrections applied to existing settings rows on startup.
+# Old defaults were 08:00-10:30 / 15:00-17:00; work hours are now 08:00-17:00
+# with a lunch break 12:00-13:00.
+_SETTINGS_CORRECTIONS = {
+    "work_start": ("07:00 AM", "08:00 AM"),
+    "late_threshold": ("07:30 AM", "08:30 AM"),
+    "check_in_end": ("10:30", "17:00"),
+    "check_out_start": ("15:00", "08:00"),
 }
 
 # FCM push tokens added to existing user tables over time:
@@ -27,6 +37,13 @@ _FCM_COLUMN_ADDITIONS = {
     },
     "supervisors": {
         "fcm_token": "VARCHAR(500)",
+    },
+}
+
+# Supervisor attendance columns added to attendance_logs over time.
+_ATTENDANCE_COLUMN_ADDITIONS = {
+    "attendance_logs": {
+        "supervisor_id": "INTEGER",
     },
 }
 
@@ -60,6 +77,16 @@ def ensure_settings_columns(engine) -> list:
                 )
             )
             added.append(col)
+
+    # Bring existing rows in line with the new 08:00-17:00 work hours.
+    with engine.begin() as conn:
+        for col, (old_val, new_val) in _SETTINGS_CORRECTIONS.items():
+            conn.execute(
+                text(
+                    "UPDATE settings SET %s = '%s' WHERE %s = '%s'"
+                    % (col, new_val, col, old_val)
+                )
+            )
     return added
 
 
@@ -86,4 +113,37 @@ def ensure_fcm_columns(engine) -> list:
                     text("ALTER TABLE %s ADD COLUMN %s %s" % (table_name, col, ddl))
                 )
                 added.append(f"{table_name}.{col}")
+    return added
+
+
+def ensure_attendance_columns(engine) -> list:
+    """Add supervisor attendance support to attendance_logs on old databases.
+
+    Adds a nullable ``supervisor_id`` column and (on PostgreSQL) drops the
+    NOT NULL constraint on ``worker_id`` so a supervisor can clock in without
+    a worker profile. SQLite cannot alter NOT NULL constraints in place, so
+    supervisor check-in there is only available on fresh databases.
+    """
+    added = []
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "attendance_logs" not in tables:
+        return added
+
+    existing = {c["name"] for c in inspector.get_columns("attendance_logs")}
+    missing = {c: ddl for c, ddl in _ATTENDANCE_COLUMN_ADDITIONS["attendance_logs"].items() if c not in existing}
+    if missing:
+        with engine.begin() as conn:
+            for col, ddl in missing.items():
+                conn.execute(
+                    text("ALTER TABLE attendance_logs ADD COLUMN %s %s" % (col, ddl))
+                )
+                added.append(f"attendance_logs.{col}")
+
+    # PostgreSQL: allow supervisor rows (worker_id NULL).
+    if engine.dialect.name == "postgresql":
+        with engine.begin() as conn:
+            conn.execute(
+                text("ALTER TABLE attendance_logs ALTER COLUMN worker_id DROP NOT NULL")
+            )
     return added

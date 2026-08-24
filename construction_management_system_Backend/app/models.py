@@ -57,7 +57,8 @@ class Worker(Base):
 class AttendanceLog(Base):
     __tablename__ = "attendance_logs"
     attendance_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=True)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
     project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
     check_in_time = Column(DateTime(timezone=True), server_default=func.now())
     check_out_time = Column(DateTime(timezone=True), nullable=True)
@@ -156,9 +157,9 @@ class Settings(Base):
     system_language = Column(String(50), nullable=False, server_default="English")
     timezone = Column(String(100), nullable=False, server_default="Asia/Kuala_Lumpur (UTC+8)")
     date_format = Column(String(20), nullable=False, server_default="DD/MM/YYYY")
-    work_start = Column(String(20), nullable=False, server_default="07:00 AM")
+    work_start = Column(String(20), nullable=False, server_default="08:00 AM")
     work_end = Column(String(20), nullable=False, server_default="05:00 PM")
-    late_threshold = Column(String(20), nullable=False, server_default="07:30 AM")
+    late_threshold = Column(String(20), nullable=False, server_default="08:30 AM")
     notif_attendance = Column(Boolean, nullable=False, server_default="1")
     notif_task_overdue = Column(Boolean, nullable=False, server_default="1")
     notif_budget = Column(Boolean, nullable=False, server_default="1")
@@ -169,8 +170,8 @@ class Settings(Base):
     # Kept as plain strings for easy editing; attendance.py falls back to hardcoded defaults
     # when the value is missing/invalid.
     check_in_start = Column(String(20), nullable=False, server_default="08:00")
-    check_in_end = Column(String(20), nullable=False, server_default="10:30")
-    check_out_start = Column(String(20), nullable=False, server_default="15:00")
+    check_in_end = Column(String(20), nullable=False, server_default="17:00")
+    check_out_start = Column(String(20), nullable=False, server_default="08:00")
     check_out_end = Column(String(20), nullable=False, server_default="17:00")
     break_start = Column(String(20), nullable=False, server_default="12:00")
     break_end = Column(String(20), nullable=False, server_default="13:00")

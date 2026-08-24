@@ -84,7 +84,8 @@ class CheckOutReq(BaseModel):
 class HeartbeatReq(BaseModel):
     attendance_id: int; lat: float; lng: float
 class AttendanceOut(BaseModel):
-    attendance_id: int; worker_id: int; worker_name: Optional[str] = None
+    attendance_id: int; worker_id: Optional[int] = None; supervisor_id: Optional[int] = None
+    worker_name: Optional[str] = None
     project_id: int
     check_in_time: Optional[datetime] = None
     check_out_time: Optional[datetime] = None
@@ -220,9 +221,9 @@ class SettingsBase(BaseModel):
     system_language: str = "English"
     timezone: str = "Asia/Kuala_Lumpur (UTC+8)"
     date_format: str = "DD/MM/YYYY"
-    work_start: str = "07:00 AM"
+    work_start: str = "08:00 AM"
     work_end: str = "05:00 PM"
-    late_threshold: str = "07:30 AM"
+    late_threshold: str = "08:30 AM"
     notif_attendance: bool = True
     notif_task_overdue: bool = True
     notif_budget: bool = True
@@ -231,8 +232,8 @@ class SettingsBase(BaseModel):
     notif_weekly_report: bool = False
     # Attendance time windows (24h "HH:MM") — editable from Settings > Attendance
     check_in_start: str = "08:00"
-    check_in_end: str = "10:30"
-    check_out_start: str = "15:00"
+    check_in_end: str = "17:00"
+    check_out_start: str = "08:00"
     check_out_end: str = "17:00"
     break_start: str = "12:00"
     break_end: str = "13:00"
@@ -304,7 +305,7 @@ class AITaskAnalysisResponse(BaseModel):
     safety_notes: Optional[str] = None
 
 class AIAutoAssignRequest(BaseModel):
-    project_id: int
+    project_id: Optional[int] = None
     task_ids: Optional[List[int]] = None
     dry_run: bool = True
     top_k: int = 3

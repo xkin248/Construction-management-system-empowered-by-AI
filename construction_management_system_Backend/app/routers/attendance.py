@@ -14,7 +14,7 @@ from app.schemas import (
     CurrentUser,
 )
 from app.geofence import is_within_fence
-from app.routers.auth import require_worker, require_any_authorized
+from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
 
 router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
 
@@ -26,11 +26,11 @@ KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
 
 # Check-in time window defaults (hardcoded fallback when Settings row is missing/invalid)
 CHECK_IN_WINDOW_START = time(8, 0)    # 08:00 AM
-CHECK_IN_WINDOW_END = time(10, 30)    # 10:30 AM
-CHECK_OUT_WINDOW_START = time(15, 0)  # 03:00 PM
+CHECK_IN_WINDOW_END = time(17, 0)     # 05:00 PM
+CHECK_OUT_WINDOW_START = time(8, 0)   # 08:00 AM
 CHECK_OUT_WINDOW_END = time(17, 0)    # 05:00 PM
 
-# Work hours: 08:00-17:00 with a lunch break 12:00-13:00 (no attendance allowed)
+# Work hours: 08:00-17:00 with a lunch break 12:00-13:00
 BREAK_START = time(12, 0)             # 12:00 PM
 BREAK_END = time(13, 0)               # 01:00 PM
 
@@ -490,3 +490,160 @@ def weekly_attendance_stats(
             "is_today": i == today_local.weekday(),
         })
     return {"project_id": project_id, "days": days}
+
+
+# ──────────────────────────────────────────────────────────────────
+# Supervisor self attendance (no worker profile required)
+# ──────────────────────────────────────────────────────────────────
+
+def _supervisor_active_check_in(user_id: int, db: Session):
+    return (
+        db.query(AttendanceLog)
+        .filter(
+            AttendanceLog.supervisor_id == user_id,
+            AttendanceLog.check_in_time >= _today_start(),
+            AttendanceLog.status.in_(["checked_in", "checked_out"]),
+        )
+        .order_by(AttendanceLog.attendance_id.desc())
+        .first()
+    )
+
+
+@router.post("/supervisor/check-in", response_model=AttendanceOut)
+def supervisor_self_check_in(
+    d: WorkerCheckInReq,
+    request: Request,
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Site supervisor self check-in — no worker profile needed.
+
+    The supervisor clocks in against their own project. The record is stored
+    with ``supervisor_id`` instead of ``worker_id`` so team reports are not
+    polluted. Geofence is enforced when the project has one configured.
+    """
+    p = db.query(Project).get(d.project_id)
+    if not p:
+        raise HTTPException(404, "Project does not exist")
+
+    if p.supervisor_id is not None and p.supervisor_id != user.id:
+        raise HTTPException(400, "You are not assigned to this project")
+
+    existing = _supervisor_active_check_in(user.id, db)
+    if existing:
+        raise HTTPException(
+            400,
+            f"You have already checked in today at {_format_hhmm(_to_local(existing.check_in_time))}. "
+            f"Duplicate check-in is not allowed.",
+        )
+
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        verified, dist = True, 0.0
+
+    a = AttendanceLog(
+        supervisor_id=user.id,
+        project_id=d.project_id,
+        check_in_time=datetime.utcnow(),
+        in_lat=d.lat,
+        in_lng=d.lng,
+        in_distance_m=dist,
+        status="checked_in" if verified else "rejected",
+        last_heartbeat_time=datetime.utcnow() if verified else None,
+        last_heartbeat_lat=d.lat if verified else None,
+        last_heartbeat_lng=d.lng if verified else None,
+        out_of_fence_count=0,
+        device_info=(d.device_info or "")[:500],
+        device_type=(d.device_type or "")[:50],
+        device_id=(d.device_id or "")[:255],
+        ip_address=_client_ip(request)[:100],
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+
+    if not verified:
+        raise HTTPException(
+            400,
+            f"Check-in failed: outside the site geofence "
+            f"(distance from center {int(dist)}m, allowed range {int(p.fence_radius)}m). "
+            f"Please ensure you are within the project boundary before checking in.",
+        )
+    return _to_out(a)
+
+
+@router.post("/supervisor/check-out", response_model=AttendanceOut)
+def supervisor_self_check_out(
+    d: WorkerCheckOutReq,
+    request: Request,
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Site supervisor self check-out for the active check-in."""
+    attendance = (
+        db.query(AttendanceLog)
+        .filter(
+            AttendanceLog.supervisor_id == user.id,
+            AttendanceLog.check_in_time >= _today_start(),
+            AttendanceLog.status == "checked_in",
+        )
+        .order_by(AttendanceLog.attendance_id.desc())
+        .first()
+    )
+    if not attendance:
+        raise HTTPException(404, "No active check-in found for you today. Please check in first.")
+
+    p = db.query(Project).get(attendance.project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        dist = 0.0
+
+    attendance.check_out_time = datetime.utcnow()
+    attendance.out_lat = d.lat
+    attendance.out_lng = d.lng
+    attendance.out_distance_m = dist
+    attendance.status = "checked_out"
+
+    if d.device_info:
+        attendance.device_info = (d.device_info or "")[:500]
+    if d.device_type:
+        attendance.device_type = (d.device_type or "")[:50]
+    attendance.ip_address = _client_ip(request)[:100]
+
+    db.commit()
+    db.refresh(attendance)
+    return _to_out(attendance)
+
+
+@router.get("/supervisor/today")
+def supervisor_today_authenticated(
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Authenticated supervisor today record + attendance windows."""
+    cfg = _load_attendance_config(db)
+    a = _supervisor_active_check_in(user.id, db)
+    base = {
+        "window_enforced": False,
+        "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+        "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+        "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
+    }
+    if not a:
+        return {"checked_in": False, "attendance": None, **base}
+    hours = 0.0
+    if a.check_in_time and a.check_out_time:
+        hours = round((a.check_out_time - a.check_in_time).total_seconds() / 3600, 1)
+    return {
+        "checked_in": a.status == "checked_in",
+        "checked_out": a.status == "checked_out",
+        "status": a.status,
+        "hours_today": hours,
+        "attendance": _to_out(a),
+        **base,
+    }

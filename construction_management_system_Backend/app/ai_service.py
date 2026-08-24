@@ -550,12 +550,14 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
 
 def auto_assign_tasks(
     db,
-    project_id: int,
+    project_id: Optional[int] = None,
     task_ids: Optional[List[int]] = None,
     dry_run: bool = True,
     top_k: int = 3
 ) -> Dict[str, Any]:
-    q = db.query(Task).filter(Task.project_id == project_id)
+    q = db.query(Task)
+    if project_id is not None:
+        q = q.filter(Task.project_id == project_id)
     if task_ids:
         q = q.filter(Task.task_id.in_(task_ids))
     q = q.filter(Task.status != "completed")
@@ -632,7 +634,6 @@ def auto_assign_tasks(
         "dry_run": dry_run,
         "assignments": assignments
     }
-
 
 # ──────────────────────────────────────────────────────────────
 #  Real-time AI Progress Dashboard
