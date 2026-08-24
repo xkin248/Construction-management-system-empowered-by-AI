@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../services/gps_notification_service.dart';
+import '../l10n/app_strings.dart';
 import '../widgets/charts.dart';
+import '../widgets/app_settings_actions.dart';
+import 'attendance_geo_helper.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -19,20 +24,190 @@ class _DashboardPageState extends State<DashboardPage> {
   Map kpi = {};
   Map attSummary = {};
   List projects = [];
-  Map<int, Map> _predictions = {};
-  List<Map> _predHistory = [];
   List<Map> _weeklyAtt = [];
-  DateTime? _lastPredUpdate;
   Timer? _autoRefreshTimer;
 
-  static const _kPredTsKey = 'ai_pred_last_fetch_ts';
-  static const _kPredCacheKey = 'ai_pred_cache';
+  // Supervisor quick check-in from the dashboard.
+  bool _isSupervisor = false;
+  bool _supLoading = false;
+  bool _supCheckedIn = false;
+  String _supMsg = AppStrings.t('dash.checkinHint');
+
+  // One-tap AI auto-assign (global — no project selection required).
+  bool _autoAssigning = false;
+  String _autoAssignMsg = 'One-tap AI auto-assign for all open tasks';
 
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+    _loadSupervisorAttendance();
     _startAutoRefresh();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _loadSupervisorAttendance() async {
+    try {
+      final me = await ApiService().me();
+      final t = (me['user_type'] ?? '').toString().toLowerCase();
+      final r = (me['role'] ?? '').toString().toLowerCase();
+      final isSup = t.contains('supervisor') || r.contains('supervisor');
+      if (!mounted || !isSup) return;
+      setState(() => _isSupervisor = true);
+      final today = await ApiService().supervisorTodayAttendance();
+      final rec = today['attendance'];
+      if (rec is Map && rec['status'] != null) {
+        final status = rec['status'].toString();
+        if (status == 'checked_in') {
+          final ci = rec['check_in_time']?.toString() ?? '';
+          setState(() {
+            _supCheckedIn = true;
+            _supMsg = ci.length >= 16
+                ? 'Checked in at ${ci.substring(11, 16)}'
+                : AppStrings.t('dash.checkedInToday');
+          });
+        }
+      }
+    } catch (_) {
+      // Role/status fetch failure is non-blocking — hide the quick check-in card.
+      if (mounted) setState(() => _isSupervisor = false);
+    }
+  }
+
+  Future<void> _quickCheckIn() async {
+    if (kIsWeb) {
+      toast('GPS check-in is not supported in web browsers — use the mobile app.');
+      return;
+    }
+    setState(() { _supLoading = true; _supMsg = 'Getting your location...'; });
+    try {
+      if (!await GeoHelper.isServiceEnabled()) {
+        await GpsNotificationService.requestEnable();
+        setState(() {
+          _supMsg = 'Please enable GPS from the notification, then try again.';
+          _supLoading = false;
+        });
+        return;
+      }
+      final pos = await GeoHelper.getCurrentPosition();
+      if (pos == null) {
+        setState(() { _supMsg = 'Location permission denied'; _supLoading = false; });
+        return;
+      }
+      int? pid;
+      if (projects.isNotEmpty) {
+        pid = projects.first['project_id'] as int;
+      }
+      if (!mounted) return;
+      if (projects.length > 1) {
+        pid = await showDialog<int>(
+          context: context,
+          builder: (ctx) => SimpleDialog(
+            title: Text(AppStrings.t('tasks.selectProject')),
+            children: projects.map<Widget>((p) {
+              final pj = p['project_id'] as int;
+              return SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, pj),
+                child: Text(p['project_name']?.toString() ?? 'Project $pj'),
+              );
+            }).toList(),
+          ),
+        );
+        if (pid == null) {
+          setState(() { _supMsg = 'Check-in cancelled'; _supLoading = false; });
+          return;
+        }
+      }
+      await ApiService().supervisorCheckIn(
+        projectId: pid ?? 1,
+        lat: pos['lat']!,
+        lng: pos['lng']!,
+      );
+      setState(() {
+        _supCheckedIn = true;
+        _supMsg = 'Checked in at ${_fmtHm()}';
+        _supLoading = false;
+      });
+      toast('Checked in successfully');
+    } on DioException catch (e) {
+      setState(() {
+        _supMsg = e.message ?? 'Check-in failed';
+        _supLoading = false;
+      });
+      toast(e.message ?? 'Check-in failed');
+    } catch (e) {
+      setState(() { _supMsg = 'Error: $e'; _supLoading = false; });
+    }
+  }
+
+  Future<void> _quickCheckOut() async {
+    if (kIsWeb) {
+      toast('GPS check-out is not supported in web browsers — use the mobile app.');
+      return;
+    }
+    setState(() { _supLoading = true; _supMsg = 'Getting your location...'; });
+    try {
+      final pos = await GeoHelper.getCurrentPosition();
+      if (pos == null) {
+        setState(() { _supMsg = 'Location permission denied'; _supLoading = false; });
+        return;
+      }
+      await ApiService().supervisorCheckOut(lat: pos['lat']!, lng: pos['lng']!);
+      setState(() {
+        _supCheckedIn = false;
+        _supMsg = 'Checked out at ${_fmtHm()}';
+        _supLoading = false;
+      });
+      toast('Checked out successfully');
+    } on DioException catch (e) {
+      setState(() { _supMsg = e.message ?? 'Check-out failed'; _supLoading = false; });
+      toast(e.message ?? 'Check-out failed');
+    } catch (e) {
+      setState(() { _supMsg = 'Error: $e'; _supLoading = false; });
+    }
+  }
+
+  Future<void> _autoAssignAll() async {
+    if (_autoAssigning) return;
+    setState(() {
+      _autoAssigning = true;
+      _autoAssignMsg = 'Analyzing all open tasks...';
+    });
+    try {
+      final res = await ApiService().aiAutoAssign(null, dryRun: false);
+      final assigns = (res['assignments'] as List? ?? []);
+      int assigned = 0;
+      for (final a in assigns) {
+        if (a is Map && a['assigned_worker_id'] != null) assigned++;
+      }
+      final total = assigns.length;
+      if (!mounted) return;
+      final msg = total == 0
+          ? 'No open tasks to assign'
+          : 'Auto-assigned $assigned of $total open task(s)';
+      setState(() {
+        _autoAssigning = false;
+        _autoAssignMsg = msg;
+      });
+      toast(msg);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _autoAssigning = false;
+        _autoAssignMsg = 'Auto-assign failed — check server connection';
+      });
+      toast('Auto-assign failed: $e');
+    }
+  }
+
+  String _fmtHm() {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
   void _startAutoRefresh() {
@@ -43,6 +218,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
@@ -65,85 +242,10 @@ class _DashboardPageState extends State<DashboardPage> {
           _weeklyAtt = List<Map>.from(weekly['days'] ?? []);
         });
       }
-
-      await _loadPredictions(forceRefresh: forceRefresh);
-      await _loadPredictionHistory();
     } catch (e) {
       if (!silent) toast('Failed to load dashboard: $e');
     } finally {
       if (mounted) setState(() => ld = false);
-    }
-  }
-
-  /// Loads the AI prediction history of the first visible project (predicted vs actual),
-  /// used to show whether the prediction was accurate.
-  Future<void> _loadPredictionHistory() async {
-    if (projects.isEmpty) return;
-    final pid = projects.first['project_id'] as int;
-    try {
-      final hist = await ApiService().getPredictionHistory(pid);
-      if (mounted) {
-        setState(() => _predHistory = List<Map>.from(hist));
-      }
-    } catch (_) {
-      // Silently fall back when the history API is unavailable (keep the list empty)
-    }
-  }
-
-  /// Fetches AI predictions: reuses the SharedPreferences cache within 7 days;
-  /// re-requests the prediction API only after 7 days or when forced to refresh.
-  Future<void> _loadPredictions({bool forceRefresh = false}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final now = DateTime.now();
-    final lastTs = prefs.getInt(_kPredTsKey) ?? 0;
-    final lastDate = lastTs > 0 ? DateTime.fromMillisecondsSinceEpoch(lastTs) : null;
-    final stale = lastDate == null || now.difference(lastDate).inDays >= 7;
-
-    if (!forceRefresh && !stale) {
-      final cached = prefs.getString(_kPredCacheKey);
-      if (cached != null && cached.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(cached) as Map<String, dynamic>;
-          final preds = <int, Map>{};
-          decoded.forEach((k, v) {
-            final id = int.tryParse(k);
-            if (id != null && v is Map) {
-              preds[id] = Map<String, dynamic>.from(v);
-            }
-          });
-          if (mounted) {
-            setState(() {
-              _predictions = preds;
-              _lastPredUpdate = lastDate;
-            });
-          }
-          return;
-        } catch (_) {
-          // Cache corrupted, fall back to refetching
-        }
-      }
-    }
-
-    final api = ApiService();
-    final preds = <int, Map>{};
-    await Future.wait(projects.take(4).map((p) async {
-      try {
-        final pid = p['project_id'] as int;
-        preds[pid] = await api.getProjectProgressPrediction(pid);
-      } catch (_) {}
-    }));
-    final ts = now.millisecondsSinceEpoch;
-    await prefs.setInt(_kPredTsKey, ts);
-    try {
-      await prefs.setString(_kPredCacheKey, jsonEncode(preds));
-    } catch (_) {
-      // Skip cache persistence on serialization failure; predictions still display normally
-    }
-    if (mounted) {
-      setState(() {
-        _predictions = preds;
-        _lastPredUpdate = now;
-      });
     }
   }
 
@@ -183,10 +285,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final inProgressPct = totalTasks > 0 ? (inProgress / totalTasks * 100).toInt() : 33;
     final pendingPct = totalTasks > 0 ? (pending / totalTasks * 100).toInt() : 25;
     final upcoming = _upcomingProjects();
-    final activeProjects = projects.where((p) {
-      final s = (p['status'] as String? ?? '').toLowerCase();
-      return s != 'completed' && s != 'done';
-    }).toList();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -198,6 +296,20 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView(
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
+          // ── Language / Theme switcher ──
+          Align(
+            alignment: Alignment.centerRight,
+            child: AppSettingsActions(),
+          ),
+          const SizedBox(height: 4),
+          // ── Supervisor Quick Check-in ──
+          if (_isSupervisor) ...[
+            _buildQuickCheckInCard(),
+            const SizedBox(height: 12),
+            _buildAutoAssignCard(),
+            const SizedBox(height: 20),
+          ],
+
           // ── KPI Cards Row ──
           _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent),
           const SizedBox(height: 20),
@@ -224,7 +336,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
           const SizedBox(height: 12),
           if (projects.isEmpty)
-            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No projects yet', style: TextStyle(color: AppColors.textMuted))))
+            Padding(padding: EdgeInsets.all(20), child: Center(child: Text(AppStrings.t('proj.noProjects'), style: TextStyle(color: AppColors.textMuted))))
           else
             ...projects.take(4).map((p) => _projectProductivityRow(p)),
           const SizedBox(height: 24),
@@ -233,41 +345,116 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
           const SizedBox(height: 12),
           if (upcoming.isEmpty)
-            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming due projects', style: TextStyle(color: AppColors.textMuted))))
+            Padding(padding: EdgeInsets.all(20), child: Center(child: Text(AppStrings.t('dash.noDueProjects'), style: TextStyle(color: AppColors.textMuted))))
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
 
-          // ── AI Estimated Progress (weekly, all active projects) ──
-          _sectionHeader(
-            'AI Estimated Progress',
-            sub: _lastPredUpdate == null
-                ? 'AI Estimated · Updated weekly'
-                : 'AI Estimated · Updated weekly · Updated: ${_fmtMd(_lastPredUpdate!)}',
-          ),
-          const SizedBox(height: 12),
-          if (activeProjects.isEmpty)
-            Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No active projects', style: TextStyle(color: AppColors.textMuted))))
-          else
-            ...activeProjects.map((p) => _aiEstimatedBar(p)),
+          // ── Recent activity / status kept minimal — AI prediction blocks removed ──
           const SizedBox(height: 24),
-
-          // ── AI Site Progress Prediction ──
-          if (_predictions.isNotEmpty) ...[
-            _sectionHeader('AI Site Progress Prediction', sub: 'Gemini-powered forecast of project completion trajectories'),
-            const SizedBox(height: 12),
-            ...projects.take(4).where((p) => _predictions.containsKey(p['project_id'])).map((p) => _aiPredictionCard(p)),
-          ],
-
-          // ── Prediction vs Actual (historical prediction accuracy) ──
-          const SizedBox(height: 20),
-          _sectionHeader('Prediction vs Actual', sub: 'Historical AI forecast vs real project progress'),
-          const SizedBox(height: 12),
-          _predictionHistoryCard(),
         ],
       ),
     );
       },
+    );
+  }
+
+  // ── Supervisor quick check-in card ──
+  Widget _buildQuickCheckInCard() {
+    final accent = _supCheckedIn ? AppColors.green : AppColors.accent;
+    final bg = _supCheckedIn ? AppColors.greenLight : AppColors.accentLight;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: Icon(
+            _supCheckedIn ? Icons.check_circle_rounded : Icons.location_on_rounded,
+            color: accent,
+            size: 24,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(_supCheckedIn ? AppStrings.t('dash.onSite') : AppStrings.t('dash.quickCheckin'),
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 2),
+            Text(_supMsg,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        _supLoading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+            : ElevatedButton.icon(
+                onPressed: _supCheckedIn ? _quickCheckOut : _quickCheckIn,
+                icon: Icon(_supCheckedIn ? Icons.logout_rounded : Icons.login_rounded, size: 16),
+                label: Text(_supCheckedIn ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn')),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+      ]),
+    );
+  }
+
+  // ── One-tap AI Auto-Assign card (global, no project selection) ──
+  Widget _buildAutoAssignCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: AppColors.purple.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(AppStrings.t('dash.autoAssignTasks'),
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 2),
+            Text(_autoAssignMsg,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        _autoAssigning
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
+            : ElevatedButton.icon(
+                onPressed: _autoAssignAll,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: Text(AppStrings.t('dash.autoAssign')),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.purple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
+              ),
+      ]),
     );
   }
 
@@ -277,7 +464,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final isWide = cs.maxWidth > 600;
       final cards = [
         _kpiCard(
-          label: 'Today Attendance Rate',
+          label: AppStrings.t('dash.todayAttendanceRate'),
           value: '$todayRate%',
           sub: '$onSite/$totalWorkers on site · $late late · $absent absent',
           icon: Icons.fact_check_rounded,
@@ -359,70 +546,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ── Prediction vs Actual history card ──
-  Widget _predictionHistoryCard() {
-    if (_predHistory.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Center(
-          child: Text('No prediction history available (auto-recorded after each AI prediction)',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-        ),
-      );
-    }
-
-    final items = _predHistory.take(8).toList();
-    final predicted = items
-        .map((e) => ((e['predicted_progress'] ?? 0) as num).toDouble())
-        .toList();
-    final actual = items
-        .map((e) => ((e['actual_progress'] ?? e['latest_progress'] ?? 0) as num).toDouble())
-        .toList();
-    final labels = items.map((e) {
-      final d = e['created_at'] as String? ?? '';
-      return d.length >= 10 ? d.substring(5, 10) : '?';
-    }).toList();
-    final projName = projects.isNotEmpty ? (projects.first['project_name'] ?? '') : '';
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('$projName'.trim().isEmpty ? 'Progress Accuracy' : '$projName · Accuracy',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            Text('Last ${items.length} prediction snapshots (%)',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-          ]),
-        ]),
-        const SizedBox(height: 16),
-        DualBarChart(seriesA: predicted, seriesB: actual, labels: labels, height: 140),
-        const SizedBox(height: 10),
-        Row(children: [
-          _legendDot(AppColors.blue, 'AI Predicted'),
-          const SizedBox(width: 14),
-          _legendDot(AppColors.green, 'Actual Progress'),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _legendDot(Color color, String text) => Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Text(text, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
-      ]);
-
   // ── Weekly Attendance Chart Card ──
   Widget _weeklyAttCard(List<double> data, List<String> labels) {
     return Container(
@@ -436,11 +559,11 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Flexible(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Weekly Attendance',
+              Text(AppStrings.t('dash.weeklyAttendance'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              Text('All projects combined',
+              Text(AppStrings.t('dash.allProjectsCombined'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
@@ -449,7 +572,7 @@ class _DashboardPageState extends State<DashboardPage> {
           TextButton(
             onPressed: () {},
             style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-            child: Text('View All →',
+            child: Text('${AppStrings.t('dash.viewAll')} →',
                 style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
           ),
         ]),
@@ -469,9 +592,9 @@ class _DashboardPageState extends State<DashboardPage> {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Task Distribution',
+        Text(AppStrings.t('dash.taskDistribution'),
             style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        Text('All active projects',
+        Text(AppStrings.t('dash.allActiveProjects'),
             style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
         const SizedBox(height: 16),
         Center(
@@ -612,311 +735,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // ── AI Estimated Progress Bar (upcoming projects, weekly) ──
-  Widget _aiEstimatedBar(Map p) {
-    final pid = p['project_id'] as int;
-    final pred = _predictions[pid];
-    final actual = (p['progress'] as num? ?? 0).toDouble();
-    final scheduled = pred != null ? (pred['scheduled_progress'] as num?)?.toDouble() : null;
-
-    // AI estimated: prefer scheduled_progress, then the 30-day milestone prediction, and finally fall back to actual progress
-    double aiEst = actual;
-    if (pred != null) {
-      if (scheduled != null) {
-        aiEst = scheduled;
-      } else {
-        final milestones = (pred['milestones'] as List?) ?? [];
-        for (final m in milestones) {
-          if (m['label'] == '30 days') {
-            aiEst = (m['predicted_progress'] as num?)?.toDouble() ?? actual;
-            break;
-          }
-        }
-      }
-    }
-    aiEst = aiEst.clamp(0.0, 100.0).toDouble();
-
-    final gap = pred != null ? (pred['progress_gap'] as num?)?.toDouble() : null;
-    final Color barColor;
-    if (pred == null) {
-      barColor = AppColors.textSecondary;
-    } else if (gap != null && gap < 0) {
-      barColor = gap < -10 ? AppColors.red : AppColors.accent;
-    } else if (gap != null && gap >= 5) {
-      barColor = AppColors.green;
-    } else {
-      barColor = AppColors.blue;
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: barColor.withValues(alpha: 0.35)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Expanded(
-            child: Text(p['project_name'] ?? '-',
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text('AI Est ${aiEst.toStringAsFixed(0)}%',
-              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: barColor)),
-        ]),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: aiEst / 100,
-            minHeight: 8,
-            backgroundColor: AppColors.border,
-            valueColor: AlwaysStoppedAnimation(barColor.withValues(alpha: 0.85)),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(children: [
-          Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.accent),
-          const SizedBox(width: 4),
-          Text('Actual ${actual.toStringAsFixed(0)}%  ·  AI Estimated · Updated weekly',
-              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-        ]),
-      ]),
-    );
-  }
-
-  String _fmtMd(DateTime dt) {
-    final m = dt.month.toString().padLeft(2, '0');
-    final d = dt.day.toString().padLeft(2, '0');
-    return '$m-$d';
-  }
-
-  // ── AI Progress Prediction Card ──
-  Widget _aiPredictionCard(Map p) {
-    final pid = p['project_id'] as int;
-    final pred = _predictions[pid]!;
-    final trend = pred['trend'] as String? ?? 'on_track';
-    final confidence = (pred['confidence'] as num? ?? 70).toDouble();
-    final predictedDate = pred['predicted_completion_date'] as String? ?? '-';
-    final plannedEnd = pred['planned_end_date'] as String?;
-    final insights = pred['ai_insights'] as String? ?? '';
-    final milestones = (pred['milestones'] as List?) ?? [];
-    final currentProgress = (pred['current_progress'] as num? ?? 0).toDouble();
-    final scheduled = (pred['scheduled_progress'] as num?)?.toDouble();
-    final gap = (pred['progress_gap'] as num?)?.toDouble();
-    final estDays = (pred['estimated_days_remaining'] as num?)?.toInt();
-
-    final trendColor = switch (trend) {
-      'ahead' => AppColors.green,
-      'on_track' => AppColors.blue,
-      'behind' => AppColors.accent,
-      'critical' => AppColors.red,
-      _ => AppColors.textMuted,
-    };
-    final trendLabel = switch (trend) {
-      'ahead' => 'Ahead of Schedule',
-      'on_track' => 'On Track',
-      'behind' => 'Behind Schedule',
-      'critical' => 'At Risk — Critical',
-      _ => trend,
-    };
-    final trendIcon = switch (trend) {
-      'ahead' => Icons.rocket_launch_rounded,
-      'on_track' => Icons.check_circle_rounded,
-      'behind' => Icons.warning_rounded,
-      'critical' => Icons.error_rounded,
-      _ => Icons.help_rounded,
-    };
-
-    // Find the 30-day milestone for the prediction bar
-    double predProgress = currentProgress;
-    for (final m in milestones) {
-      if (m['label'] == '30 days') {
-        predProgress = (m['predicted_progress'] as num).toDouble();
-        break;
-      }
-    }
-
-    // Real-Time gap color/label: ahead(green) / on track(blue) / behind(accent) / critical(red)
-    final Color gapColor;
-    final String gapLabel;
-    if (gap == null) {
-      gapColor = trendColor;
-      gapLabel = '';
-    } else if (gap >= 5) {
-      gapColor = AppColors.green;
-      gapLabel = 'Ahead +${gap.toStringAsFixed(1)}%';
-    } else if (gap >= 0) {
-      gapColor = AppColors.blue;
-      gapLabel = 'On Track ${gap.toStringAsFixed(1)}%';
-    } else if (gap >= -10) {
-      gapColor = AppColors.accent;
-      gapLabel = 'Behind ${gap.toStringAsFixed(1)}%';
-    } else {
-      gapColor = AppColors.red;
-      gapLabel = 'Critical ${gap.toStringAsFixed(1)}%';
-    }
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: trendColor.withValues(alpha: 0.3)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Header row: project name + trend badge ──
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Expanded(
-            child: Text(p['project_name'] ?? '-',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: trendColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: trendColor.withValues(alpha: 0.3)),
-            ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(trendIcon, size: 14, color: trendColor),
-              const SizedBox(width: 5),
-              Text(trendLabel,
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: trendColor)),
-            ]),
-          ),
-        ]),
-        const SizedBox(height: 10),
-
-        // ── AI Insight ──
-        if (insights.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(insights,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, height: 1.45)),
-          ),
-
-        // ── Actual vs Scheduled Progress (responsive) ──
-        LayoutBuilder(builder: (ctx, cs) {
-          final narrow = cs.maxWidth < 320;
-          final statItems = [
-            _statCell('Actual', '${currentProgress.toStringAsFixed(1)}%', gapColor),
-            _statCell(scheduled != null ? 'Scheduled' : 'Predicted 30d',
-                '${(scheduled ?? predProgress).toStringAsFixed(1)}%', gapColor.withValues(alpha: 0.75)),
-            _statCell('AI Conf.', '${confidence.toStringAsFixed(0)}%', AppColors.green),
-          ];
-          if (narrow) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: statItems.map((w) => Padding(padding: const EdgeInsets.only(bottom: 6), child: w)).toList(),
-            );
-          }
-          return Row(
-            children: statItems
-                .expand((w) => [Expanded(child: w), const SizedBox(width: 10)])
-                .toList()
-              ..removeLast(),
-          );
-        }),
-        const SizedBox(height: 8),
-
-        // ── Progress gap badge ──
-        if (gap != null)
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: gapColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(gapLabel,
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: gapColor)),
-            ),
-            const SizedBox(width: 8),
-            Text(gap >= 0 ? 'ahead of plan' : 'behind plan',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-          ]),
-        const SizedBox(height: 10),
-
-        // ── Dual Progress Bar (scheduled background + actual foreground) ──
-        Stack(
-          children: [
-            // Scheduled / predicted (background)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: LinearProgressIndicator(
-                value: (scheduled ?? predProgress) / 100,
-                minHeight: 14,
-                backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(gapColor.withValues(alpha: 0.25)),
-              ),
-            ),
-            // Actual (solid foreground)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: LinearProgressIndicator(
-                value: currentProgress / 100,
-                minHeight: 14,
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(gapColor),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // ── Date rows (Wrap to prevent overflow on narrow phones) ──
-        Wrap(
-          spacing: 14,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            _dateChip('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
-            _dateChip('AI Predicted', _fmtDate(predictedDate), trendColor),
-            if (estDays != null)
-              _dateChip(
-                estDays > 0 ? '≈ Days Left' : 'Overdue',
-                estDays > 0 ? '$estDays days' : '${-estDays} days',
-                estDays > 0 ? AppColors.textSecondary : AppColors.red,
-              ),
-            if (confidence >= 80)
-              Icon(Icons.verified_rounded, size: 16, color: AppColors.green)
-            else if (confidence >= 60)
-              Icon(Icons.info_outline, size: 16, color: AppColors.accent),
-          ],
-        ),
-      ]),
-    );
-  }
-
-  Widget _dateChip(String label, String value, Color color) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-      Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-    ]);
-  }
-
-  /// Compact stat cell used inside the AI prediction card's responsive stats row.
-  Widget _statCell(String label, String value, Color color) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-      const SizedBox(height: 2),
-      FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerLeft,
-        child: Text(value,
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-      ),
-    ]);
-  }
 
   String _fmtDate(String iso) {
     try {

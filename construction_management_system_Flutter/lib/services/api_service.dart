@@ -197,6 +197,40 @@ class ApiService {
   Future<Map> workerTodayAttendance() async =>
       Map.from((await dio.get('/attendance/worker/today')).data);
 
+  // ───────── Supervisor Authenticated Attendance ─────────
+  Future<Map> supervisorCheckIn({
+    required int projectId,
+    required double lat,
+    required double lng,
+    String? deviceInfo,
+    String? deviceType,
+    String? deviceId,
+  }) async =>
+      Map.from((await dio.post('/attendance/supervisor/check-in', data: {
+        'project_id': projectId,
+        'lat': lat,
+        'lng': lng,
+        if (deviceInfo != null) 'device_info': deviceInfo,
+        if (deviceType != null) 'device_type': deviceType,
+        if (deviceId != null) 'device_id': deviceId,
+      })).data);
+
+  Future<Map> supervisorCheckOut({
+    required double lat,
+    required double lng,
+    String? deviceInfo,
+    String? deviceType,
+  }) async =>
+      Map.from((await dio.post('/attendance/supervisor/check-out', data: {
+        'lat': lat,
+        'lng': lng,
+        if (deviceInfo != null) 'device_info': deviceInfo,
+        if (deviceType != null) 'device_type': deviceType,
+      })).data);
+
+  Future<Map> supervisorTodayAttendance() async =>
+      Map.from((await dio.get('/attendance/supervisor/today')).data);
+
   Future<Map> workerHeartbeat({
     required int attendanceId,
     required double lat,
@@ -269,30 +303,15 @@ class ApiService {
     }
   }
 
-  Future<List> aiMatch(String trade, int pid) async =>
-      (await dio.post('/ai/tasks/match', queryParameters: {
-        'required_trade': trade,
-        'project_id': pid,
-      })).data as List;
-
   Future<List> getTasks(int pid) async =>
       (await dio.get('/projects/$pid/tasks')).data as List;
   Future<Map> createTask(Map d) async =>
       Map.from((await dio.post('/tasks', data: d)).data);
   Future<Map> updateTask(int taskId, Map d) async =>
       Map.from((await dio.put('/tasks/$taskId', data: d)).data);
-  Future<Map> aiAnalyzeTask(Map taskInfo, int projectId,
-          {bool sameProjectOnly = false}) async =>
-      Map.from((await dio.post('/ai/tasks/analyze', data: {
-        'task_name': taskInfo['task_name'] ?? '',
-        'description': taskInfo['description'] ?? '',
-        'trade': taskInfo['trade'] ?? '',
-        'project_id': projectId,
-        'same_project_only': sameProjectOnly,
-      })).data);
-  Future<Map> aiAutoAssign(int projectId, {List<int>? taskIds, bool dryRun = false}) async =>
+  Future<Map> aiAutoAssign(int? projectId, {List<int>? taskIds, bool dryRun = false}) async =>
       Map.from((await dio.post('/ai/tasks/auto-assign', data: {
-        'project_id': projectId,
+        if (projectId != null) 'project_id': projectId,
         if (taskIds != null) 'task_ids': taskIds,
         'dry_run': dryRun,
         'top_k': 3,
@@ -350,13 +369,6 @@ class ApiService {
         'gps_lng': lng,
       })).data);
 
-  // ───────── AI Site Progress Prediction ─────────
-  Future<Map> getProjectProgressPrediction(int projectId) async =>
-      Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
-
-  Future<List> getPredictionHistory(int projectId) async =>
-      (await dio.get('/ai/projects/$projectId/prediction-history')).data as List;
-
   // ───────── Weekly Attendance Stats (Dashboard) ─────────
   Future<Map> getWeeklyAttendanceStats() async =>
       Map.from((await dio.get('/attendance/weekly-stats')).data);
@@ -384,9 +396,6 @@ class ApiService {
   }
 
   String downloadUrl(int fileId) => '$baseUrl/api/files/$fileId/download';
-
-  String thumbnailUrl(String? path) =>
-      path != null && path.isNotEmpty ? '$baseUrl/$path' : '';
 
   // ───────── Notifications ─────────
   Future<List> getNotifications() async =>

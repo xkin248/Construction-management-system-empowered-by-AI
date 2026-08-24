@@ -4,7 +4,10 @@ import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
+import '../widgets/app_settings_actions.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -24,7 +27,20 @@ class _TasksPageState extends State<TasksPage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -67,7 +83,6 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   Future<void> _aiAutoAssignAll() async {
-    if (pid == null) { toast('Select a project first'); return; }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -76,20 +91,20 @@ class _TasksPageState extends State<TasksPage> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: AppColors.purpleLight, borderRadius: BorderRadius.circular(10)),
-            child: Icon(Icons.smart_toy_outlined, color: AppColors.purple, size: 20),
+            child: Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 20),
           ),
           const SizedBox(width: 10),
-          Text('AI Auto-Assign', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
+          Text('Auto-Assign Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
         ]),
         content: Text(
-          'Gemini AI will analyse all unassigned tasks and match the best worker based on their trade, availability, and performance.\n\nProceed?',
+          'All unassigned tasks will be matched to the best worker based on their trade, availability and performance. No project selection needed - everything is handled automatically.\n\nProceed?',
           style: GoogleFonts.outfit(fontSize: 13.5, height: 1.5, color: AppColors.textSecondary),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton.icon(
             onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.auto_fix_high_rounded, size: 16),
+            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
             label: const Text('Auto-Assign'),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.purple, foregroundColor: Colors.white),
           ),
@@ -100,10 +115,10 @@ class _TasksPageState extends State<TasksPage> {
 
     setState(() => ld = true);
     try {
-      final result = await ApiService().aiAutoAssign(pid!, dryRun: false);
+      final result = await ApiService().aiAutoAssign(pid, dryRun: false);
       final assignments = (result['assignments'] as List?) ?? [];
       final assigned = assignments.where((a) => a['assigned_worker_id'] != null).length;
-      toast('AI assigned $assigned tasks successfully!');
+      toast('Assigned $assigned tasks successfully!');
       await _switchProject(pid);
     } catch (e) {
       toast('Auto-assign failed: $e');
@@ -150,11 +165,11 @@ class _TasksPageState extends State<TasksPage> {
         title: Text('Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 4),
             child: TextButton.icon(
               onPressed: _aiAutoAssignAll,
-              icon: Icon(Icons.smart_toy_outlined, size: 17, color: AppColors.purple),
-              label: Text('AI Assign', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple)),
+              icon: Icon(Icons.auto_awesome_rounded, size: 17, color: AppColors.purple),
+              label: Text(AppStrings.t('tasks.autoAssign'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple)),
               style: TextButton.styleFrom(
                 backgroundColor: AppColors.purpleLight,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -162,12 +177,14 @@ class _TasksPageState extends State<TasksPage> {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          const AppSettingsActions(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openNewTask,
         icon: const Icon(Icons.add),
-        label: const Text('New Task'),
+        label: Text(AppStrings.t('tasks.newTask')),
         backgroundColor: AppColors.accent,
       ),
       body: Align(
@@ -202,7 +219,7 @@ class _TasksPageState extends State<TasksPage> {
                 child: ld
                     ? const Center(child: CircularProgressIndicator())
                     : _filtered.isEmpty
-                        ? Center(child: Text('No tasks yet', style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                        ? Center(child: Text(AppStrings.t('tasks.noTasks'), style: GoogleFonts.outfit(color: AppColors.textMuted)))
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: LayoutBuilder(builder: (ctx, constraints) {
@@ -285,9 +302,9 @@ class _TasksPageState extends State<TasksPage> {
       SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          _dropdown(['All', 'In Progress', 'Completed', 'Pending'], _statusFilter, (v) => setState(() => _statusFilter = v!), 'Status'),
+          _dropdown(['All', 'In Progress', 'Completed', 'Pending'], _statusFilter, (v) => setState(() => _statusFilter = v!), AppStrings.t('tasks.statusLabel')),
           const SizedBox(width: 8),
-          _dropdown(['All', 'Low', 'Medium', 'High'], _priorityFilter, (v) => setState(() => _priorityFilter = v!), 'Priority'),
+          _dropdown(['All', 'Low', 'Medium', 'High'], _priorityFilter, (v) => setState(() => _priorityFilter = v!), AppStrings.t('tasks.priority')),
           if (projects.length > 1) ...[
             const SizedBox(width: 8),
             _dropdown(
@@ -300,12 +317,35 @@ class _TasksPageState extends State<TasksPage> {
                   final found = projects.firstWhere((p) => p['project_name'] == v, orElse: () => null);
                   if (found != null) _switchProject(found['project_id']);
                 }
-              }, 'Project',
+              }, AppStrings.t('tasks.projectLabel'),
             ),
           ],
         ]),
       ),
     ]);
+  }
+
+  /// Localised display for status / priority filter values.
+  /// The internal filter value stays in English so existing logic is untouched.
+  String _displayOf(String s) {
+    switch (s) {
+      case 'All':
+        return AppStrings.t('common.all');
+      case 'In Progress':
+        return AppStrings.t('tasks.inProgress');
+      case 'Completed':
+        return AppStrings.t('tasks.completed');
+      case 'Pending':
+        return AppStrings.t('tasks.pending');
+      case 'High':
+        return AppStrings.t('tasks.high');
+      case 'Medium':
+        return AppStrings.t('tasks.medium');
+      case 'Low':
+        return AppStrings.t('tasks.low');
+      default:
+        return s;
+    }
   }
 
   Widget _dropdown(List<String> items, String value, ValueChanged<String?> onChanged, String hint) {
@@ -323,7 +363,7 @@ class _TasksPageState extends State<TasksPage> {
         underline: const SizedBox(),
         isExpanded: true,
         style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-        items: items.map((s) => DropdownMenuItem(value: s, child: Text('$hint: $s'))).toList(),
+        items: items.map((s) => DropdownMenuItem(value: s, child: Text('$hint: ${_displayOf(s)}'))).toList(),
         onChanged: onChanged,
       ),
     );
@@ -370,7 +410,7 @@ class _TaskCardState extends State<_TaskCard> {
         Icon(Icons.calendar_today_outlined,
             size: 12, color: AppColors.textMuted),
         const SizedBox(width: 4),
-        Text('No due date',
+        Text(AppStrings.t('tasks.noDueDate'),
             style:
                 GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
       ]);
@@ -404,9 +444,9 @@ class _TaskCardState extends State<_TaskCard> {
           .updateTask(widget.task['task_id'], {'due_date': newDate});
       setState(() => _dueDate = newDate);
       widget.task['due_date'] = newDate;
-      toast('Due date updated');
+      toast(AppStrings.t('tasks.dueUpdated'));
     } catch (e) {
-      toast('Failed to update due date');
+      toast(AppStrings.t('tasks.dueFailed'));
     }
   }
 
@@ -417,9 +457,9 @@ class _TaskCardState extends State<_TaskCard> {
           .updateTask(widget.task['task_id'], {'status': newStatus});
       setState(() => _status = newStatus);
       widget.task['status'] = newStatus;
-      toast('Status: ${newStatus.replaceAll('_', ' ')}');
+      toast(AppStrings.t('tasks.statusUpdated'));
     } catch (e) {
-      toast('Failed to update status');
+      toast(AppStrings.t('tasks.statusFailed'));
     }
   }
 
@@ -559,7 +599,7 @@ class _TaskCardState extends State<_TaskCard> {
                   ),
                 ),
               ] else
-                Text('Unassigned',
+                Text(AppStrings.t('tasks.unassigned'),
                     style:
                         GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
               const Spacer(),
@@ -578,11 +618,11 @@ class _TaskCardState extends State<_TaskCard> {
         const SizedBox(height: 10),
         // ── Status quick-toggle (does not navigate) ──
         Row(children: [
-          _statusBtn('Pending', 'pending'),
+          _statusBtn(AppStrings.t('tasks.pending'), 'pending'),
           const SizedBox(width: 6),
-          _statusBtn('In Progress', 'in_progress'),
+          _statusBtn(AppStrings.t('tasks.inProgress'), 'in_progress'),
           const SizedBox(width: 6),
-          _statusBtn('Completed', 'completed'),
+          _statusBtn(AppStrings.t('tasks.completed'), 'completed'),
         ]),
       ]),
     );
@@ -639,18 +679,19 @@ class _PriorityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     Color bg;
     Color fg;
+    final String label;
     switch (priority.toLowerCase()) {
       case 'high':
-        bg = AppColors.redLight; fg = AppColors.red; break;
+        label = AppStrings.t('tasks.high'); bg = AppColors.redLight; fg = AppColors.red; break;
       case 'medium':
-        bg = AppColors.yellowLight; fg = AppColors.yellow; break;
+        label = AppStrings.t('tasks.medium'); bg = AppColors.yellowLight; fg = AppColors.yellow; break;
       default:
-        bg = AppColors.blueLight; fg = AppColors.blue;
+        label = AppStrings.t('tasks.low'); bg = AppColors.blueLight; fg = AppColors.blue;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
-      child: Text(priority[0].toUpperCase() + priority.substring(1),
+      child: Text(label,
           style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
     );
   }
@@ -690,12 +731,8 @@ class TaskDetailPage extends StatefulWidget {
 }
 
 class _TaskDetailPageState extends State<TaskDetailPage> {
-  bool _loadingAI = false;
-  List _aiWorkers = [];          // AI-suggested workers
-  String _aiNotice = '';         // no-match warning from backend
   List _assignedWorkers = [];    // currently-assigned workers (mutable)
   List _projectWorkers = [];     // all workers in the project
-  bool _sameProjectOnly = false; // restrict AI to same-project workers
   late Map _task;
 
   @override
@@ -718,32 +755,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     } catch (_) {}
   }
 
-  Future<void> _loadAI() async {
-    final projectId = _task['project_id'] as int?;
-    if (projectId == null) return;
-    setState(() => _loadingAI = true);
-    try {
-      final result = await ApiService().aiAnalyzeTask(_task, projectId,
-          sameProjectOnly: _sameProjectOnly);
-      final suggestions = (result['suggested_workers'] as List?) ?? [];
-      setState(() {
-        _aiWorkers = suggestions;
-        _aiNotice = (result['notice'] as String?) ?? '';
-      });
-    } catch (e) {
-      toast('AI error: $e');
-    } finally {
-      if (mounted) setState(() => _loadingAI = false);
-    }
-  }
-
   Future<void> _saveAssignments(Set<int> workerIds) async {
     try {
       await ApiService().updateTask(_task['task_id'], {
         'worker_ids': workerIds.toList(),
       });
-      // Restore selected objects using the full worker pool (project workers + AI recommendations)
-      final pool = [..._projectWorkers, ..._aiWorkers];
+      // Restore selected objects using the full worker pool
+      final pool = _projectWorkers;
       final selected = <Map>[];
       final seen = <int>{};
       for (final w in pool) {
@@ -754,10 +772,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         }
       }
       setState(() => _assignedWorkers = selected);
-      toast('${selected.length} worker(s) assigned');
+      toast('${selected.length} ${AppStrings.t('tasks.assignedCount')}');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      toast('Failed to assign: $e');
+      toast('${AppStrings.t('tasks.assignFailed')}: $e');
     }
   }
 
@@ -765,16 +783,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     try {
       await ApiService().updateTask(_task['task_id'], {'worker_ids': []});
       setState(() => _assignedWorkers = []);
-      toast('All workers unassigned');
+      toast(AppStrings.t('tasks.unassignAll'));
     } catch (e) {
-      toast('Failed: $e');
+      toast('${AppStrings.t('tasks.assignFailed')}: $e');
     }
   }
 
   void _openAssignSheet() {
-    // Load AI when the sheet opens
-    if (_aiWorkers.isEmpty) _loadAI();
-
     // Current set of assigned worker_ids (checkbox toggles inside the sheet; save replaces all)
     final currentIds = _assignedWorkers
         .map((w) => w['worker_id'] as int?)
@@ -815,100 +830,18 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Assign Worker(s)', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
+                    Text(AppStrings.t('tasks.assignWorkersTitle'), style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
                     Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]),
                 ),
-                // Same-project-only toggle
+                // All workers
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                  child: SwitchListTile(
-                    value: _sameProjectOnly,
-                    onChanged: (v) {
-                      setState(() => _sameProjectOnly = v);
-                      setS(() {});
-                      if (_aiWorkers.isNotEmpty) _loadAI();
-                    },
-                    activeThumbColor: AppColors.purple,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: Text('Same project only', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
-                    subtitle: Text('AI recommends only workers bound to the current project', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                  child: Text(AppStrings.t('tasks.allWorkers'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                 ),
-                // AI section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF7C3AED), Color(0xFF9F67FF)],
-                        begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(children: [
-                      const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('AI Recommendations', style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-                          Text('Gemini matches workers by trade, attendance & performance', style: GoogleFonts.outfit(color: Colors.white70, fontSize: 13)),
-                        ]),
-                      ),
-                      if (_loadingAI)
-                        const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      else if (_aiWorkers.isEmpty)
-                        TextButton(
-                          onPressed: () async { await _loadAI(); setS(() {}); },
-                          style: TextButton.styleFrom(foregroundColor: Colors.white, backgroundColor: Colors.white24, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          child: Text('Analyse', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
-                        ),
-                    ]),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // AI suggestions (if loaded)
-                if (_aiWorkers.isNotEmpty) ...[
-                  if (_aiNotice.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.warning.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(_aiNotice,
-                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-                    child: Row(children: [
-                      Text('Top AI Picks', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.purple)),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          setS(() {
-                            for (final w in _aiWorkers.take(3)) {
-                              final id = w['worker_id'] as int?;
-                              if (id != null) selectedIds.add(id);
-                            }
-                          });
-                        },
-                        style: TextButton.styleFrom(foregroundColor: AppColors.purple, padding: EdgeInsets.symmetric(horizontal: 8), minimumSize: Size(0, 32)),
-                        child: Text('Add All', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
-                      ),
-                    ]),
-                  ),
-                  ..._aiWorkers.take(3).map((w) => _WorkerTile(
+                ..._projectWorkers.map((w) => _WorkerTile(
                     worker: w,
-                    isAI: true,
                     selected: selectedIds.contains(w['worker_id']),
-                    score: (w['score'] as num?)?.toDouble(),
-                    reasons: (w['reasons'] as List?)?.cast<String>(),
                     onToggle: () {
                       setS(() {
                         final id = w['worker_id'] as int?;
@@ -917,29 +850,6 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       });
                     },
                   )),
-                  const Divider(indent: 16, endIndent: 16),
-                ],
-                // All workers
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Text('All Workers', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-                ),
-                ..._projectWorkers.map((w) {
-                  final alreadyAI = _aiWorkers.any((ai) => ai['worker_id'] == w['worker_id']);
-                  if (alreadyAI) return const SizedBox.shrink();
-                  return _WorkerTile(
-                    worker: w,
-                    isAI: false,
-                    selected: selectedIds.contains(w['worker_id']),
-                    onToggle: () {
-                      setS(() {
-                        final id = w['worker_id'] as int?;
-                        if (id == null) return;
-                        if (!selectedIds.add(id)) selectedIds.remove(id);
-                      });
-                    },
-                  );
-                }),
                     ],
                   ),
                 ),
@@ -981,12 +891,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Task Details', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
+        title: Text(AppStrings.t('tasks.taskDetails'), style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
         actions: [
           if (_assignedWorkers.isNotEmpty)
             TextButton(
               onPressed: _unassign,
-              child: Text('Unassign', style: GoogleFonts.outfit(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
+              child: Text(AppStrings.t('tasks.unassign'), style: GoogleFonts.outfit(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
             ),
         ],
       ),
@@ -1013,7 +923,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           Row(children: [
             Icon(Icons.trending_up_rounded, size: 16, color: AppColors.blue),
             const SizedBox(width: 8),
-            Text('Progress', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(AppStrings.t('tasks.progress'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
             const Spacer(),
             Text('${progress.toStringAsFixed(0)}%', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, color: AppColors.blue, fontSize: 15)),
           ]),
@@ -1034,7 +944,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             ),
             const SizedBox(width: 12),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Due Date', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
               Text(t['due_date'], style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
             ]),
           ])),
@@ -1044,7 +954,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           Row(children: [
             Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textMuted),
             const SizedBox(width: 6),
-            Text('Assigned Worker', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            Text(AppStrings.t('tasks.assignedWorker'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
           ]),
           const SizedBox(height: 12),
           if (_assignedWorkers.isNotEmpty) ...[
@@ -1071,7 +981,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   child: Icon(Icons.person_add_outlined, color: AppColors.textMuted, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Text('No worker assigned yet', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13)),
+                Text(AppStrings.t('tasks.noWorkerAssigned'), style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13)),
               ]),
             ),
           // Change / Assign button
@@ -1084,12 +994,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 size: 18,
               ),
               label: Text(
-                _assignedWorkers.isNotEmpty ? 'Change Assignment' : 'Assign Worker (AI)',
+                _assignedWorkers.isNotEmpty ? AppStrings.t('tasks.changeAssignment') : AppStrings.t('tasks.assignWorker'),
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.purple,
-                side: BorderSide(color: AppColors.purple),
+                foregroundColor: AppColors.accent,
+                side: BorderSide(color: AppColors.accent),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -1104,26 +1014,22 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 // ── Worker tile used in the assign bottom sheet ──
 class _WorkerTile extends StatelessWidget {
   final Map worker;
-  final bool isAI;
   final bool selected;
-  final double? score;
-  final List<String>? reasons;
   final VoidCallback onToggle;
-  const _WorkerTile({required this.worker, required this.isAI, required this.selected, required this.onToggle, this.score, this.reasons});
+  const _WorkerTile({required this.worker, required this.selected, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
     final name = worker['name'] as String? ?? '?';
-    final trade = worker['trade'] as String? ?? 'General';
-    final pct = score != null ? score! : 0.0;
+    final trade = worker['trade'] as String? ?? AppStrings.t('tasks.generalWorker');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isAI ? AppColors.purpleLight.withValues(alpha: 0.4) : AppColors.bgMain,
+        color: AppColors.bgMain,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: isAI ? AppColors.purple.withValues(alpha: 0.3) : AppColors.border),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(children: [
         Row(children: [
@@ -1132,12 +1038,6 @@ class _WorkerTile extends StatelessWidget {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(name, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14), overflow: TextOverflow.ellipsis)),
-              if (isAI && score != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.purple, borderRadius: BorderRadius.circular(8)),
-                  child: Text('${pct.toInt()}% match', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
-                ),
             ]),
             Text(trade, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
           ])),
@@ -1145,30 +1045,15 @@ class _WorkerTile extends StatelessWidget {
           ElevatedButton(
             onPressed: onToggle,
             style: ElevatedButton.styleFrom(
-              backgroundColor: selected ? AppColors.green : (isAI ? AppColors.purple : AppColors.accent),
+              backgroundColor: selected ? AppColors.green : AppColors.accent,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               minimumSize: const Size(70, 36),
             ),
-            child: Text(selected ? '✓' : 'Add', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+            child: Text(selected ? '✓' : AppStrings.t('common.add'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ]),
-        // AI reason chips
-        if (isAI && reasons != null && reasons!.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Wrap(
-              spacing: 6, runSpacing: 4,
-              children: reasons!.map((r) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.purple.withValues(alpha: 0.3))),
-                child: Text(r, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.purple)),
-              )).toList(),
-            ),
-          ),
-        ],
       ]),
     );
   }

@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
+import '../l10n/app_strings.dart';
 import '../models/notification.dart';
 import 'projects_page.dart';
 import 'tasks_page.dart';
@@ -45,18 +49,40 @@ class _NotificationsPageState extends State<NotificationsPage> {
   String _weather = 'Sunny';
   String _severity = 'low';
   String _category = 'safety';
+  bool _isWorker = false;
 
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
+    _loadRole();
     _load();
     _loadReports();
     _loadIssues();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshCount());
   }
 
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  /// Worker accounts do not use daily reports — hide that tab entirely.
+  Future<void> _loadRole() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final t = (sp.getString('user_type') ?? '').toLowerCase();
+      final r = (sp.getString('user_role') ?? '').toLowerCase();
+      if (mounted && (t == 'worker' || r == 'worker')) {
+        setState(() => _isWorker = true);
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
     _pollTimer?.cancel();
     _workProgress.dispose();
     _materials.dispose();
@@ -160,7 +186,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Notification Settings',
+          title: Text(AppStrings.t('notif.settingsTitle'),
               style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           content: SingleChildScrollView(
@@ -187,18 +213,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel')),
+              child: Text(AppStrings.t('common.cancel'))),
             ElevatedButton(
               onPressed: () async {
                 try {
                   await ApiService().updateNotificationSettings(_settings!.toJson());
                   if (ctx.mounted) Navigator.pop(ctx);
-                  toast('Settings saved');
+                  toast(AppStrings.t('common.success'));
                 } catch (e) {
-                  toast('Failed: $e');
+                  toast('${AppStrings.t('common.failed')}: $e');
                 }
               },
-              child: const Text('Save')),
+              child: Text(AppStrings.t('common.save'))),
           ],
         ),
       ),
@@ -236,7 +262,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         backgroundColor: AppColors.bgMain,
         appBar: AppBar(
           title: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text('Notifications',
+            Text(AppStrings.t('notif.title'),
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
             if (_unreadCount > 0) ...[
               const SizedBox(width: 8),
@@ -253,11 +279,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ],
           ]),
           actions: [
+            const AppSettingsActions(),
             if (_items.any((e) => !e.isRead))
               TextButton.icon(
                 onPressed: _markAllRead,
                 icon: const Icon(Icons.done_all_rounded, size: 18),
-                label: const Text('All Read'),
+                label: Text(AppStrings.t('notif.markAllRead')),
                 style: TextButton.styleFrom(foregroundColor: AppColors.accent),
               ),
             IconButton(
@@ -271,10 +298,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
             labelColor: AppColors.accent,
             unselectedLabelColor: AppColors.textSecondary,
             labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
-            tabs: const [
-              Tab(text: 'Notifications'),
-              Tab(text: 'Daily Reports'),
-              Tab(text: 'Issues'),
+            tabs: [
+              Tab(text: AppStrings.t('notif.title')),
+              if (!_isWorker) Tab(text: AppStrings.t('notif.dailyReports')),
+              Tab(text: AppStrings.t('notif.issues')),
             ],
           ),
         ),
@@ -287,7 +314,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: TabBarView(
                 children: [
                   _buildNotificationsTab(),
-                  _buildReportsTab(),
+                  if (!_isWorker) _buildReportsTab(),
                   _buildIssuesTab(),
                 ],
               ),
@@ -320,7 +347,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         children: [
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('Submit Daily Report',
+              Text(AppStrings.t('notif.submitDailyReport'),
                   style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
               const SizedBox(height: 14),
               if (projects.length > 1) ...[
@@ -350,7 +377,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               TextField(
                 controller: _manpower,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Workers Present', hintText: 'e.g. 45'),
+                decoration: InputDecoration(labelText: AppStrings.t('notif.workersPresent'), hintText: AppStrings.t('notif.workersPresentHint')),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -377,18 +404,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Submit Report'),
+                child: Text(AppStrings.t('notif.submitReport')),
               ),
             ]),
           ),
           const SizedBox(height: 20),
-          Text('Recent Reports',
+          Text(AppStrings.t('notif.recentReports'),
               style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
           const SizedBox(height: 10),
           if (reports.isEmpty)
             Padding(
               padding: EdgeInsets.all(20),
-              child: Center(child: Text('No reports submitted yet',
+              child: Center(child: Text(AppStrings.t('notif.noReports'),
                   style: TextStyle(color: AppColors.textMuted))),
             )
           else
@@ -434,7 +461,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         children: [
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text('Report an Issue',
+              Text(AppStrings.t('notif.reportIssue'),
                   style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
               const SizedBox(height: 14),
               if (projects.length > 1) ...[
@@ -449,7 +476,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               ],
               TextField(
                 controller: _issTitle,
-                decoration: const InputDecoration(labelText: 'Issue Title', hintText: 'Short description of the issue'),
+                decoration: InputDecoration(labelText: AppStrings.t('notif.issueTitle'), hintText: AppStrings.t('notif.issueTitleHint')),
               ),
               const SizedBox(height: 12),
               Row(children: [
@@ -477,7 +504,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               TextField(
                 controller: _issDesc,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Detailed Description', hintText: 'Provide as much detail as possible...'),
+                decoration: InputDecoration(labelText: AppStrings.t('notif.issueDetail'), hintText: AppStrings.t('notif.issueDetailHint')),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -487,18 +514,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Report Issue'),
+                child: Text(AppStrings.t('notif.reportIssueSubmit')),
               ),
             ]),
           ),
           const SizedBox(height: 20),
-          Text('Active Issues',
+          Text(AppStrings.t('notif.activeIssues'),
               style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
           const SizedBox(height: 10),
           if (issues.isEmpty)
             Padding(
               padding: EdgeInsets.all(20),
-              child: Center(child: Text('No issues reported. Looking good!',
+              child: Center(child: Text(AppStrings.t('notif.noIssues'),
                   style: TextStyle(color: AppColors.textMuted))),
             )
           else
@@ -525,7 +552,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       const Spacer(),
                       TextButton(
                         onPressed: () => _resolveIssue(iss['issue_id'] as int),
-                        child: const Text('Mark Resolved'),
+                        child: Text(AppStrings.t('notif.markResolved')),
                       ),
                     ]),
                   ]),
@@ -655,13 +682,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 size: 36, color: AppColors.accent),
           ),
           const SizedBox(height: 16),
-          Text('No notifications',
+          Text(AppStrings.t('notif.noNotifications'),
               style: GoogleFonts.outfit(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary)),
           const SizedBox(height: 6),
-          Text('You\'re all caught up!',
+          Text(AppStrings.t('notif.allCaughtUp'),
               style: GoogleFonts.outfit(
                   fontSize: 13, color: AppColors.textMuted)),
         ]),

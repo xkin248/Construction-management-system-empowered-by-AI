@@ -4,6 +4,12 @@ import 'package:geolocator/geolocator.dart';
 /// Platform-safe wrapper for GPS location.
 /// Returns null on web or if permission is denied.
 class GeoHelper {
+  /// Whether the device location service (GPS) is enabled.
+  static Future<bool> isServiceEnabled() async {
+    if (kIsWeb) return true;
+    return Geolocator.isLocationServiceEnabled();
+  }
+
   static Future<Map<String, double>?> getCurrentPosition() async {
     if (kIsWeb) return null;
 

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
+import '../l10n/app_strings.dart';
 import 'login_page.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -17,7 +20,20 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -46,7 +62,8 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColors.bgCard,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text('My Profile'),
+        title: Text(AppStrings.t('profile.title')),
+        actions: const [AppSettingsActions()],
       ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
@@ -68,13 +85,13 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(children: [
                   ListTile(
                     leading: Icon(Icons.phone_outlined, color: AppColors.textSecondary),
-                    title: const Text('Phone'),
+                    title: Text(AppStrings.t('profile.phone')),
                     trailing: Text(user?['phone'] ?? '-', style: TextStyle(color: AppColors.textMuted)),
                   ),
                   const Divider(height: 1),
                   ListTile(
                     leading: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-                    title: const Text('App Settings'),
+                    title: Text(AppStrings.t('profile.appSettings')),
                     trailing: const Icon(Icons.chevron_right, size: 18),
                     onTap: () => toast('Use the Settings section from the menu'),
                   ),
@@ -84,7 +101,7 @@ class _ProfilePageState extends State<ProfilePage> {
               OutlinedButton.icon(
                 onPressed: _logout,
                 icon: Icon(Icons.logout, color: AppColors.red, size: 18),
-                label: Text('Log Out', style: TextStyle(color: AppColors.red)),
+                label: Text(AppStrings.t('profile.logout'), style: TextStyle(color: AppColors.red)),
                 style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.redLight), minimumSize: Size.fromHeight(46)),
               ),
             ]),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'services/api_service.dart';
@@ -7,6 +8,8 @@ import 'services/fcm_service.dart';
 import 'screens/login_page.dart';
 import 'screens/home_shell.dart';
 import 'screens/worker_home_shell.dart';
+import 'services/app_settings.dart';
+import 'services/gps_notification_service.dart';
 
 void main() {
   runZonedGuarded(() {
@@ -86,12 +89,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    AppColors.isDark = _systemIsDark();
     WidgetsBinding.instance.addObserver(this);
+    // Load persisted language/theme before the first frame.
+    AppSettings.init().then((_) {
+      if (mounted) setState(() {});
+    });
+    // Rebuild the MaterialApp when language / theme mode changes so the
+    // locale + themeMode + dictionary all update instantly.
+    AppSettings.lang.addListener(_onSettingsChanged);
+    AppSettings.themeMode.addListener(_onSettingsChanged);
+    // Local notifications (GPS request) setup. Never blocks startup.
+    GpsNotificationService.init();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    AppSettings.lang.removeListener(_onSettingsChanged);
+    AppSettings.themeMode.removeListener(_onSettingsChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -99,9 +117,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   void didChangePlatformBrightness() {
     final dark = _systemIsDark();
-    if (AppColors.isDark != dark) {
-      setState(() => AppColors.isDark = dark);
-    }
+    AppSettings.onSystemBrightnessChanged(dark);
+    if (mounted) setState(() {});
   }
 
   bool _systemIsDark() =>
@@ -109,16 +126,31 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Keep the switch in sync even if the observer callback was missed.
-    AppColors.isDark = _systemIsDark();
+    final dark = _systemIsDark();
+    // Keep system-driven theme in sync with the platform brightness.
+    if (AppSettings.themeMode.value == 'system') {
+      AppColors.darkMode.value = dark;
+    }
     return MaterialApp(
       title: 'BuildSmart Construction Management',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: scaffoldMessengerKey,
+      // EN / BM localization support (Material widgets + app dictionary).
+      locale: Locale(AppSettings.lang.value == 'ms' ? 'ms' : 'en'),
+      supportedLocales: const [Locale('en'), Locale('ms')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: buildAppTheme(),
       darkTheme: buildDarkTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: AppSettings.themeMode.value == 'dark'
+          ? ThemeMode.dark
+          : AppSettings.themeMode.value == 'light'
+              ? ThemeMode.light
+              : ThemeMode.system,
       // Root pages listen to AppColors.darkMode themselves and rebuild in
       // place, so the Navigator subtree must NOT be keyed here (that would
       // reset the route stack on every theme flip).

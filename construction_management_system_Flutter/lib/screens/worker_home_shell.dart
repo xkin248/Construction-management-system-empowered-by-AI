@@ -8,12 +8,25 @@ import 'login_page.dart';
 import 'worker_dashboard_page.dart';
 import 'profile_page.dart';
 import 'notifications_page.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
 
 // ──────────────── Nav model ────────────────
 class _NavItem {
   final String label;
   final IconData icon;
   const _NavItem(this.label, this.icon);
+}
+
+/// Translate worker navigation labels (English / 中文 / Bahasa Melayu).
+String _navT(String en) {
+  const zh = {
+    'My Dashboard': '我的仪表盘', 'My Attendance': '我的考勤', 'Notifications': '通知', 'Profile': '个人资料',
+  };
+  const ms = {
+    'My Dashboard': 'Papan Pemuka Saya', 'My Attendance': 'Kehadiran Saya', 'Notifications': 'Notifikasi', 'Profile': 'Profil',
+  };
+  return AppSettings.t(en, zh[en], ms[en]);
 }
 
 const _workerMenu = [
@@ -150,9 +163,10 @@ class _NarrowLayout extends StatelessWidget {
           icon: Icon(Icons.menu_rounded, color: AppColors.textPrimary),
           onPressed: () => scaffoldKey.currentState?.openDrawer(),
         ),
-        title: Text(_workerTitles[idx],
+        title: Text(_navT(_workerTitles[idx]),
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
+          const AppSettingsActions(),
           IconButton(
             icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red),
             tooltip: 'Log out',
@@ -192,8 +206,8 @@ class _NarrowLayout extends StatelessWidget {
             items: _workerMenu
                 .map((e) => BottomNavigationBarItem(
                       icon: Icon(e.icon),
-                      label: e.label,
-                      tooltip: e.label,
+                      label: _navT(e.label),
+                      tooltip: _navT(e.label),
                     ))
                 .toList(),
           ),
@@ -339,7 +353,7 @@ class _WorkerNavTile extends StatelessWidget {
               Icon(item.icon, size: 18, color: selected ? Colors.white : AppColors.textSidebar),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(item.label,
+                child: Text(_navT(item.label),
                     style: GoogleFonts.outfit(
                         color: selected ? Colors.white : AppColors.textSidebar,
                         fontSize: 13.5, fontWeight: FontWeight.w600)),
@@ -368,16 +382,17 @@ class _WorkerTopBar extends StatelessWidget {
       ),
       child: Row(children: [
         Expanded(
-          child: Text(title,
+          child: Text(_navT(title),
               style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
+        const AppSettingsActions(),
         IconButton(
           icon: Icon(Icons.info_outline, color: AppColors.textSecondary, size: 20),
           tooltip: 'About Worker Portal',
           onPressed: () {
             showDialog(context: context, builder: (_) => AlertDialog(
               title: const Text('Worker Portal'),
-              content: const Text('This is the dedicated portal for construction workers. Use the Dashboard to check in and see your AI-assigned tasks.'),
+              content: const Text('This is the dedicated portal for construction workers. Use the Dashboard to check in and see your assigned tasks.'),
               actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
             ));
           },
@@ -403,6 +418,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   void initState() {
     super.initState();
     AppColors.darkMode.addListener(_onDarkChanged);
+    AppSettings.lang.addListener(_onLangChanged);
     _load();
   }
 
@@ -410,9 +426,14 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
     if (mounted) setState(() {});
   }
 
+  void _onLangChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     AppColors.darkMode.removeListener(_onDarkChanged);
+    AppSettings.lang.removeListener(_onLangChanged);
     super.dispose();
   }
 

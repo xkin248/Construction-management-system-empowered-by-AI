@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
+import '../l10n/app_strings.dart';
+import '../widgets/app_settings_actions.dart';
 import 'home_shell.dart';
 import 'worker_home_shell.dart';
 import 'worker_register_page.dart';
@@ -109,7 +111,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           ),
         ),
         child: SafeArea(
-          child: LayoutBuilder(builder: (ctx, constraints) {
+          child: Stack(
+            children: [
+              // Top-right language / theme switcher (login has no AppBar).
+              Positioned(
+                top: 0, right: 4,
+                child: AppSettingsActions(),
+              ),
+              LayoutBuilder(builder: (ctx, constraints) {
             final isNarrow = constraints.maxWidth < 400;
             final hPad    = isNarrow ? 16.0 : 24.0;
             final cardPad = isNarrow ? 20.0 : 28.0;
@@ -153,7 +162,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               style: GoogleFonts.outfit(
                                   fontSize: 12, color: const Color(0xFF757E90), letterSpacing: 0.3)),
                           const SizedBox(height: 24),
-
                           // ── Login Card ──
                           Container(
                             padding: EdgeInsets.all(cardPad),
@@ -180,7 +188,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                                     ),
-                                    child: Text('🔐  Worker & Site Supervisor Login',
+                                    child: Text(AppStrings.t('login.roleBadge'),
                                         style: GoogleFonts.outfit(
                                             fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
                                   ),
@@ -188,7 +196,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 const SizedBox(height: 22),
 
                                 // Email field
-                                Text('Email',
+                                Text(AppStrings.t('login.email'),
                                     style: GoogleFonts.outfit(
                                         fontSize: 13, fontWeight: FontWeight.w600,
                                         color: const Color(0xFFC8CDD8))),
@@ -203,7 +211,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 const SizedBox(height: 16),
 
                                 // Password field
-                                Text('Password',
+                                Text(AppStrings.t('login.password'),
                                     style: GoogleFonts.outfit(
                                         fontSize: 13, fontWeight: FontWeight.w600,
                                         color: const Color(0xFFC8CDD8))),
@@ -244,7 +252,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                             height: 20, width: 20,
                                             child: CircularProgressIndicator(
                                                 color: Colors.white, strokeWidth: 2.2))
-                                        : Text('Sign In',
+                                        : Text(AppStrings.t('login.signIn'),
                                             style: GoogleFonts.outfit(
                                                 fontSize: 15.5, fontWeight: FontWeight.w700)),
                                   ),
@@ -263,9 +271,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               text: TextSpan(
                                 style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90)),
                                 children: [
-                                  const TextSpan(text: "Don't have a Worker account?  "),
+                                  TextSpan(text: AppStrings.t('login.noWorkerAccount')),
                                   TextSpan(
-                                    text: 'Register →',
+                                    text: '${AppStrings.t('login.register')} →',
                                     style: TextStyle(
                                         color: AppColors.accent, fontWeight: FontWeight.w700),
                                   ),
@@ -274,7 +282,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text('Powered by Google Gemini AI  •  CIDB Construction 4.0',
+                          Text('CIDB Construction 4.0',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.outfit(
                                   fontSize: 11, color: const Color(0xFF3D4A5C))),
@@ -286,7 +294,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
               ),
             );
-          }),
+            }),
+            ],
+          ),
         ),
       ),
     );

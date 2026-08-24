@@ -4,6 +4,8 @@ import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../l10n/app_strings.dart';
+import '../widgets/app_settings_actions.dart';
 import 'login_page.dart';
 
 class WorkerRegisterPage extends StatefulWidget {
@@ -109,7 +111,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
             ),
           ),
           child: SafeArea(
-            child: LayoutBuilder(builder: (ctx, constraints) {
+            child: Stack(
+              children: [
+                Positioned(
+                  top: 0, right: 4,
+                  child: AppSettingsActions(),
+                ),
+                LayoutBuilder(builder: (ctx, constraints) {
               final isNarrow = constraints.maxWidth < 400;
               final hPad    = isNarrow ? 16.0 : 24.0;
               final cardPad = isNarrow ? 20.0 : 28.0;
@@ -144,11 +152,11 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                               ),
                             ),
                             const SizedBox(height: 14),
-                            Text('Worker Registration',
+                            Text(AppStrings.t('worker.register.title'),
                                 style: GoogleFonts.outfit(
                                     fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white)),
                             const SizedBox(height: 4),
-                            Text('Create your BuildSmart worker account',
+                            Text(AppStrings.t('worker.register.subtitle'),
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF757E90))),
                             const SizedBox(height: 20),
@@ -181,7 +189,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                           borderRadius: BorderRadius.circular(20),
                                           border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
                                         ),
-                                        child: Text('🔒  Worker Role Only',
+                                        child: Text(AppStrings.t('worker.register.roleBadge'),
                                             style: GoogleFonts.outfit(
                                                 fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
                                       ),
@@ -189,7 +197,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     const SizedBox(height: 22),
 
                                     // ── Full Name ──
-                                    _label('Full Name'),
+                                    _label(AppStrings.t('worker.register.fullName')),
                                     const SizedBox(height: 7),
                                     _field(
                                       controller: _name,
@@ -200,7 +208,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     const SizedBox(height: 14),
 
                                     // ── Email ──
-                                    _label('Email'),
+                                    _label(AppStrings.t('login.email')),
                                     const SizedBox(height: 7),
                                     _field(
                                       controller: _email,
@@ -215,7 +223,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     // ── Password + Confirm (stacked on narrow, side-by-side on wide) ──
                                     isNarrow
                                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            _label('Password'),
+                                            _label(AppStrings.t('login.password')),
                                             const SizedBox(height: 7),
                                             _pwdField(
                                               controller: _pwd,
@@ -226,7 +234,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               nextFocus: _pwd2Focus,
                                             ),
                                             const SizedBox(height: 14),
-                                            _label('Confirm Password'),
+                                            _label(AppStrings.t('worker.register.confirmPassword')),
                                             const SizedBox(height: 7),
                                             _pwdField(
                                               controller: _pwd2,
@@ -239,7 +247,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                           ])
                                         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label('Password'),
+                                              _label(AppStrings.t('login.password')),
                                               const SizedBox(height: 7),
                                               _pwdField(
                                                 controller: _pwd,
@@ -252,7 +260,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             ])),
                                             const SizedBox(width: 12),
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label('Confirm'),
+                                              _label(AppStrings.t('worker.register.confirm')),
                                               const SizedBox(height: 7),
                                               _pwdField(
                                                 controller: _pwd2,
@@ -269,7 +277,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     // ── Phone + IC (stacked on narrow) ──
                                     isNarrow
                                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                            _label('Phone (required)'),
+                                            _label(AppStrings.t('worker.register.phone')),
                                             const SizedBox(height: 7),
                                             _field(
                                               controller: _phone,
@@ -280,7 +288,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               onSubmitted: (_) => FocusScope.of(context).requestFocus(_icFocus),
                                             ),
                                             const SizedBox(height: 14),
-                                            _label('IC Number (optional)'),
+                                            _label(AppStrings.t('worker.register.ic')),
                                             const SizedBox(height: 7),
                                             _field(
                                               controller: _ic,
@@ -292,7 +300,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                           ])
                                         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label('Phone (required)'),
+                                              _label(AppStrings.t('worker.register.phone')),
                                               const SizedBox(height: 7),
                                               _field(
                                                 controller: _phone,
@@ -305,7 +313,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             ])),
                                             const SizedBox(width: 12),
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label('IC Number (optional)'),
+                                              _label(AppStrings.t('worker.register.ic')),
                                               const SizedBox(height: 7),
                                               _field(
                                                 controller: _ic,
@@ -319,7 +327,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     const SizedBox(height: 14),
 
                                     // ── Trade/Skill ──
-                                    _label('Trade / Skill'),
+                                    _label(AppStrings.t('worker.register.trade')),
                                     const SizedBox(height: 7),
                                     _dropdownField(),
                                     const SizedBox(height: 26),
@@ -340,7 +348,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             ? const SizedBox(
                                                 height: 20, width: 20,
                                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
-                                            : Text('Create Worker Account',
+                                            : Text(AppStrings.t('worker.register.submit'),
                                                 style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
                                       ),
                                     ),
@@ -359,9 +367,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                 text: TextSpan(
                                   style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90)),
                                   children: [
-                                    const TextSpan(text: 'Already have an account?  '),
+                                    TextSpan(text: AppStrings.t('worker.register.haveAccount')),
                                     TextSpan(
-                                      text: '← Back to Login',
+                                      text: '← ${AppStrings.t('worker.register.backToLogin')}',
                                       style: TextStyle(color: AppColors.accent, fontWeight: FontWeight.w700),
                                     ),
                                   ],
@@ -369,7 +377,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                               ),
                             ),
                             const SizedBox(height: 8),
-                            Text('Powered by Google Gemini AI  •  CIDB Construction 4.0',
+                            Text('CIDB Construction 4.0',
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF3D4A5C))),
                             const SizedBox(height: 8),
@@ -380,8 +388,10 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                   ),
                 ),
               );
-            }),
+            }), 
+            ],
           ),
+        ),
         ),
       ),
     );

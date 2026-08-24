@@ -8,6 +8,10 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../services/gps_notification_service.dart';
+import '../l10n/app_strings.dart';
+import '../widgets/app_settings_actions.dart';
 
 // ─────────────────────────────────────────────
 //  Fence Map (OpenStreetMap free tiles) — center marker + radius circle
@@ -76,12 +80,12 @@ class _FenceMap extends StatelessWidget {
 Future<Map<String, double>?> _getSiteGps() async {
   if (kIsWeb) return null;
   try {
-    // 1) Ensure the location service is ON — open system GPS settings if it is off
+    // 1) Ensure the location service is ON — notify in-app instead of jumping to system settings
     bool svc = await Geolocator.isLocationServiceEnabled();
     if (!svc) {
-      try {
-        await Geolocator.openLocationSettings();
-      } catch (_) {}
+      await GpsNotificationService.requestEnable();
+      // Wait briefly so the user can toggle GPS from the notification, then retry.
+      await Future.delayed(const Duration(seconds: 3));
       svc = await Geolocator.isLocationServiceEnabled();
       if (!svc) return null;
     }
@@ -96,10 +100,7 @@ Future<Map<String, double>?> _getSiteGps() async {
       );
       return {'lat': pos.latitude, 'lng': pos.longitude};
     } catch (_) {
-      // Retry once after re-opening system location settings (fixes GPS toggled off)
-      try {
-        await Geolocator.openLocationSettings();
-      } catch (_) {}
+      // Retry once in-app — do NOT open the system location settings page.
       final pos2 = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
       );
@@ -126,7 +127,20 @@ class _ProjectsPageState extends State<ProjectsPage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -161,7 +175,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openProjectForm(),
         icon: const Icon(Icons.add),
-        label: const Text('New Project'),
+        label: Text(AppStrings.t('proj.newProject')),
         backgroundColor: AppColors.accent,
       ),
       body: Align(
@@ -179,7 +193,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             Padding(
                               padding: EdgeInsets.all(40),
                               child: Center(
-                                child: Text('No projects yet',
+                                child: Text(AppStrings.t('proj.noProjects'),
                                     style: TextStyle(color: AppColors.textMuted)),
                               ),
                             )
@@ -710,12 +724,24 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool ld = true;
   Map? project;
   List tasks = [];
-  Map? _prediction;
 
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -724,13 +750,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       final all = await ApiService().getProjects();
       project = all.firstWhere((p) => p['project_id'] == widget.projectId, orElse: () => null);
       tasks = await ApiService().getTasks(widget.projectId);
-
-      // Load AI progress prediction
-      try {
-        _prediction = await ApiService().getProjectProgressPrediction(widget.projectId);
-      } catch (_) {
-        _prediction = null;
-      }
     } catch (e) {
       toast('Failed to load project: $e');
     } finally {
@@ -741,7 +760,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   @override
   Widget build(BuildContext c) {
     if (ld) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
-    if (project == null) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text('Project not found')));
+    if (project == null) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text(AppStrings.t('proj.projectNotFound'))));
     final p = project!;
     final completed = tasks.where((t) => t['status'] == 'completed').length;
     final radius = (p['fence_radius'] as num?)?.toInt() ?? 5000;
@@ -757,6 +776,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         title: Text(p['project_name'] ?? 'Project',
             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
         actions: [
+          const AppSettingsActions(),
           TextButton.icon(
             onPressed: () {
               showModalBottomSheet(
@@ -770,7 +790,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               );
             },
             icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Edit'),
+            label: Text(AppStrings.t('proj.edit')),
             style: TextButton.styleFrom(foregroundColor: AppColors.accent),
           ),
         ],
@@ -795,7 +815,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ]),
             const SizedBox(height: 16),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Overall Completion', style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
+              Text(AppStrings.t('proj.overallCompletion'), style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
               Text('${p['progress']?.toStringAsFixed(0) ?? 0}%',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ]),
@@ -812,12 +832,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         ),
         const SizedBox(height: 16),
 
-        // ── AI Progress Prediction Card ──
-        if (_prediction != null) ...[
-          _buildAiPredictionCard(),
-          const SizedBox(height: 16),
-        ],
-
         // ── Geofence Info Card ────────────────────────
         sectionCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -830,9 +844,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Site Geofence',
+                  Text(AppStrings.t('proj.siteGeofence'),
                       style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
-                  Text('Workers must be within $radius m to check in',
+                  Text(AppStrings.t('proj.geofenceHint').replaceAll('{radius}', '$radius'),
                       style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                 ]),
               ),
@@ -861,7 +875,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         const SizedBox(height: 16),
 
         // Tasks
-        Text('Task Summary',
+        Text(AppStrings.t('proj.taskSummary'),
             style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
         const SizedBox(height: 10),
         Row(children: [
@@ -881,230 +895,4 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         Text('$label: ', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
         Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary))),
       ]);
-
-  // ── AI Progress Prediction Card ──
-  Widget _buildAiPredictionCard() {
-    final pred = _prediction!;
-    final trend = pred['trend'] as String? ?? 'on_track';
-    final confidence = (pred['confidence'] as num? ?? 70).toDouble();
-    final predictedDate = pred['predicted_completion_date'] as String? ?? '-';
-    final plannedEnd = pred['planned_end_date'] as String?;
-    final insights = pred['ai_insights'] as String? ?? '';
-    final milestones = (pred['milestones'] as List?) ?? [];
-    final currentProgress = (pred['current_progress'] as num? ?? 0).toDouble();
-    final riskFactors = (pred['risk_factors'] as List?)?.cast<String>() ?? [];
-    final recommendations = (pred['recommendations'] as List?)?.cast<String>() ?? [];
-    final velocity = pred['velocity'] as Map? ?? {};
-    final aiUsed = pred['ai_used'] as bool? ?? false;
-
-    final trendColor = switch (trend) {
-      'ahead' => AppColors.green,
-      'on_track' => AppColors.blue,
-      'behind' => AppColors.accent,
-      'critical' => AppColors.red,
-      _ => AppColors.textMuted,
-    };
-    final trendLabel = switch (trend) {
-      'ahead' => 'Ahead of Schedule',
-      'on_track' => 'On Track',
-      'behind' => 'Behind Schedule',
-      'critical' => 'At Risk — Critical',
-      _ => trend,
-    };
-    final trendIcon = switch (trend) {
-      'ahead' => Icons.rocket_launch_rounded,
-      'on_track' => Icons.check_circle_rounded,
-      'behind' => Icons.warning_rounded,
-      'critical' => Icons.error_rounded,
-      _ => Icons.help_rounded,
-    };
-
-    double predProgress30d = currentProgress;
-    for (final m in milestones) {
-      if (m['label'] == '30 days') {
-        predProgress30d = (m['predicted_progress'] as num).toDouble();
-        break;
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: trendColor.withValues(alpha: 0.3)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Header ──
-        Row(children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-              color: trendColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(trendIcon, size: 16, color: trendColor),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AI Progress Prediction',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
-              Row(children: [
-                Text(aiUsed ? 'Gemini AI • ' : 'Rule-based • ',
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-                Text('${confidence.toStringAsFixed(0)}% confidence',
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.green)),
-              ]),
-            ]),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: trendColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(trendLabel,
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: trendColor)),
-          ),
-        ]),
-        const SizedBox(height: 14),
-
-        // ── AI Insight ──
-        if (insights.isNotEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.only(bottom: 14),
-            decoration: BoxDecoration(
-              color: trendColor.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(insights,
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.45)),
-          ),
-
-        // ── Progress Bars ──
-        Row(children: [
-          _miniStat('Current', '${currentProgress.toStringAsFixed(1)}%', AppColors.textPrimary),
-          const SizedBox(width: 8),
-          _miniStat('30-Day Pred.', '${predProgress30d.toStringAsFixed(1)}%', trendColor),
-          const SizedBox(width: 8),
-          _miniStat('Velocity', '${(velocity['weekly_tasks_completed'] ?? 0).toStringAsFixed(1)} /wk', AppColors.textSecondary),
-        ]),
-        const SizedBox(height: 8),
-        Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: LinearProgressIndicator(
-                value: predProgress30d / 100,
-                minHeight: 12,
-                backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(trendColor.withValues(alpha: 0.2)),
-              ),
-            ),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(7),
-              child: LinearProgressIndicator(
-                value: currentProgress / 100,
-                minHeight: 12,
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(trendColor),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-
-        // ── Date comparison ──
-        Row(children: [
-          _datePill('Planned End', plannedEnd ?? '-', AppColors.textSecondary),
-          Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.textMuted)),
-          _datePill('Predicted', _fmtDateStr(predictedDate), trendColor),
-        ]),
-
-        // ── Risk factors ──
-        if (riskFactors.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Divider(height: 1, color: AppColors.border),
-          const SizedBox(height: 12),
-          Text('Risk Factors', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.red)),
-          const SizedBox(height: 6),
-          ...riskFactors.take(3).map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.error_outline, size: 14, color: AppColors.red),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
-                ]),
-              )),
-        ],
-
-        // ── Recommendations ──
-        if (recommendations.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Text('AI Recommendations', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.blue)),
-          const SizedBox(height: 6),
-          ...recommendations.take(3).map((r) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.lightbulb_outline, size: 14, color: AppColors.blue),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(r, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
-                ]),
-              )),
-        ],
-
-        // ── Milestone chips ──
-        if (milestones.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          Divider(height: 1, color: AppColors.border),
-          const SizedBox(height: 10),
-          Text('Predicted Progress Milestones', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: milestones.map((m) {
-            final pct = (m['predicted_progress'] as num).toDouble();
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.bgMain,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(m['label'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-                Text('${pct.toStringAsFixed(0)}%',
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: pct >= currentProgress ? AppColors.green : AppColors.red)),
-              ]),
-            );
-          }).toList()),
-        ],
-      ]),
-    );
-  }
-
-  Widget _miniStat(String label, String value, Color color) => Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        ]),
-      );
-
-  Widget _datePill(String label, String value, Color color) => Expanded(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-          Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
-        ]),
-      );
-
-  String _fmtDateStr(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-    } catch (_) {
-      return iso;
-    }
-  }
 }

@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
+import '../l10n/app_strings.dart';
 
 class WorkersPage extends StatefulWidget {
   const WorkersPage({super.key});
@@ -19,7 +22,20 @@ class _WorkersPageState extends State<WorkersPage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -69,24 +85,24 @@ class _WorkersPageState extends State<WorkersPage> {
                   decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              Text('Add Worker', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              Text(AppStrings.t('workers.addWorker'), style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               const SizedBox(height: 16),
-              TextField(controller: name, decoration: const InputDecoration(labelText: 'Full Name', hintText: 'e.g. Ali Hassan')),
+              TextField(controller: name, decoration: InputDecoration(labelText: AppStrings.t('workers.fullName'), hintText: AppStrings.t('workers.fullNameHint'))),
               const SizedBox(height: 12),
-              TextField(controller: role, decoration: const InputDecoration(labelText: 'Trade / Role', hintText: 'e.g. Electrician')),
+              TextField(controller: role, decoration: InputDecoration(labelText: AppStrings.t('workers.tradeRole'), hintText: AppStrings.t('workers.tradeRoleHint'))),
               const SizedBox(height: 12),
               TextField(controller: phone, keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone', hintText: '+60 12-345 6789')),
+                  decoration: InputDecoration(labelText: AppStrings.t('workers.phone'), hintText: AppStrings.t('workers.phoneHint'))),
               const SizedBox(height: 12),
               TextField(controller: email, keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email (for login)', hintText: 'worker@example.com')),
+                  decoration: InputDecoration(labelText: AppStrings.t('workers.emailForLogin'), hintText: AppStrings.t('workers.emailHint'))),
               const SizedBox(height: 12),
               TextField(controller: password, obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password', hintText: 'Min 8 chars')),
+                  decoration: InputDecoration(labelText: AppStrings.t('workers.password'), hintText: AppStrings.t('workers.passwordHint'))),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
-                  if (name.text.trim().isEmpty) { toast("Enter the worker's name"); return; }
+                  if (name.text.trim().isEmpty) { toast(AppStrings.t('workers.nameRequired')); return; }
                   try {
                     if (email.text.trim().isNotEmpty && password.text.isNotEmpty) {
                       // Register as authenticated worker (project auto-assigned by backend)
@@ -104,10 +120,10 @@ class _WorkersPageState extends State<WorkersPage> {
                       });
                     }
                     if (ctx.mounted) Navigator.pop(ctx);
-                    toast('Worker added!');
+                    toast(AppStrings.t('workers.added'));
                     _load();
                   } on DioException catch (e) {
-                    toast(e.message ?? 'Failed to add worker');
+                    toast(e.message ?? AppStrings.t('common.failed'));
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -116,7 +132,7 @@ class _WorkersPageState extends State<WorkersPage> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                child: Text('Add Worker', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+                child: Text(AppStrings.t('workers.addWorker'), style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
             ]),
           ),
@@ -131,7 +147,7 @@ class _WorkersPageState extends State<WorkersPage> {
       floatingActionButton: FloatingActionButton.extended(
           onPressed: _openAddWorker,
           icon: const Icon(Icons.add),
-          label: const Text('Add Worker')),
+          label: Text(AppStrings.t('workers.addWorker'))),
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
@@ -139,13 +155,21 @@ class _WorkersPageState extends State<WorkersPage> {
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
+              // Settings actions
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: const [AppSettingsActions()],
+                ),
+              ),
               // Search bar
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   decoration: InputDecoration(
-                    hintText: 'Search workers by name or trade...',
+                    hintText: AppStrings.t('workers.searchHint'),
                     hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
                     prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.bgCard,
@@ -160,7 +184,7 @@ class _WorkersPageState extends State<WorkersPage> {
                 child: ld
                 ? const Center(child: CircularProgressIndicator())
                 : _filtered.isEmpty
-                    ? Center(child: Text('No workers found', style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                    ? Center(child: Text(AppStrings.t('workers.noWorkersFound'), style: GoogleFonts.outfit(color: AppColors.textMuted)))
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: LayoutBuilder(builder: (ctx, constraints) {

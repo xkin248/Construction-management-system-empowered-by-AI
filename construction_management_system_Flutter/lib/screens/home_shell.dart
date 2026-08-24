@@ -12,8 +12,9 @@ import 'attendance_page.dart';
 import 'workers_page.dart';
 import 'files_page.dart';
 import 'notifications_page.dart';
-import 'settings_page.dart';
 import 'profile_page.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
 import 'worker_home_shell.dart';
 
 // ──────────────── Nav model ────────────────
@@ -23,6 +24,21 @@ class _NavItem {
   final IconData activeIcon;
   const _NavItem(this.label, this.icon, [IconData? active])
       : activeIcon = active ?? icon;
+}
+
+/// Translate navigation labels (English / 中文 / Bahasa Melayu).
+String _navT(String en) {
+  const zh = {
+    'Dashboard': '仪表盘', 'Projects': '项目', 'Tasks': '任务', 'Attendance': '考勤',
+    'Workers': '工人', 'Files': '文件', 'Notifications': '通知', 'More': '更多',
+    'My Dashboard': '我的仪表盘', 'My Attendance': '我的考勤', 'Profile': '个人资料',
+  };
+  const ms = {
+    'Dashboard': 'Papan Pemuka', 'Projects': 'Projek', 'Tasks': 'Tugas', 'Attendance': 'Kehadiran',
+    'Workers': 'Pekerja', 'Files': 'Fail', 'Notifications': 'Notifikasi', 'More': 'Lagi',
+    'My Dashboard': 'Papan Pemuka Saya', 'My Attendance': 'Kehadiran Saya', 'Profile': 'Profil',
+  };
+  return AppSettings.t(en, zh[en], ms[en]);
 }
 
 const _bottomNavItems = [
@@ -42,9 +58,6 @@ const _mainMenu = [
   _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
   _NavItem('Notifications', Icons.notifications_outlined, Icons.notifications_rounded),
 ];
-const _settingsMenu = [
-  _NavItem('Settings', Icons.settings_outlined),
-];
 
 final _pages = <Widget>[
   const DashboardPage(),   // 0 Dashboard
@@ -54,13 +67,9 @@ final _pages = <Widget>[
   const WorkersPage(),     // 4 Workers
   const FilesPage(),       // 5 Files
   const NotificationsPage(), // 6 Notifications
-  const SettingsPage(),    // 7 Settings
 ];
 
-final _titles = [
-  ..._mainMenu.map((e) => e.label),
-  ..._settingsMenu.map((e) => e.label),
-];
+final _titles = _mainMenu.map((e) => e.label).toList();
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -82,6 +91,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     AppColors.darkMode.addListener(_onDarkChanged);
+    AppSettings.lang.addListener(_onLangChanged);
     _guardWorkerEntry();
     _loadUser();
   }
@@ -90,9 +100,14 @@ class _HomeShellState extends State<HomeShell> {
     if (mounted) setState(() {});
   }
 
+  void _onLangChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
     AppColors.darkMode.removeListener(_onDarkChanged);
+    AppSettings.lang.removeListener(_onLangChanged);
     super.dispose();
   }
 
@@ -294,11 +309,12 @@ class _NarrowLayout extends StatelessWidget {
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('BuildSmart',
                 style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            Text(_titles[idx.clamp(0, _titles.length - 1)],
+            Text(_navT(_titles[idx.clamp(0, _titles.length - 1)]),
                 style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
           ]),
         ]),
         actions: [
+          const AppSettingsActions(),
           Stack(children: [
             IconButton(
               icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
@@ -380,7 +396,7 @@ class _BottomNavBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: item.label,
+      message: _navT(item.label),
       child: InkWell(
       onTap: onTap,
       child: AnimatedContainer(
@@ -400,7 +416,7 @@ class _BottomNavBtn extends StatelessWidget {
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              item.label,
+              _navT(item.label),
               maxLines: 1,
               style: GoogleFonts.outfit(
                 fontSize: 13,
@@ -432,7 +448,6 @@ class _MoreSheet extends StatelessWidget {
       {'label': 'Workers', 'icon': Icons.badge_outlined, 'idx': 4},
       {'label': 'Files', 'icon': Icons.folder_outlined, 'idx': 5},
       {'label': 'Notifications', 'icon': Icons.notifications_outlined, 'idx': 6},
-      {'label': 'Settings', 'icon': Icons.settings_outlined, 'idx': 7},
     ];
 
     return Container(
@@ -478,7 +493,7 @@ class _MoreSheet extends StatelessWidget {
               ),
               child: Icon(item['icon'] as IconData, size: 20, color: AppColors.textSecondary),
             ),
-            title: Text(item['label'] as String,
+            title: Text(_navT(item['label'] as String),
                 style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             trailing: Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             onTap: () {
@@ -587,12 +602,6 @@ class _SidebarContent extends StatelessWidget {
                       onTap: () => onNav(e.key),
                       showNotificationBadge: e.value.label == 'Notifications',
                     )),
-                _sectionLabel('SETTINGS'),
-                ..._settingsMenu.asMap().entries.map((e) => _NavTile(
-                      item: e.value,
-                      selected: (_mainMenu.length + e.key) == idx,
-                      onTap: () => onNav(_mainMenu.length + e.key),
-                    )),
               ],
             ),
           ),
@@ -668,7 +677,7 @@ class _NavTile extends StatelessWidget {
               Icon(item.icon, size: 18, color: selected ? Colors.white : AppColors.textSidebar),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(item.label,
+                child: Text(_navT(item.label),
                     style: GoogleFonts.outfit(
                         color: selected ? Colors.white : AppColors.textSidebar,
                         fontSize: 13.5,
@@ -716,7 +725,7 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(children: [
         Expanded(
-          child: Text(title,
+          child: Text(_navT(title),
               style: GoogleFonts.outfit(
                   fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
@@ -745,6 +754,7 @@ class _TopBar extends StatelessWidget {
         const SizedBox(width: 12),
         _ProjectChip(currentProject: currentProject, onChanged: onProjectChanged),
         const SizedBox(width: 12),
+        const AppSettingsActions(),
         Stack(children: [
           IconButton(
             icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),

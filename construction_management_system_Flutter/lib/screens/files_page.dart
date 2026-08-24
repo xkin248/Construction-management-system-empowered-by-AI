@@ -6,7 +6,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../l10n/app_strings.dart';
 import '../models/file.dart';
+import '../widgets/app_settings_actions.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -41,7 +44,20 @@ class _FilesPageState extends State<FilesPage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -70,9 +86,11 @@ class _FilesPageState extends State<FilesPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete File',
-            style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        title: Text(
+          AppStrings.t('files.deleteTitle'),
+          style: GoogleFonts.outfit(
+              fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+        ),
         content: Text(
             'Delete "${file.originalName}"?\nThis moves the file to recycle bin.',
             style: GoogleFonts.outfit(
@@ -80,13 +98,13 @@ class _FilesPageState extends State<FilesPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(AppStrings.t('files.cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style:
                 TextButton.styleFrom(foregroundColor: AppColors.red),
-            child: const Text('Delete'),
+            child: Text(AppStrings.t('files.delete')),
           ),
         ],
       ),
@@ -135,7 +153,7 @@ class _FilesPageState extends State<FilesPage> {
                         borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
-                Text('Upload File',
+                Text(AppStrings.t('files.uploadTitle'),
                     style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -197,9 +215,9 @@ class _FilesPageState extends State<FilesPage> {
                         prefixIcon: Icon(Icons.apartment_rounded,
                             size: 20, color: AppColors.textMuted)),
                     items: [
-                      const DropdownMenuItem<int>(
+                      DropdownMenuItem<int>(
                           value: null,
-                          child: Text('No project')),
+                          child: Text(AppStrings.t('files.noProject'))),
                       ..._projects.map((p) => DropdownMenuItem<int>(
                           value: p['project_id'],
                           child: Text(p['project_name'] ?? ''))),
@@ -247,7 +265,7 @@ class _FilesPageState extends State<FilesPage> {
                         borderRadius: BorderRadius.circular(12)),
                     minimumSize: const Size(0, 48),
                   ),
-                  child: const Text('Upload'),
+                  child: Text(AppStrings.t('files.upload')),
                 ),
               ],
             ),
@@ -293,9 +311,7 @@ class _FilesPageState extends State<FilesPage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  (file.thumbnailPath != null && file.thumbnailPath!.isNotEmpty)
-                      ? ApiService().thumbnailUrl(file.thumbnailPath)
-                      : ApiService().downloadUrl(file.fileId),
+                  ApiService().downloadUrl(file.fileId),
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -332,7 +348,7 @@ class _FilesPageState extends State<FilesPage> {
                   _launchDownload(url, file.originalName);
                 },
                 icon: const Icon(Icons.download_rounded, size: 20),
-                label: const Text('Download & Open'),
+                label: Text(AppStrings.t('files.downloadOpen')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: Colors.white,
@@ -402,6 +418,14 @@ class _FilesPageState extends State<FilesPage> {
         ),
       ),
       body: Column(children: [
+        // ── Language / Theme switcher ──
+        Align(
+          alignment: Alignment.centerRight,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: AppSettingsActions(),
+          ),
+        ),
         // ── Project dropdown ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -430,17 +454,17 @@ class _FilesPageState extends State<FilesPage> {
                         fontWeight: FontWeight.w600),
                     hint: Padding(
                       padding: const EdgeInsets.only(left: 12),
-                      child: Text('All Projects',
+                      child: Text(AppStrings.t('files.allProjects'),
                           style: GoogleFonts.outfit(
                               fontSize: 13.5,
                               color: AppColors.textMuted)),
                     ),
                     items: [
-                      const DropdownMenuItem<int?>(
+                      DropdownMenuItem<int?>(
                           value: null,
                           child: Padding(
                             padding: EdgeInsets.only(left: 8),
-                            child: Text('All Projects'),
+                            child: Text(AppStrings.t('files.allProjects')),
                           )),
                       ..._projects.map((p) => DropdownMenuItem<int?>(
                           value: p['project_id'],
@@ -567,7 +591,7 @@ class _FilesPageState extends State<FilesPage> {
                     size: 34, color: AppColors.accent),
               ),
               const SizedBox(height: 16),
-              Text('No files yet',
+              Text(AppStrings.t('files.noFiles'),
                   style: GoogleFonts.outfit(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -632,7 +656,7 @@ class _FilesPageState extends State<FilesPage> {
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: Image.network(
-                            ApiService().thumbnailUrl(file.thumbnailPath),
+                            ApiService().downloadUrl(file.fileId),
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,

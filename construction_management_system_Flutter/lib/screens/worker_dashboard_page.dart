@@ -7,6 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../widgets/app_settings_actions.dart';
+import '../l10n/app_strings.dart';
+import '../services/gps_notification_service.dart';
 import 'attendance_geo_helper.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
@@ -46,13 +50,21 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   @override
   void initState() {
     super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
     _initDevice();
     _loadAll();
     _startAutoSync();
   }
 
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
     _syncTimer?.cancel();
     super.dispose();
   }
@@ -209,6 +221,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       _statusMsg = 'Getting your location...';
     });
     try {
+      if (!await GeoHelper.isServiceEnabled()) {
+        setState(() {
+          _statusMsg = 'GPS is off. A notification has been sent to enable it.';
+          _checkInLoading = false;
+        });
+        await GpsNotificationService.requestEnable();
+        return;
+      }
       final pos = await GeoHelper.getCurrentPosition();
       if (pos == null) {
         setState(() {
@@ -372,6 +392,11 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: AppSettingsActions(),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
                   if (isWide)
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(child: _buildWelcomeCard()),
@@ -384,8 +409,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                     _buildCheckInCard(),
                   ],
                   const SizedBox(height: AppSpacing.lg),
-                  _buildAIBanner(),
-                  const SizedBox(height: AppSpacing.md),
                   _buildTaskBoard(isWide: isWide),
                 ],
               ),
@@ -399,7 +422,11 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   Widget _buildWelcomeCard() {
     final name = _workerName ?? 'Worker';
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
+    final greeting = hour < 12
+        ? AppStrings.t('common.goodMorning')
+        : hour < 18
+            ? AppStrings.t('common.goodAfternoon')
+            : AppStrings.t('common.goodEvening');
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -425,13 +452,12 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               Text('$greeting, ${name.split(' ').first}!',
                   style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('BuildSmart Worker Portal',
+              Text(AppStrings.t('worker.portal'),
                   style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
               const SizedBox(height: 10),
               Wrap(spacing: 6, runSpacing: 4, children: [
-                _welcomeChip(Icons.badge_rounded, 'Worker Portal'),
-                _welcomeChip(Icons.auto_awesome_rounded, 'AI Assisted'),
-                if (_checkedIn) _welcomeChip(Icons.gps_fixed, 'On Site', bg: Colors.white.withValues(alpha: 0.9), fg: AppColors.green),
+                _welcomeChip(Icons.badge_rounded, AppStrings.t('worker.portal')),
+                if (_checkedIn) _welcomeChip(Icons.gps_fixed, AppStrings.t('dash.onSite'), bg: Colors.white.withValues(alpha: 0.9), fg: AppColors.green),
               ]),
             ]),
           ),
@@ -557,7 +583,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         ),
         const SizedBox(height: 6),
         if (_hoursToday > 0)
-          Text('Hours worked today: ${_hoursToday.toStringAsFixed(1)}h',
+          Text('${AppStrings.t('worker.hoursToday')}: ${_hoursToday.toStringAsFixed(1)}h',
               style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
         const SizedBox(height: 18),
 
@@ -582,15 +608,15 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               Column(children: [
-                Text('Work Hours',
+                Text(AppStrings.t('worker.workHours'),
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                Text(_windowEnforced ? _workHours : 'Anytime',
+                Text(_windowEnforced ? _workHours : AppStrings.t('worker.anytime'),
                     style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
               ]),
               Container(width: 1, height: 30, color: AppColors.border),
               Column(children: [
-                Text('Break (no check-in)',
+                Text(AppStrings.t('worker.breakNoCheckin'),
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(_breakWindow,
@@ -641,37 +667,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     );
   }
 
-  Widget _buildAIBanner() {
-    final alert = _taskBoard?['alert']?.toString();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: alert != null && alert.isNotEmpty ? AppColors.yellowLight : AppColors.purpleLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: alert != null && alert.isNotEmpty ? AppColors.yellow.withValues(alpha: 0.4) : AppColors.purple.withValues(alpha: 0.3)),
-      ),
-      child: Row(children: [
-        Icon(
-          alert != null && alert.isNotEmpty ? Icons.warning_amber_rounded : Icons.auto_awesome_rounded,
-          size: 20,
-          color: alert != null && alert.isNotEmpty ? AppColors.yellow : AppColors.purple,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            alert != null && alert.isNotEmpty ? '⚠ Alert: $alert' : (_taskBoard?['summary']?.toString() ?? '🤖 AI analyzing your tasks...'),
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: alert != null && alert.isNotEmpty ? const Color(0xFF92400E) : const Color(0xFF5B21B6),
-              height: 1.35,
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-
   Widget _buildTaskBoard({bool isWide = false}) {
     if (_loadingTasks) {
       return sectionCard(
@@ -680,7 +675,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           SizedBox(height: 18),
           Center(child: CircularProgressIndicator()),
           SizedBox(height: 12),
-          Center(child: Text('Loading AI task board...', style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
+          Center(child: Text(AppStrings.t('worker.loadingTaskBoard'), style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
           SizedBox(height: 18),
         ]),
       );
@@ -715,10 +710,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 child: Icon(Icons.assignment_outlined, size: 26, color: AppColors.accent),
               ),
               const SizedBox(height: 12),
-              Text('No tasks assigned yet',
+              Text(AppStrings.t('worker.noTasks'),
                   style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
-              Text('Your supervisor or AI will assign tasks to your account.',
+              Text(AppStrings.t('worker.noTasksHint'),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
             ]),
@@ -768,7 +763,6 @@ class _TaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = task['status']?.toString() ?? 'Pending';
     final priority = task['priority']?.toString() ?? 'Medium';
-    final conf = (task['ai_confidence'] as num?)?.toDouble() ?? 0;
     final part = task['part_section']?.toString() ?? 'General Section';
     final instructions = task['work_instructions']?.toString() ?? '';
     final projectName = task['project_name']?.toString() ?? '';
@@ -776,7 +770,7 @@ class _TaskTile extends StatelessWidget {
     return Container(
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: idx.isEven ? AppColors.bgMain.withValues(alpha: 0.4) : Colors.white,
+        color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
@@ -837,11 +831,6 @@ class _TaskTile extends StatelessWidget {
                 _miniTag(Icons.apartment_rounded, projectName, AppColors.blue),
               if (task['due_date'] != null)
                 _miniTag(Icons.event_rounded, 'Due: ${task['due_date'].toString().substring(0, 10)}', AppColors.textSecondary),
-              if (conf > 0)
-                _miniTag(
-                    Icons.auto_awesome_rounded,
-                    'AI ${(conf * 100).toInt()}% confidence',
-                    conf >= 0.7 ? AppColors.green : conf >= 0.4 ? AppColors.yellow : AppColors.red),
             ],
           ),
           if (instructions.isNotEmpty) ...[
@@ -859,7 +848,7 @@ class _TaskTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(instructions,
-                      style: GoogleFonts.outfit(fontSize: 13, color: Color(0xFF1E40AF), height: 1.4, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, height: 1.4, fontWeight: FontWeight.w600)),
                 ),
               ]),
             ),
