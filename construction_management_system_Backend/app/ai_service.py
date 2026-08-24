@@ -35,16 +35,16 @@ if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
-SYSTEM_PROMPT = """你是一个专业的建筑工程管理助手，名为 BuildSmart AI。你的职责是帮助施工管理人员高效地管理工程项目。
+SYSTEM_PROMPT = """You are BuildSmart AI, a professional construction management assistant. Your role is to help construction managers manage engineering projects efficiently.
 
-你的专业领域包括：
-1. 施工任务分配与人员调度
-2. 安全管理与风险评估
-3. 进度跟踪与报告
-4. 材料与设备管理建议
-5. 成本控制建议
+Your areas of expertise include:
+1. Construction task assignment and workforce scheduling
+2. Safety management and risk assessment
+3. Progress tracking and reporting
+4. Material and equipment management advice
+5. Cost control advice
 
-请用简洁、专业、实用的语言回答问题。如果涉及具体数据，请基于提供的上下文信息进行分析。"""
+Please respond in concise, professional, and practical language, in English or Malay (English preferred). If specific data is involved, base your analysis on the provided context information."""
 
 
 # Trade synonyms: canonical group -> keywords matched against worker trade strings.
@@ -302,13 +302,13 @@ def analyze_task(
             strength = semantic_scores.get(wgroup, 0.5)
             score += int(20 + 30 * strength)
             matched_any = True
-            reasons.append("工种语义匹配：{}（匹配度 {:.0%}）".format(worker.trade, strength))
+            reasons.append("Trade semantic match: {} (confidence {:.0%})".format(worker.trade, strength))
         elif wgroup:
             score -= 15
-            reasons.append("工种不符任务需求：{}".format(worker.trade))
+            reasons.append("Trade does not match task requirement: {}".format(worker.trade))
         elif worker.trade:
             score += 5
-            reasons.append("可用工种：{}".format(worker.trade))
+            reasons.append("Available trade: {}".format(worker.trade))
 
         attendance_today = db.query(AttendanceLog).filter(
             AttendanceLog.worker_id == worker.worker_id,
@@ -317,19 +317,19 @@ def analyze_task(
 
         if attendance_today and attendance_today.status in ("checked_in", "checked_out"):
             score += 15
-            reasons.append("今日已到岗")
+            reasons.append("Already checked in today")
 
         if worker.has_safety_training:
             score += 3
-            reasons.append("已接受安全培训")
+            reasons.append("Safety training completed")
         if worker.is_safety_officer:
             score += 2
-            reasons.append("是安全员")
+            reasons.append("Is a safety officer")
 
         suggested_workers.append({
             "worker_id": worker.worker_id,
             "name": worker.name,
-            "trade": worker.trade or "通用",
+            "trade": worker.trade or "General",
             "score": min(score, 100),
             "reasons": reasons,
             "available_today": attendance_today is not None
@@ -347,21 +347,21 @@ def analyze_task(
     # Dataset-informed duration estimate: sum standard duration of detected trades.
     if detected_trades:
         est_days = max(TRADE_DURATION.get(g, 1.5) for g in detected_trades)
-        duration_estimate = "根据任务类型（{}）的行业标准工时，预计需要 {:.0f}-{:.0f} 天".format(
+        duration_estimate = "Based on industry standard man-hours for task type ({}), estimated {:.0f}-{:.0f} days".format(
             "/".join(sorted(detected_trades)), max(1, est_days - 0.5), est_days + 1
         )
     else:
-        duration_estimate = "根据任务复杂度，预计需要 1-3 天"
+        duration_estimate = "Based on task complexity, estimated 1-3 days"
 
     return {
         "suggested_workers": suggested_workers[:5],
         "estimated_duration": duration_estimate,
         "priority_suggestion": priority,
-        "safety_notes": "请确保施工人员佩戴必要的安全防护装备，并遵守现场安全规定。",
+        "safety_notes": "Please ensure construction workers wear the necessary safety protective equipment and follow on-site safety regulations.",
         "matched_trades": sorted(detected_trades),
         "trade_source": "semantic",
         "semantic_used": bool(semantic_scores),
-        "notice": "" if matched_any or not detected_trades else "项目中暂无匹配工种（{}）的工人，以下为其他工种候选".format(
+        "notice": "" if matched_any or not detected_trades else "No workers match the required trade ({}), showing alternative candidates".format(
             "/".join(sorted(detected_trades))
         ),
     }
@@ -370,7 +370,7 @@ def analyze_task(
 def generate_daily_report(db, project_id: int, report_date: date) -> str:
     project = db.query(Project).filter(Project.project_id == project_id).first()
     if not project:
-        return "项目不存在"
+        return "Project not found"
 
     workers = get_project_workers(db, project_id)
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
@@ -385,28 +385,28 @@ def generate_daily_report(db, project_id: int, report_date: date) -> str:
     pending_tasks = sum(1 for t in tasks if t.status == "pending")
     in_progress_tasks = sum(1 for t in tasks if t.status == "in_progress")
 
-    report = f"""# {project.project_name} - {report_date.strftime('%Y年%m月%d日')} 工作日报
+    report = f"""# {project.project_name} - {report_date.strftime('%Y-%m-%d')} Daily Work Report
 
-## 人员出勤
-- 总人数：{len(workers)} 人
-- 今日出勤：{present_count} 人
-- 缺勤：{len(workers) - present_count} 人
+## Attendance
+- Total workers: {len(workers)}
+- Present today: {present_count}
+- Absent: {len(workers) - present_count}
 
-## 任务进度
-- 已完成：{completed_tasks} 项
-- 进行中：{in_progress_tasks} 项
-- 待开始：{pending_tasks} 项
+## Task Progress
+- Completed: {completed_tasks}
+- In progress: {in_progress_tasks}
+- Pending: {pending_tasks}
 
-## 待处理问题
-- 开放问题：{len(issues)} 个
+## Open Issues
+- Open issues: {len(issues)}
 """
 
     if issues:
-        report += "\n问题列表：\n"
+        report += "\nIssue List:\n"
         for issue in issues:
             report += f"- {issue.title}\n"
 
-    report += "\n注：此报告由 AI 自动生成，请根据实际情况进行调整和补充。"
+    report += "\nNote: This report is auto-generated by AI. Please adjust and supplement it based on the actual situation."
 
     return report
 
@@ -414,23 +414,23 @@ def generate_daily_report(db, project_id: int, report_date: date) -> str:
 def analyze_safety_risk(description: str) -> str:
     model = get_gemini_model()
     if not model:
-        return "AI 服务不可用，无法进行安全分析。"
+        return "AI service unavailable, unable to perform safety analysis."
 
-    prompt = f"""请分析以下施工安全事件描述，评估风险等级并提供建议：
+    prompt = f"""Please analyze the following construction safety incident description, assess the risk level, and provide recommendations:
 
-事件描述：{description}
+Incident description: {description}
 
-请按以下格式回答：
-风险等级：[高/中/低]
-风险分析：[简要分析]
-处理建议：[建议措施]
+Please answer in the following format:
+Risk level: [High/Medium/Low]
+Risk analysis: [Brief analysis]
+Recommended actions: [Suggested measures]
 """
 
     try:
         response = model.generate_content(prompt)
         return response.text
     except Exception:
-        return "安全分析暂时不可用，请人工评估。"
+        return "Safety analysis is temporarily unavailable, please assess manually."
 
 
 def _worker_metrics(db, worker: Worker) -> Dict[str, Any]:
@@ -525,7 +525,7 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
         }
         try:
             resp = model.generate_content(
-                "请基于以下JSON输入，推荐最适合执行该任务的工人(最多{}个)。只输出JSON，不要输出多余文字。\n\n{}".format(
+                "Based on the following JSON input, recommend the most suitable workers for this task (up to {}). Output JSON only, no extra text.\n\n{}".format(
                     top_k, json.dumps(prompt, ensure_ascii=False)
                 )
             )

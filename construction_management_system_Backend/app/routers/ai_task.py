@@ -132,8 +132,8 @@ def _notify_workers_assigned(db: Session, task: Task, worker_ids: List[int]) -> 
     from app.services.fcm import send_to_device
 
     project_name = task.project.project_name if task.project else "Project"
-    title = "您有新任务"
-    content = f"任务「{task.task_name}」已分配给您（{project_name}）"
+    title = "You have a new task"
+    content = f"Task \"{task.task_name}\" has been assigned to you ({project_name})"
     data = {
         "type": "task_assigned",
         "task_id": str(task.task_id),
@@ -405,7 +405,7 @@ def worker_task_board(
 ):
     """Worker AI-driven task board for the authenticated worker.
     Returns all tasks assigned to the current worker.
-    AI inference enriches each task with part_section (work板块) and work_instructions,
+    AI inference enriches each task with part_section (work section) and work_instructions,
     a human-readable summary, and anomaly alerts.
     Set refresh=true to force AI re-analysis (simulated for realtime content  the front-end polling.
     """

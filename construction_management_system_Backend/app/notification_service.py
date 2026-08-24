@@ -53,8 +53,8 @@ def notify_task_assigned(db: Session, supervisor_id: int, task_name: str, worker
         db=db,
         supervisor_id=supervisor_id,
         notification_type="task_assigned",
-        title="新任务已分配",
-        content=f"任务「{task_name}」已分配给 {worker_name}",
+        title="New task assigned",
+        content=f"Task \"{task_name}\" has been assigned to {worker_name}",
         related_entity_type="task"
     )
 
@@ -64,8 +64,8 @@ def notify_issue_created(db: Session, supervisor_id: int, issue_title: str, proj
         db=db,
         supervisor_id=supervisor_id,
         notification_type="issue",
-        title="新问题报告",
-        content=f"项目「{project_name}」有新问题：{issue_title}",
+        title="New issue reported",
+        content=f"Project \"{project_name}\" has a new issue: {issue_title}",
         related_entity_type="issue"
     )
 
@@ -75,8 +75,8 @@ def notify_safety_incident(db: Session, supervisor_id: int, incident_title: str,
         db=db,
         supervisor_id=supervisor_id,
         notification_type="safety",
-        title="⚠️ 安全事件报告",
-        content=f"项目「{project_name}」发生安全事件：{incident_title}",
+        title="Safety incident reported",
+        content=f"A safety incident occurred on project \"{project_name}\": {incident_title}",
         related_entity_type="issue"
     )
 
@@ -86,7 +86,7 @@ def notify_attendance_alert(db: Session, supervisor_id: int, worker_name: str, s
         db=db,
         supervisor_id=supervisor_id,
         notification_type="attendance",
-        title="考勤异常提醒",
+        title="Attendance alert",
         content=f"{worker_name} {status}",
         related_entity_type="worker"
     )
@@ -97,7 +97,7 @@ def notify_daily_report_reminder(db: Session, supervisor_id: int, project_name: 
         db=db,
         supervisor_id=supervisor_id,
         notification_type="daily_report",
-        title="日报提交提醒",
-        content=f"请记得提交项目「{project_name}」的今日日报",
+        title="Daily report reminder",
+        content=f"Please remember to submit today's daily report for project \"{project_name}\"",
         related_entity_type="project"
     )

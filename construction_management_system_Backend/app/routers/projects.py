@@ -12,7 +12,7 @@ router = APIRouter(tags=["🏗️ Project Management"])
 @router.get("/projects", response_model=List[ProjectOut])
 def lp(db=Depends(get_db)):
     projects = db.query(Project).order_by(Project.project_id.desc()).all()
-    # 动态计算 progress：有任务的项目按任务完成率展示，无任务时保留手动值（不写库）
+    # Dynamically compute progress: projects with tasks show task completion rate; projects without tasks keep the manual value (not persisted)
     for p in projects:
         total = len(p.tasks)
         if total > 0:
