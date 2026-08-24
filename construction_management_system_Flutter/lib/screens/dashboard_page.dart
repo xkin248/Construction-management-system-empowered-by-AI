@@ -75,7 +75,8 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 加载第一个可见项目的 AI 预测历史（预测 vs 实际），用于展示"预测准不准"。
+  /// Loads the AI prediction history of the first visible project (predicted vs actual),
+  /// used to show whether the prediction was accurate.
   Future<void> _loadPredictionHistory() async {
     if (projects.isEmpty) return;
     final pid = projects.first['project_id'] as int;
@@ -85,11 +86,12 @@ class _DashboardPageState extends State<DashboardPage> {
         setState(() => _predHistory = List<Map>.from(hist));
       }
     } catch (_) {
-      // 历史接口不可用时静默降级（保留空列表）
+      // Silently fall back when the history API is unavailable (keep the list empty)
     }
   }
 
-  /// AI 预测拉取：7 天内复用 SharedPreferences 缓存，超过 7 天或强制刷新才重新请求预测接口。
+  /// Fetches AI predictions: reuses the SharedPreferences cache within 7 days;
+  /// re-requests the prediction API only after 7 days or when forced to refresh.
   Future<void> _loadPredictions({bool forceRefresh = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now();
@@ -117,7 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
           }
           return;
         } catch (_) {
-          // 缓存损坏则回退重新拉取
+          // Cache corrupted, fall back to refetching
         }
       }
     }
@@ -135,7 +137,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       await prefs.setString(_kPredCacheKey, jsonEncode(preds));
     } catch (_) {
-      // 序列化失败时跳过缓存持久化，前端仍正常显示预测数据
+      // Skip cache persistence on serialization failure; predictions still display normally
     }
     if (mounted) {
       setState(() {
@@ -162,7 +164,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final totalAtt = (attSummary['total'] ?? totalWorkers) as int;
     final todayRate = totalAtt > 0 ? ((present + late) / totalAtt * 100).round() : 0;
 
-    // Weekly attendance data from backend (Mon-Sun, 本周每日出勤人数)
+    // Weekly attendance data from backend (Mon-Sun, daily attendance count of the current week)
     final weeklyData = _weeklyAtt
         .map((d) => ((d['present_workers'] ?? d['check_in_count'] ?? 0) as num).toDouble())
         .toList();
@@ -231,7 +233,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
           const SizedBox(height: 12),
           if (upcoming.isEmpty)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('无临近到期项目', style: TextStyle(color: AppColors.textMuted))))
+            const Padding(padding: EdgeInsets.all(20), child: Center(child: Text('No upcoming due projects', style: TextStyle(color: AppColors.textMuted))))
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
@@ -240,8 +242,8 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader(
             'AI Estimated Progress',
             sub: _lastPredUpdate == null
-                ? 'AI Estimated · 每周更新'
-                : 'AI Estimated · 每周更新 · Updated: ${_fmtMd(_lastPredUpdate!)}',
+                ? 'AI Estimated · Updated weekly'
+                : 'AI Estimated · Updated weekly · Updated: ${_fmtMd(_lastPredUpdate!)}',
           ),
           const SizedBox(height: 12),
           if (activeProjects.isEmpty)
@@ -257,7 +259,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ...projects.take(4).where((p) => _predictions.containsKey(p['project_id'])).map((p) => _aiPredictionCard(p)),
           ],
 
-          // ── Prediction vs Actual (历史预测准确度) ──
+          // ── Prediction vs Actual (historical prediction accuracy) ──
           const SizedBox(height: 20),
           _sectionHeader('Prediction vs Actual', sub: 'Historical AI forecast vs real project progress'),
           const SizedBox(height: 12),
@@ -368,7 +370,7 @@ class _DashboardPageState extends State<DashboardPage> {
           border: Border.all(color: AppColors.border),
         ),
         child: Center(
-          child: Text('暂无预测历史数据（每次 AI 预测后自动记录）',
+          child: Text('No prediction history available (auto-recorded after each AI prediction)',
               style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
         ),
       );
@@ -399,7 +401,7 @@ class _DashboardPageState extends State<DashboardPage> {
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('$projName'.trim().isEmpty ? 'Progress Accuracy' : '$projName · Accuracy',
                 style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            Text('最近 ${items.length} 次预测快照（%）',
+            Text('Last ${items.length} prediction snapshots (%)',
                 style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
           ]),
         ]),
@@ -576,7 +578,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
     final overdue = daysLeft < 0;
     final dueToday = daysLeft == 0;
-    final label = overdue ? '已逾期 ${-daysLeft} 天' : (dueToday ? '今天到期' : '剩 $daysLeft 天');
+    final label = overdue ? '${-daysLeft} day(s) overdue' : (dueToday ? 'Due today' : '$daysLeft day(s) left');
     final color = overdue ? AppColors.red : (dueToday ? AppColors.yellow : AppColors.green);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -617,7 +619,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final actual = (p['progress'] as num? ?? 0).toDouble();
     final scheduled = pred != null ? (pred['scheduled_progress'] as num?)?.toDouble() : null;
 
-    // AI estimated：优先 scheduled_progress，其次 30 天 milestone 预测值，最后回退实际进度
+    // AI estimated: prefer scheduled_progress, then the 30-day milestone prediction, and finally fall back to actual progress
     double aiEst = actual;
     if (pred != null) {
       if (scheduled != null) {
@@ -678,7 +680,7 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(children: [
           Icon(Icons.auto_awesome_rounded, size: 12, color: AppColors.accent),
           const SizedBox(width: 4),
-          Text('Actual ${actual.toStringAsFixed(0)}%  ·  AI Estimated · 每周更新',
+          Text('Actual ${actual.toStringAsFixed(0)}%  ·  AI Estimated · Updated weekly',
               style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
         ]),
       ]),

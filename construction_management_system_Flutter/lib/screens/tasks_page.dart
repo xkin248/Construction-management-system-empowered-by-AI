@@ -742,7 +742,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       await ApiService().updateTask(_task['task_id'], {
         'worker_ids': workerIds.toList(),
       });
-      // 用完整工人池（项目工人 + AI 推荐）还原选中对象
+      // Restore selected objects using the full worker pool (project workers + AI recommendations)
       final pool = [..._projectWorkers, ..._aiWorkers];
       final selected = <Map>[];
       final seen = <int>{};
@@ -775,7 +775,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     // Load AI when the sheet opens
     if (_aiWorkers.isEmpty) _loadAI();
 
-    // 当前已分配的 worker_id 集合（弹窗内可勾选/取消，保存时整体替换）
+    // Current set of assigned worker_ids (checkbox toggles inside the sheet; save replaces all)
     final currentIds = _assignedWorkers
         .map((w) => w['worker_id'] as int?)
         .whereType<int>()
@@ -831,8 +831,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     },
                     activeThumbColor: AppColors.purple,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                    title: Text('仅限同项目', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
-                    subtitle: Text('AI 仅推荐绑定到当前项目的工人', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                    title: Text('Same project only', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                    subtitle: Text('AI recommends only workers bound to the current project', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
                   ),
                 ),
                 // AI section
@@ -943,7 +943,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     ],
                   ),
                 ),
-                // Save bar (整体替换分配)
+                // Save bar (replaces the entire assignment)
                 Container(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                   decoration: const BoxDecoration(

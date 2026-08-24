@@ -532,7 +532,7 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
         toast('Supervisor account has no worker profile');
         setState(() {
           _loading = false;
-          _statusMsg = 'Site Supervisor 账号没有 Worker 档案，无法在此打卡。请使用 Worker 账号登录后，在 My Dashboard 页面打卡。';
+          _statusMsg = 'Site Supervisor account has no Worker profile, cannot clock in here. Please log in with a Worker account and clock in from My Dashboard.';
         });
         return;
       }

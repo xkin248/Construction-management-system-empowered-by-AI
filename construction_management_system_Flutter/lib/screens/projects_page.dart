@@ -339,7 +339,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
       _lat    = (e['center_lat'] as num?)?.toDouble() ?? 3.1390;
       _lng    = (e['center_lng'] as num?)?.toDouble() ?? 101.6869;
       _radius = (e['fence_radius'] as num?)?.toDouble() ?? 5000.0;
-      // 编辑模式也需重新捕获位置后才允许保存，防止沿用旧坐标静默放行
+      // Edit mode also requires re-capturing the location before saving, to prevent silently using stale coordinates
       _hasGps = false;
       _gpsFailed = false;
       if (e['start_date'] != null) _start = DateTime.tryParse(e['start_date'].toString());

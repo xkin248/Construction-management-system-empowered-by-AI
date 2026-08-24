@@ -427,7 +427,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
     final windowEnabled = att?['window_enforced'] == true;
     final statusRaw = (attRec?['status'] ?? '').toString().toUpperCase();
     final statusNote = statusRaw == 'REJECTED'
-        ? '（被拒绝：可能超出工地 GPS 围栏范围，请靠近工地后重试）'
+        ? ' (Rejected: possibly outside the site GPS fence radius. Please move closer to the site and try again)'
         : '';
 
     return RefreshIndicator(
@@ -483,7 +483,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                 const SizedBox(height: 6),
                 _row('Check Out', 'Anytime', AppColors.blue),
                 const SizedBox(height: 6),
-                const Text('打卡时间不限时段（已放开时间窗口限制）',
+                const Text('Clock-in is allowed at any time (time window restrictions removed)',
                     style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               ] else ...[
                 _row('Check In', att?['check_in_window'] ?? '08:00 - 10:30', AppColors.green),
