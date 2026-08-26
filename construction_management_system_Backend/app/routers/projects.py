@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from datetime import date
+from datetime import date, datetime, time as dtime
 
 from app.database import get_db
 from app.models import Project, Worker, Task, Issue, DailyReport, AttendanceLog
@@ -58,13 +58,16 @@ def dp(pid:int, db=Depends(get_db)):
 @router.get("/dashboard/kpi", response_model=DashboardKPI)
 def kpi(db=Depends(get_db)):
     t = date.today()
+    start = datetime.combine(t, dtime.min)
     return DashboardKPI(
         total_projects=db.query(Project).count(),
         ongoing_projects=db.query(Project).filter(Project.status=="in_progress").count(),
         completed_projects=db.query(Project).filter(Project.status=="completed").count(),
         total_workers=db.query(Worker).count(),
-        today_attendance=db.query(AttendanceLog).filter(AttendanceLog.check_in_time>=t).count(),
+        today_attendance=db.query(AttendanceLog).filter(AttendanceLog.check_in_time>=start).count(),
         pending_tasks=db.query(Task).filter(Task.status.in_(["pending","in_progress"])).count(),
         open_issues=db.query(Issue).filter(Issue.status.in_(["open","in_progress"])).count(),
         today_reports=db.query(DailyReport).filter(DailyReport.report_date==t).count(),
+        completed_tasks=db.query(Task).filter(Task.status=="completed").count(),
+        in_progress_tasks=db.query(Task).filter(Task.status=="in_progress").count(),
     )

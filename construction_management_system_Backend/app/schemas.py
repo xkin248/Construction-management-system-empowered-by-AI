@@ -201,6 +201,7 @@ class DashboardKPI(BaseModel):
     total_projects: int; ongoing_projects: int; completed_projects: int
     total_workers: int; today_attendance: int; pending_tasks: int
     open_issues: int; today_reports: int
+    completed_tasks: int = 0; in_progress_tasks: int = 0
 
 # 9. Worker + today's attendance status (for the Workers list/board screen)
 class WorkerWithStatus(WorkerOut):
