@@ -247,6 +247,7 @@ class AppStrings {
     'notif.noNotifications': ['No notifications', 'Tiada notifikasi'],
     'notif.read': ['Read', 'Dibaca'],
     'notif.unread': ['Unread', 'Belum dibaca'],
+    'notif.allCaughtUp': ["You're all caught up", 'Semuanya terkini'],
 
     // ============ Workers ============
     'workers.title': ['Workers', 'Pekerja'],

@@ -9,7 +9,6 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../models/file.dart';
-import '../widgets/app_settings_actions.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -442,14 +441,6 @@ class _FilesPageState extends State<FilesPage> {
         ),
       ),
       body: Column(children: [
-        // ── Language / Theme switcher ──
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-            child: AppSettingsActions(),
-          ),
-        ),
         // ── Project dropdown ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),

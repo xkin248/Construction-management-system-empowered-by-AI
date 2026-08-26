@@ -8,7 +8,6 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
-import '../widgets/app_settings_actions.dart';
 import '../l10n/app_strings.dart';
 import '../models/notification.dart';
 import 'projects_page.dart';
@@ -279,7 +278,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
             ],
           ]),
           actions: [
-            const AppSettingsActions(),
             if (_items.any((e) => !e.isRead))
               TextButton.icon(
                 onPressed: _markAllRead,

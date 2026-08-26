@@ -10,7 +10,6 @@ import '../services/app_settings.dart';
 import '../widgets/charts.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
-import '../widgets/app_settings_actions.dart';
 
 // Conditional geolocator import — only on supported platforms
 import 'attendance_geo_helper.dart';
@@ -48,13 +47,6 @@ class _AttendancePageState extends State<AttendancePage>
   @override
   Widget build(BuildContext c) {
     return Column(children: [
-      Align(
-        alignment: Alignment.centerRight,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: AppSettingsActions(),
-        ),
-      ),
       Container(
         color: AppColors.bgCard,
         child: TabBar(
@@ -538,24 +530,12 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
   List _projects = [];
   int? _selectedProject;
 
-  // Attendance time-window settings (kept after the old Settings page was
-  // removed) — lets a supervisor configure check-in / check-out / break times.
-  bool _settingsLd = true;
-  Map _settings = {};
-  final _checkInStart = TextEditingController();
-  final _checkInEnd = TextEditingController();
-  final _checkOutStart = TextEditingController();
-  final _checkOutEnd = TextEditingController();
-  final _breakStart = TextEditingController();
-  final _breakEnd = TextEditingController();
-
   @override
   void initState() {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
     _loadProjects();
-    _loadSettings();
   }
 
   void _rebuild() {
@@ -566,69 +546,8 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
   void dispose() {
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
-    _checkInStart.dispose();
-    _checkInEnd.dispose();
-    _checkOutStart.dispose();
-    _checkOutEnd.dispose();
-    _breakStart.dispose();
-    _breakEnd.dispose();
     super.dispose();
   }
-
-  Future<void> _loadSettings() async {
-    try {
-      _settings = await ApiService().getSettings();
-      _checkInStart.text = _settings['check_in_start'] ?? '08:00';
-      _checkInEnd.text = _settings['check_in_end'] ?? '10:30';
-      _checkOutStart.text = _settings['check_out_start'] ?? '15:00';
-      _checkOutEnd.text = _settings['check_out_end'] ?? '17:00';
-      _breakStart.text = _settings['break_start'] ?? '12:00';
-      _breakEnd.text = _settings['break_end'] ?? '13:00';
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _settingsLd = false);
-    }
-  }
-
-  bool _validHHMM(String s) {
-    final parts = s.trim().split(':');
-    if (parts.length != 2) return false;
-    final h = int.tryParse(parts[0]), m = int.tryParse(parts[1]);
-    return h != null && m != null && h >= 0 && h <= 23 && m >= 0 && m <= 59;
-  }
-
-  Future<void> _saveSettings() async {
-    final vals = [
-      _checkInStart.text, _checkInEnd.text,
-      _checkOutStart.text, _checkOutEnd.text,
-      _breakStart.text, _breakEnd.text,
-    ];
-    if (vals.any((v) => !_validHHMM(v))) {
-      toast('All times must use HH:MM 24-hour format (e.g. 08:00)');
-      return;
-    }
-    try {
-      await ApiService().updateSettings({
-        ..._settings,
-        'check_in_start': _checkInStart.text.trim(),
-        'check_in_end': _checkInEnd.text.trim(),
-        'check_out_start': _checkOutStart.text.trim(),
-        'check_out_end': _checkOutEnd.text.trim(),
-        'break_start': _breakStart.text.trim(),
-        'break_end': _breakEnd.text.trim(),
-      });
-      toast('Attendance windows saved');
-    } on DioException catch (e) {
-      toast(e.message ?? 'Failed to save settings');
-    }
-  }
-
-  Widget _timeField(TextEditingController ctrl, String label) => Expanded(
-        child: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(labelText: label, helperText: 'HH:MM'),
-        ),
-      );
 
   Future<void> _loadProjects() async {
     try {
@@ -738,62 +657,6 @@ class _MyCheckInTabState extends State<_MyCheckInTab> {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        // Attendance time-window settings (replaces the old Settings page)
-        sectionCard(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: _settingsLd
-              ? const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Row(children: [
-                    Icon(Icons.schedule_outlined, size: 16, color: AppColors.accent),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(AppStrings.t('att.timeWindows'),
-                          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                    ),
-                  ]),
-                  const SizedBox(height: 4),
-                  Text(AppStrings.t('att.timeWindowsHint'),
-                      style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
-                  const SizedBox(height: 14),
-                  Text(AppStrings.t('att.checkinWindow'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    _timeField(_checkInStart, 'Start'),
-                    const SizedBox(width: 10),
-                    _timeField(_checkInEnd, 'End'),
-                  ]),
-                  const SizedBox(height: 14),
-                  Text(AppStrings.t('att.checkoutWindow'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    _timeField(_checkOutStart, 'Start'),
-                    const SizedBox(width: 10),
-                    _timeField(_checkOutEnd, 'End'),
-                  ]),
-                  const SizedBox(height: 14),
-                  Text(AppStrings.t('att.breakWindow'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    _timeField(_breakStart, 'Start'),
-                    const SizedBox(width: 10),
-                    _timeField(_breakEnd, 'End'),
-                  ]),
-                  const SizedBox(height: 16),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      onPressed: _saveSettings,
-                      icon: const Icon(Icons.save_outlined, size: 18),
-                      label: Text(AppStrings.t('att.saveTimeWindows')),
-                    ),
-                  ),
-                ]),
-        ),
-
         // Project selector
         if (_projects.isNotEmpty)
           sectionCard(

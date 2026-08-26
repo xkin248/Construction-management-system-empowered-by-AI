@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
-import '../widgets/app_settings_actions.dart';
 import '../l10n/app_strings.dart';
 import 'login_page.dart';
 
@@ -63,7 +62,6 @@ class _ProfilePageState extends State<ProfilePage> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(AppStrings.t('profile.title')),
-        actions: const [AppSettingsActions()],
       ),
       body: ld
           ? const Center(child: CircularProgressIndicator())

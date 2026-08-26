@@ -8,7 +8,6 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
-import '../widgets/app_settings_actions.dart';
 import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
 import 'attendance_geo_helper.dart';
@@ -392,10 +391,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               child: ListView(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: AppSettingsActions(),
-                  ),
                   const SizedBox(height: AppSpacing.xs),
                   if (isWide)
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

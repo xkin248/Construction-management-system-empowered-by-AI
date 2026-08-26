@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../l10n/app_strings.dart';
-import '../widgets/app_settings_actions.dart';
 import 'login_page.dart';
 
 class WorkerRegisterPage extends StatefulWidget {
@@ -113,10 +112,6 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
           child: SafeArea(
             child: Stack(
               children: [
-                Positioned(
-                  top: 0, right: 4,
-                  child: AppSettingsActions(),
-                ),
                 LayoutBuilder(builder: (ctx, constraints) {
               final isNarrow = constraints.maxWidth < 400;
               final hPad    = isNarrow ? 16.0 : 24.0;

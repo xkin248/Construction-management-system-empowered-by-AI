@@ -7,7 +7,6 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
-import '../widgets/app_settings_actions.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -82,50 +81,6 @@ class _TasksPageState extends State<TasksPage> {
     }
   }
 
-  Future<void> _aiAutoAssignAll() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.purpleLight, borderRadius: BorderRadius.circular(10)),
-            child: Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Text('Auto-Assign Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
-        ]),
-        content: Text(
-          'All unassigned tasks will be matched to the best worker based on their trade, availability and performance. No project selection needed - everything is handled automatically.\n\nProceed?',
-          style: GoogleFonts.outfit(fontSize: 13.5, height: 1.5, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton.icon(
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-            label: const Text('Auto-Assign'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.purple, foregroundColor: Colors.white),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    setState(() => ld = true);
-    try {
-      final result = await ApiService().aiAutoAssign(pid, dryRun: false);
-      final assignments = (result['assignments'] as List?) ?? [];
-      final assigned = assignments.where((a) => a['assigned_worker_id'] != null).length;
-      toast('Assigned $assigned tasks successfully!');
-      await _switchProject(pid);
-    } catch (e) {
-      toast('Auto-assign failed: $e');
-      if (mounted) setState(() => ld = false);
-    }
-  }
-
   void _openNewTask() async {
     if (projects.isEmpty) { toast('Create a project first'); return; }
     // pid may be null (viewing ALL projects); TaskForm falls back to the
@@ -151,10 +106,6 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   Widget build(BuildContext c) {
-    final inProgress = tasks.where((t) => t['status'] == 'in_progress').length;
-    final completed = tasks.where((t) => t['status'] == 'completed').length;
-    final pending = tasks.where((t) => t['status'] == 'pending').length;
-
     return Scaffold(
       backgroundColor: AppColors.bgMain,
       appBar: AppBar(
@@ -162,24 +113,8 @@ class _TasksPageState extends State<TasksPage> {
         backgroundColor: AppColors.bgCard,
         elevation: 0,
         titleSpacing: 16,
-        title: Text('Tasks', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: TextButton.icon(
-              onPressed: _aiAutoAssignAll,
-              icon: Icon(Icons.auto_awesome_rounded, size: 17, color: AppColors.purple),
-              label: Text(AppStrings.t('tasks.autoAssign'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.purple)),
-              style: TextButton.styleFrom(
-                backgroundColor: AppColors.purpleLight,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          const AppSettingsActions(),
-        ],
+        title: Text(AppStrings.t('tasks.title'), style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
+        actions: const [],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openNewTask,
@@ -194,19 +129,6 @@ class _TasksPageState extends State<TasksPage> {
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
-              // ── Summary Cards ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Row(children: [
-                  Expanded(child: _summaryCard('In Progress', '$inProgress', AppColors.blue)),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: _summaryCard('Completed', '$completed', AppColors.green)),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: _summaryCard('Pending', '$pending', AppColors.yellow)),
-                ]),
-              ),
-              const SizedBox(height: 14),
-
               // ── Search + Filters ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
@@ -256,25 +178,6 @@ class _TasksPageState extends State<TasksPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _summaryCard(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(value, style: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w800, color: color)),
-        const SizedBox(height: 2),
-        Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-      ]),
     );
   }
 
@@ -457,6 +360,7 @@ class _TaskCardState extends State<_TaskCard> {
           .updateTask(widget.task['task_id'], {'status': newStatus});
       setState(() => _status = newStatus);
       widget.task['status'] = newStatus;
+      widget.onChanged?.call();
       toast(AppStrings.t('tasks.statusUpdated'));
     } catch (e) {
       toast(AppStrings.t('tasks.statusFailed'));

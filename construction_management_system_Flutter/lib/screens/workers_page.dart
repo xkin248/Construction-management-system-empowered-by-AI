@@ -5,7 +5,6 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
-import '../widgets/app_settings_actions.dart';
 import '../l10n/app_strings.dart';
 
 class WorkersPage extends StatefulWidget {
@@ -155,14 +154,6 @@ class _WorkersPageState extends State<WorkersPage> {
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
-              // Settings actions
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: const [AppSettingsActions()],
-                ),
-              ),
               // Search bar
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),

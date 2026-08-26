@@ -7,7 +7,6 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
 import '../l10n/app_strings.dart';
-import '../widgets/app_settings_actions.dart';
 import 'home_shell.dart';
 import 'worker_home_shell.dart';
 import 'worker_register_page.dart';
@@ -113,11 +112,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         child: SafeArea(
           child: Stack(
             children: [
-              // Top-right language / theme switcher (login has no AppBar).
-              Positioned(
-                top: 0, right: 4,
-                child: AppSettingsActions(),
-              ),
               LayoutBuilder(builder: (ctx, constraints) {
             final isNarrow = constraints.maxWidth < 400;
             final hPad    = isNarrow ? 16.0 : 24.0;

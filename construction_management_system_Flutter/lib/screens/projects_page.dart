@@ -11,7 +11,6 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
-import '../widgets/app_settings_actions.dart';
 import '../widgets/task_form.dart';
 import 'tasks_page.dart' show TaskDetailPage;
 
@@ -850,7 +849,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         title: Text(p['project_name'] ?? 'Project',
             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
         actions: [
-          const AppSettingsActions(),
           TextButton.icon(
             onPressed: () {
               showModalBottomSheet(
@@ -1097,6 +1095,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     _priorityChip(priority),
                     const SizedBox(width: 8),
                     statusPill(status),
+                    const SizedBox(width: 2),
+                    _quickStatusBtn(t, 'pending', Icons.radio_button_unchecked_rounded, AppColors.yellow),
+                    _quickStatusBtn(t, 'in_progress', Icons.play_arrow_rounded, AppColors.blue),
+                    _quickStatusBtn(t, 'completed', Icons.check_rounded, AppColors.green),
                     const SizedBox(width: 4),
                     Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
                   ]),
@@ -1105,6 +1107,31 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             );
           }),
       ]),
+    );
+  }
+
+  Future<void> _setTaskStatus(Map t, String newStatus) async {
+    final taskId = t['task_id'];
+    if (taskId == null) { toast('Invalid task'); return; }
+    try {
+      await ApiService().updateTask(taskId, {'status': newStatus});
+      t['status'] = newStatus;
+      toast('Task marked $newStatus');
+      if (mounted) _load();
+    } catch (e) {
+      toast('Failed to update task: $e');
+    }
+  }
+
+  Widget _quickStatusBtn(Map t, String value, IconData icon, Color color) {
+    final active = t['status'] == value;
+    return IconButton(
+      onPressed: () => _setTaskStatus(t, value),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      tooltip: value.replaceAll('_', ' '),
+      icon: Icon(icon,
+          size: 18, color: active ? color : AppColors.textMuted),
     );
   }
 

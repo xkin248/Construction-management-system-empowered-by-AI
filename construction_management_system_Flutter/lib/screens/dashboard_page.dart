@@ -10,7 +10,6 @@ import '../services/app_settings.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/charts.dart';
-import '../widgets/app_settings_actions.dart';
 import 'attendance_geo_helper.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -268,12 +267,6 @@ class _DashboardPageState extends State<DashboardPage> {
       child: ListView(
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
-          // ── Language / Theme switcher ──
-          Align(
-            alignment: Alignment.centerRight,
-            child: AppSettingsActions(),
-          ),
-          const SizedBox(height: 4),
           // ── Load error banner with retry ──
           if (_loadError != null) ...[
             Container(
