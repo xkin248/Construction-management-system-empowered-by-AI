@@ -21,6 +21,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   bool ld = true;
+  String? _loadError;
   Map kpi = {};
   Map attSummary = {};
   List projects = [];
@@ -32,10 +33,6 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _supLoading = false;
   bool _supCheckedIn = false;
   String _supMsg = AppStrings.t('dash.checkinHint');
-
-  // One-tap AI auto-assign (global — no project selection required).
-  bool _autoAssigning = false;
-  String _autoAssignMsg = 'One-tap AI auto-assign for all open tasks';
 
   @override
   void initState() {
@@ -172,39 +169,6 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Future<void> _autoAssignAll() async {
-    if (_autoAssigning) return;
-    setState(() {
-      _autoAssigning = true;
-      _autoAssignMsg = 'Analyzing all open tasks...';
-    });
-    try {
-      final res = await ApiService().aiAutoAssign(null, dryRun: false);
-      final assigns = (res['assignments'] as List? ?? []);
-      int assigned = 0;
-      for (final a in assigns) {
-        if (a is Map && a['assigned_worker_id'] != null) assigned++;
-      }
-      final total = assigns.length;
-      if (!mounted) return;
-      final msg = total == 0
-          ? 'No open tasks to assign'
-          : 'Auto-assigned $assigned of $total open task(s)';
-      setState(() {
-        _autoAssigning = false;
-        _autoAssignMsg = msg;
-      });
-      toast(msg);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _autoAssigning = false;
-        _autoAssignMsg = 'Auto-assign failed — check server connection';
-      });
-      toast('Auto-assign failed: $e');
-    }
-  }
-
   String _fmtHm() {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
@@ -226,26 +190,34 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> _load({bool silent = false, bool forceRefresh = false}) async {
     if (!silent) setState(() => ld = true);
-    try {
-      final results = await Future.wait([
-        ApiService().kpi(),
-        ApiService().attendanceToday(),
-        ApiService().getProjects(),
-        ApiService().getWeeklyAttendanceStats(),
-      ]);
-      kpi = results[0] as Map;
-      attSummary = results[1] as Map;
-      projects = results[2] as List;
-      final weekly = results[3] as Map;
-      if (mounted) {
-        setState(() {
-          _weeklyAtt = List<Map>.from(weekly['days'] ?? []);
-        });
+    final errs = <String>[];
+
+    Future<void> safe(String tag, Future<dynamic> f, void Function(dynamic) assign) async {
+      try {
+        assign(await f);
+      } catch (e) {
+        errs.add('$tag: $e');
       }
-    } catch (e) {
-      if (!silent) toast('Failed to load dashboard: $e');
-    } finally {
-      if (mounted) setState(() => ld = false);
+    }
+
+    // Load each section independently so a single failed endpoint (500/timeout)
+    // never blanks out the whole dashboard on mobile.
+    await Future.wait([
+      safe('kpi', ApiService().kpi(), (v) => kpi = v as Map),
+      safe('attendance', ApiService().attendanceToday(), (v) => attSummary = v as Map),
+      safe('projects', ApiService().getProjects(), (v) => projects = v as List),
+      safe('weekly', ApiService().getWeeklyAttendanceStats(), (v) {
+        final weekly = v as Map;
+        _weeklyAtt = List<Map>.from(weekly['days'] ?? []);
+      }),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        ld = false;
+        _loadError = errs.isEmpty ? null : errs.join('\n');
+      });
+      if (errs.isNotEmpty && !silent) toast('Some dashboard data failed to load: ${errs.first}');
     }
   }
 
@@ -281,9 +253,9 @@ class _DashboardPageState extends State<DashboardPage> {
     final inProgress = (kpi['in_progress_tasks'] ?? 0) as int;
     final pending = (kpi['pending_tasks'] ?? 0) as int;
     final totalTasks = completed + inProgress + pending;
-    final completedPct = totalTasks > 0 ? (completed / totalTasks * 100).toInt() : 42;
-    final inProgressPct = totalTasks > 0 ? (inProgress / totalTasks * 100).toInt() : 33;
-    final pendingPct = totalTasks > 0 ? (pending / totalTasks * 100).toInt() : 25;
+    final completedPct = totalTasks > 0 ? (completed / totalTasks * 100).toInt() : 0;
+    final inProgressPct = totalTasks > 0 ? (inProgress / totalTasks * 100).toInt() : 0;
+    final pendingPct = totalTasks > 0 ? (pending / totalTasks * 100).toInt() : 0;
     final upcoming = _upcomingProjects();
 
     return LayoutBuilder(
@@ -302,11 +274,41 @@ class _DashboardPageState extends State<DashboardPage> {
             child: AppSettingsActions(),
           ),
           const SizedBox(height: 4),
+          // ── Load error banner with retry ──
+          if (_loadError != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.redLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.red.withValues(alpha: 0.35)),
+              ),
+              child: Row(children: [
+                Icon(Icons.error_outline_rounded, size: 18, color: AppColors.red),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _loadError!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.red),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _load(forceRefresh: true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.red,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 14),
+          ],
           // ── Supervisor Quick Check-in ──
           if (_isSupervisor) ...[
             _buildQuickCheckInCard(),
-            const SizedBox(height: 12),
-            _buildAutoAssignCard(),
             const SizedBox(height: 20),
           ],
 
@@ -321,13 +323,13 @@ class _DashboardPageState extends State<DashboardPage> {
               return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Expanded(flex: 3, child: _weeklyAttCard(weeklyData, weekLabels)),
                 const SizedBox(width: 16),
-                SizedBox(width: 240, child: _taskDistCard(completedPct, inProgressPct, pendingPct)),
+                SizedBox(width: 240, child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
               ]);
             }
             return Column(children: [
               _weeklyAttCard(weeklyData, weekLabels),
               const SizedBox(height: 16),
-              _taskDistCard(completedPct, inProgressPct, pendingPct),
+              _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0),
             ]);
           }),
           const SizedBox(height: 20),
@@ -402,54 +404,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 label: Text(_supCheckedIn ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                ),
-              ),
-      ]),
-    );
-  }
-
-  // ── One-tap AI Auto-Assign card (global, no project selection) ──
-  Widget _buildAutoAssignCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: AppColors.purple.withValues(alpha: 0.12),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(Icons.auto_awesome_rounded, color: AppColors.purple, size: 24),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(AppStrings.t('dash.autoAssignTasks'),
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const SizedBox(height: 2),
-            Text(_autoAssignMsg,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
-          ]),
-        ),
-        const SizedBox(width: 10),
-        _autoAssigning
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-            : ElevatedButton.icon(
-                onPressed: _autoAssignAll,
-                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-                label: Text(AppStrings.t('dash.autoAssign')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.purple,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 ),
@@ -577,13 +531,33 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ]),
         const SizedBox(height: 14),
-        LabeledBarChart(values: data, labels: labels, height: 140, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue),
+        if (data.any((v) => v > 0))
+          LabeledBarChart(values: data, labels: labels, height: 140, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue)
+        else
+          Container(
+            height: 140,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.bgCard,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(AppStrings.t('dash.noAttendanceData'),
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          ),
       ]),
     );
   }
 
   // ── Task Distribution Donut Card ──
-  Widget _taskDistCard(int completedPct, int inProgressPct, int pendingPct) {
+  Widget _taskDistCard(int completedPct, int inProgressPct, int pendingPct, {bool hasTasks = true}) {
+    final slices = hasTasks
+        ? [
+            DonutSlice(completedPct.toDouble(), AppColors.green, 'Completed'),
+            DonutSlice(inProgressPct.toDouble(), AppColors.accent, 'In Progress'),
+            DonutSlice(pendingPct.toDouble(), AppColors.border, 'Pending'),
+          ]
+        : [DonutSlice(1, AppColors.border, 'Empty')];
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -600,19 +574,21 @@ class _DashboardPageState extends State<DashboardPage> {
         Center(
           child: SimpleDonutChart(
             size: 110,
-            slices: [
-              DonutSlice(completedPct.toDouble(), AppColors.green, 'Completed'),
-              DonutSlice(inProgressPct.toDouble(), AppColors.accent, 'In Progress'),
-              DonutSlice(pendingPct.toDouble(), AppColors.border, 'Pending'),
-            ],
+            slices: slices,
           ),
         ),
         const SizedBox(height: 14),
-        _legendRow('Completed', '$completedPct%', AppColors.green),
-        const SizedBox(height: 6),
-        _legendRow('In Progress', '$inProgressPct%', AppColors.accent),
-        const SizedBox(height: 6),
-        _legendRow('Pending', '$pendingPct%', AppColors.textMuted),
+        if (hasTasks) ...[
+          _legendRow('Completed', '$completedPct%', AppColors.green),
+          const SizedBox(height: 6),
+          _legendRow('In Progress', '$inProgressPct%', AppColors.accent),
+          const SizedBox(height: 6),
+          _legendRow('Pending', '$pendingPct%', AppColors.textMuted),
+        ] else
+          Center(
+            child: Text(AppStrings.t('dash.noTaskData'),
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+          ),
       ]),
     );
   }

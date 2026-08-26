@@ -27,17 +27,15 @@ class _FilesPageState extends State<FilesPage> {
 
   static const _categories = [
     {'value': 'all', 'label': 'All'},
-    {'value': 'drawings', 'label': 'Drawings'},
+    {'value': 'drawings_photos', 'label': 'Drawings & Photos'},
     {'value': 'documents', 'label': 'Documents'},
-    {'value': 'photos', 'label': 'Photos'},
     {'value': 'reports', 'label': 'Reports'},
   ];
 
   static const _catIcons = {
     'all': Icons.all_inbox_rounded,
-    'drawings': Icons.architecture_rounded,
+    'drawings_photos': Icons.folder_shared_rounded,
     'documents': Icons.description_rounded,
-    'photos': Icons.photo_library_rounded,
     'reports': Icons.assessment_rounded,
   };
 
@@ -63,15 +61,22 @@ class _FilesPageState extends State<FilesPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final results = await Future.wait([
+      // "Drawings & Photos" is a merged chip backed by two backend categories.
+      final cats = _selectedCategory == 'drawings_photos'
+          ? const ['drawings', 'photos']
+          : <String?>[_selectedCategory];
+      final futures = <Future>[
         ApiService().getProjects(),
-        ApiService().getFiles(
-          pid: _selectedProjectId,
-          category: _selectedCategory,
-        ),
-      ]);
+        ...cats.map((c) => ApiService().getFiles(
+              pid: _selectedProjectId,
+              category: c,
+            )),
+      ];
+      final results = await Future.wait(futures);
       _projects = results[0].cast<Map<String, dynamic>>();
-      final rawFiles = results[1];
+      final rawFiles = <dynamic>[
+        for (var i = 1; i < results.length; i++) ...results[i] as List,
+      ];
       _files = rawFiles
           .map((e) => FileItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
@@ -119,9 +124,26 @@ class _FilesPageState extends State<FilesPage> {
     }
   }
 
+  // Maps the merged "Drawings & Photos" chip (and legacy 'all') to a concrete
+  // backend category based on the file extension. Images -> photos, everything
+  // else picked under Drawings & Photos -> drawings.
+  String _resolveUploadCategory(String cat, String name) {
+    if (cat != 'drawings_photos' && cat != 'all') return cat;
+    final dot = name.lastIndexOf('.');
+    final ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
+    const imageExts = [
+      'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+      'heic', 'heif', 'svg', 'tiff',
+    ];
+    if (imageExts.contains(ext)) return 'photos';
+    return cat == 'drawings_photos' ? 'drawings' : 'documents';
+  }
+
   void _openUpload() {
     int? pid = _selectedProjectId;
-    String cat = _selectedCategory == 'all' ? 'documents' : _selectedCategory;
+    String cat = _selectedCategory == 'all'
+        ? 'documents'
+        : (_selectedCategory == 'drawings_photos' ? 'drawings_photos' : _selectedCategory);
     String? pickedPath;
     String? pickedName;
 
@@ -172,18 +194,11 @@ class _FilesPageState extends State<FilesPage> {
                     setD(() {
                       pickedPath = f.path;
                       pickedName = f.name;
-                      // When the user is on the "All" category, infer the
-                      // upload category from the file extension so images land
-                      // in Photos and remain visible under that chip.
-                      if (_selectedCategory == 'all') {
-                        final dot = f.name.lastIndexOf('.');
-                        final ext = dot >= 0 ? f.name.substring(dot + 1).toLowerCase() : '';
-                        const imageExts = [
-                          'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
-                          'heic', 'heif', 'svg', 'tiff',
-                        ];
-                        cat = imageExts.contains(ext) ? 'photos' : 'documents';
-                      }
+                      // Infer the concrete category from the file extension
+                      // when the merged "Drawings & Photos" or legacy "All"
+                      // chip is active, so images land in Photos and drawings
+                      // (pdf etc.) land in Drawings.
+                      cat = _resolveUploadCategory(cat, f.name);
                     });
                   },
                   icon: Icon(Icons.folder_open_rounded,
@@ -243,13 +258,22 @@ class _FilesPageState extends State<FilesPage> {
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
+                    // Mandatory: file + project + category.
                     if (pickedPath == null || pickedPath!.isEmpty) {
                       toast('Please pick a file first');
                       return;
                     }
+                    if (pid == null || pid! <= 0) {
+                      toast('Please select a project');
+                      return;
+                    }
+                    if (cat.isEmpty || cat == 'all') {
+                      toast('Please select a category');
+                      return;
+                    }
                     try {
                       await ApiService().uploadFile(File(pickedPath!),
-                          pid: pid, category: cat);
+                          pid: pid, category: _resolveUploadCategory(cat, pickedName ?? ''));
                       if (ctx.mounted) Navigator.pop(ctx);
                       toast('File uploaded!');
                       _load();

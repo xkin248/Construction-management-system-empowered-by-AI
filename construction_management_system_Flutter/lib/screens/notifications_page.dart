@@ -550,10 +550,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     Row(children: [
                       _statusPill(iss['incident_type']?.toString() ?? 'general'),
                       const Spacer(),
-                      TextButton(
-                        onPressed: () => _resolveIssue(iss['issue_id'] as int),
-                        child: Text(AppStrings.t('notif.markResolved')),
-                      ),
+                      if ((iss['status']?.toString() ?? 'open').toLowerCase() == 'open')
+                        TextButton(
+                          onPressed: () => _resolveIssue(iss['issue_id'] as int),
+                          child: Text(AppStrings.t('notif.markResolved')),
+                        ),
+                      _issueStatusPill(iss['status']?.toString() ?? 'open'),
                     ]),
                   ]),
                 )),
@@ -585,6 +587,17 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
+  Widget _issueStatusPill(String status) {
+    final resolved = status.toLowerCase() == 'resolved';
+    final color = resolved ? AppColors.green : AppColors.red;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+      child: Text(resolved ? 'Resolved' : 'Open',
+          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+
   Future<void> _loadReports() async {
     setState(() => _repLoading = true);
     try {
@@ -612,7 +625,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
         'materials_used': _materials.text,
         'issues_encountered': _issuesEnc.text,
         'manpower_count': int.tryParse(_manpower.text) ?? 0,
-        'submitted_by': 1,
       });
       _workProgress.clear();
       _materials.clear();
@@ -630,7 +642,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
     try {
       projects = await ApiService().getProjects();
       _issPid ??= projects.isNotEmpty ? projects.first['project_id'] as int : null;
-      issues = await ApiService().getIssues(status: 'open');
+      // Load issues in every status so the history stays visible/traceable.
+      issues = await ApiService().getIssues();
     } catch (e) {
       toast('Failed to load issues: $e');
     } finally {

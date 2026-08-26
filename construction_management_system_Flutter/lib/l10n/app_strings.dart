@@ -80,7 +80,7 @@ class AppStrings {
     'dash.pendingTasks': ['Pending tasks', 'Tugasan tertunda'],
     'dash.quickCheckIn': ['Quick check in', 'Daftar masuk pantas'],
     'dash.autoAssign': ['Auto assign tasks', 'Auto tugaskan'],
-    'dash.checkIn': ['Check in', 'Daftar masuk'],
+    'dash.checkIn': ['Check In', 'Daftar Masuk'],
     'dash.checkOut': ['Check out', 'Daftar keluar'],
     'dash.overview': ['Overview', 'Gambaran keseluruhan'],
     'dash.todayAttendance': ["Today's attendance", 'Kehadiran hari ini'],
@@ -100,6 +100,8 @@ class AppStrings {
     'dash.allActiveProjects': ['All active projects', 'Semua projek aktif'],
     'dash.todayAttendanceRate': ['Today Attendance Rate', 'Kadar Kehadiran Hari Ini'],
     'dash.autoAssignTasks': ['Auto Assign Tasks', 'Tugasan Auto Berikan'],
+    'dash.noAttendanceData': ['No attendance data this week yet', 'Tiada data kehadiran minggu ini'],
+    'dash.noTaskData': ['No task data yet', 'Tiada data tugasan'],
 
     // ============ Tasks ============
     'tasks.title': ['Tasks', 'Tugasan'],

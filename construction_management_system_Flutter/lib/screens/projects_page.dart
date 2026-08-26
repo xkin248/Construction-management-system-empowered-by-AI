@@ -12,6 +12,8 @@ import '../services/app_settings.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
+import '../widgets/task_form.dart';
+import 'tasks_page.dart' show TaskDetailPage;
 
 // ─────────────────────────────────────────────
 //  Fence Map (OpenStreetMap free tiles) — center marker + radius circle
@@ -725,12 +727,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Map? project;
   List tasks = [];
 
+  // Attendance time-window settings (same fields/logic as attendance_page)
+  bool _settingsLd = true;
+  Map _settings = {};
+  final _checkInStart = TextEditingController();
+  final _checkInEnd = TextEditingController();
+  final _checkOutStart = TextEditingController();
+  final _checkOutEnd = TextEditingController();
+  final _breakStart = TextEditingController();
+  final _breakEnd = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
     _load();
+    _loadSettings();
   }
 
   void _rebuild() {
@@ -741,8 +754,69 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   void dispose() {
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
+    _checkInStart.dispose();
+    _checkInEnd.dispose();
+    _checkOutStart.dispose();
+    _checkOutEnd.dispose();
+    _breakStart.dispose();
+    _breakEnd.dispose();
     super.dispose();
   }
+
+  Future<void> _loadSettings() async {
+    try {
+      _settings = await ApiService().getSettings();
+      _checkInStart.text = _settings['check_in_start'] ?? '08:00';
+      _checkInEnd.text = _settings['check_in_end'] ?? '10:30';
+      _checkOutStart.text = _settings['check_out_start'] ?? '15:00';
+      _checkOutEnd.text = _settings['check_out_end'] ?? '17:00';
+      _breakStart.text = _settings['break_start'] ?? '12:00';
+      _breakEnd.text = _settings['break_end'] ?? '13:00';
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _settingsLd = false);
+    }
+  }
+
+  bool _validHHMM(String s) {
+    final parts = s.trim().split(':');
+    if (parts.length != 2) return false;
+    final h = int.tryParse(parts[0]), m = int.tryParse(parts[1]);
+    return h != null && m != null && h >= 0 && h <= 23 && m >= 0 && m <= 59;
+  }
+
+  Future<void> _saveSettings() async {
+    final vals = [
+      _checkInStart.text, _checkInEnd.text,
+      _checkOutStart.text, _checkOutEnd.text,
+      _breakStart.text, _breakEnd.text,
+    ];
+    if (vals.any((v) => !_validHHMM(v))) {
+      toast('All times must use HH:MM 24-hour format (e.g. 08:00)');
+      return;
+    }
+    try {
+      await ApiService().updateSettings({
+        ..._settings,
+        'check_in_start': _checkInStart.text.trim(),
+        'check_in_end': _checkInEnd.text.trim(),
+        'check_out_start': _checkOutStart.text.trim(),
+        'check_out_end': _checkOutEnd.text.trim(),
+        'break_start': _breakStart.text.trim(),
+        'break_end': _breakEnd.text.trim(),
+      });
+      toast('Attendance windows saved');
+    } on DioException catch (e) {
+      toast(e.message ?? 'Failed to save settings');
+    }
+  }
+
+  Widget _timeField(TextEditingController ctrl, String label) => Expanded(
+        child: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(labelText: label, helperText: 'HH:MM'),
+        ),
+      );
 
   Future<void> _load() async {
     setState(() => ld = true);
@@ -885,7 +959,167 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           const SizedBox(width: 10),
           Expanded(child: statCard(label: 'Left', value: '${tasks.length - completed}', iconColor: AppColors.accent)),
         ]),
+        const SizedBox(height: 16),
+
+        // ── Attendance Time Window Settings ─────────────────────
+        sectionCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
+                child: Icon(Icons.schedule_rounded, size: 16, color: AppColors.green),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('Attendance Time Window',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+              ),
+              if (!_settingsLd)
+                TextButton.icon(
+                  onPressed: _saveSettings,
+                  icon: const Icon(Icons.save_outlined, size: 16),
+                  label: Text(AppStrings.t('proj.edit')),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                ),
+            ]),
+            const SizedBox(height: 6),
+            Text('Work start / late threshold / check-out window',
+                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+            const SizedBox(height: 14),
+            if (_settingsLd)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              )
+            else ...[
+              Row(children: [
+                _timeField(_checkInStart, 'Check-in start'),
+                const SizedBox(width: 10),
+                _timeField(_checkInEnd, 'Late threshold'),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                _timeField(_checkOutStart, 'Check-out start'),
+                const SizedBox(width: 10),
+                _timeField(_checkOutEnd, 'Check-out end'),
+              ]),
+              const SizedBox(height: 10),
+              Row(children: [
+                _timeField(_breakStart, 'Break start'),
+                const SizedBox(width: 10),
+                _timeField(_breakEnd, 'Break end'),
+              ]),
+            ],
+          ]),
+        ),
+        const SizedBox(height: 16),
+
+        // ── Tasks: list + Add New Task ──────────────────────────
+        Row(children: [
+          Expanded(
+            child: Text(AppStrings.t('proj.taskSummary'),
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+          ),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final created = await showDialog<bool>(
+                context: context,
+                builder: (_) => TaskForm(initialProjectId: widget.projectId),
+              );
+              if (created == true) _load();
+            },
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: const Text('Add New Task'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.green,
+              side: BorderSide(color: AppColors.green),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        if (tasks.isEmpty)
+          sectionCard(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('No tasks yet — tap Add New Task to create one.',
+                    style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+              ),
+            ),
+          )
+        else
+          ...tasks.map((t) {
+            final name = t['task_name'] ?? '-';
+            final status = t['status'] ?? 'todo';
+            final priority = t['priority'] ?? 'medium';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => TaskDetailPage(task: Map<String, dynamic>.from(t))),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgCard,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 34, height: 34,
+                      decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
+                      child: Icon(
+                        status == 'completed' ? Icons.check_rounded : Icons.construction_rounded,
+                        size: 16, color: AppColors.green,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(name,
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${t['due_date'] ?? 'No due date'}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
+                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(width: 8),
+                    _priorityChip(priority),
+                    const SizedBox(width: 8),
+                    statusPill(status),
+                    const SizedBox(width: 4),
+                    Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                  ]),
+                ),
+              ),
+            );
+          }),
       ]),
+    );
+  }
+
+  Widget _priorityChip(String priority) {
+    final p = priority.toLowerCase();
+    final color = p == 'high'
+        ? AppColors.red
+        : p == 'low'
+            ? AppColors.blue
+            : AppColors.accentOrange;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+      child: Text(priority,
+          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
     );
   }
 
