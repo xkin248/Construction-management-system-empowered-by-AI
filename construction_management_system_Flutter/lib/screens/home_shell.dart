@@ -46,7 +46,7 @@ const _bottomNavItems = [
   _NavItem('Projects', Icons.apartment_outlined, Icons.apartment_rounded),
   _NavItem('Tasks', Icons.check_circle_outline_rounded, Icons.check_circle_rounded),
   _NavItem('Attendance', Icons.calendar_month_outlined, Icons.calendar_month_rounded),
-  _NavItem('More', Icons.apps_outlined, Icons.apps_rounded),
+  _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
 ];
 
 const _mainMenu = [
@@ -269,21 +269,14 @@ class _NarrowLayout extends StatelessWidget {
 
   // Map bottom nav index → page index
   int _bottomToPageIdx(int bottomIdx) {
-    const map = [0, 1, 2, 3, 4]; // Dashboard, Projects, Tasks, Attendance, Workers
+    const map = [0, 1, 2, 3, 5]; // Dashboard, Projects, Tasks, Attendance, Files
     return map[bottomIdx];
   }
 
   int _pageToBottomIdx(int pageIdx) {
     if (pageIdx <= 3) return pageIdx;
-    return 4; // all others map to "More"
-  }
-
-  void _showMoreSheet(BuildContext ctx, ValueChanged<int> onNav) {
-    showModalBottomSheet(
-      context: ctx,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _MoreSheet(currentIdx: idx, onNav: onNav, onLogout: onLogout, user: user),
-    );
+    if (pageIdx == 5) return 4; // Files
+    return -1; // Workers(4) / Notifications(6) are not in the bottom nav
   }
 
   @override
@@ -360,21 +353,12 @@ class _NarrowLayout extends StatelessWidget {
             child: Row(
               children: List.generate(_bottomNavItems.length, (i) {
                 final item = _bottomNavItems[i];
-                final isMore = i == 4;
-                final isSelected = isMore
-                    ? idx >= 4
-                    : _pageToBottomIdx(idx) == i;
+                final isSelected = _pageToBottomIdx(idx) == i;
                 return Expanded(
                   child: _BottomNavBtn(
                     item: item,
                     selected: isSelected,
-                    onTap: () {
-                      if (isMore) {
-                        _showMoreSheet(context, onNav);
-                      } else {
-                        onNav(_bottomToPageIdx(i));
-                      }
-                    },
+                    onTap: () => onNav(_bottomToPageIdx(i)),
                   ),
                 );
               }),
@@ -427,107 +411,6 @@ class _BottomNavBtn extends StatelessWidget {
           ),
         ]),
       ),
-      ),
-    );
-  }
-}
-
-// ──────────────── More Bottom Sheet ──────────────────
-class _MoreSheet extends StatelessWidget {
-  final int currentIdx;
-  final ValueChanged<int> onNav;
-  final VoidCallback onLogout;
-  final Map<String, dynamic> user;
-  const _MoreSheet({required this.currentIdx, required this.onNav, required this.onLogout, required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    final userName = (user['full_name'] as String?) ?? 'User';
-    final role = (user['role'] as String?) ?? '';
-    final moreItems = [
-      {'label': 'Workers', 'icon': Icons.badge_outlined, 'idx': 4},
-      {'label': 'Files', 'icon': Icons.folder_outlined, 'idx': 5},
-      {'label': 'Notifications', 'icon': Icons.notifications_outlined, 'idx': 6},
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Handle
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 36, height: 4,
-            decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
-          ),
-          // User info
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
-            child: Row(children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: avatarColor(userName),
-                child: Text(initials(userName),
-                    style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(userName,
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary)),
-                Text(role.replaceAll('_', ' '),
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary)),
-              ])),
-            ]),
-          ),
-          Divider(height: 1, color: AppColors.border),
-          // Menu items
-          ...moreItems.map((item) => ListTile(
-            leading: Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.bgMain,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(item['icon'] as IconData, size: 20, color: AppColors.textSecondary),
-            ),
-            title: Text(_navT(item['label'] as String),
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-            trailing: Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-            onTap: () {
-              Navigator.pop(context);
-              final targetIdx = item['idx'] as int;
-              if (targetIdx >= 0) {
-                onNav(targetIdx);
-              } else {
-                // Feature coming soon
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('${item['label']} — Coming soon!'),
-                  backgroundColor: AppColors.bgCard,
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ));
-              }
-            },
-          )),
-          Divider(height: 1, color: AppColors.border),
-          ListTile(
-            leading: Container(
-              width: 38, height: 38,
-              decoration: BoxDecoration(color: AppColors.redLight, borderRadius: BorderRadius.circular(10)),
-              child: Icon(Icons.logout_rounded, size: 20, color: AppColors.red),
-            ),
-            title: Text('Log Out',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.red)),
-            onTap: () {
-              Navigator.pop(context);
-              onLogout();
-            },
-          ),
-          const SizedBox(height: 8),
-        ]),
       ),
     );
   }

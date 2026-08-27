@@ -1,18 +1,12 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../widgets/charts.dart';
-import '../services/gps_notification_service.dart';
+import '../widgets/add_worker_sheet.dart';
 import '../l10n/app_strings.dart';
-
-// Conditional geolocator import — only on supported platforms
-import 'attendance_geo_helper.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -21,46 +15,10 @@ class AttendancePage extends StatefulWidget {
   State<AttendancePage> createState() => _AttendancePageState();
 }
 
-class _AttendancePageState extends State<AttendancePage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tab = TabController(length: 2, vsync: this);
-
-  @override
-  void initState() {
-    super.initState();
-    AppColors.darkMode.addListener(_rebuild);
-    AppSettings.lang.addListener(_rebuild);
-  }
-
-  void _rebuild() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    AppColors.darkMode.removeListener(_rebuild);
-    AppSettings.lang.removeListener(_rebuild);
-    _tab.dispose();
-    super.dispose();
-  }
-
+class _AttendancePageState extends State<AttendancePage> {
   @override
   Widget build(BuildContext c) {
-    return Column(children: [
-      Container(
-        color: AppColors.bgCard,
-        child: TabBar(
-          controller: _tab,
-          tabs: [Tab(text: AppStrings.t('att.teamOverview')), Tab(text: AppStrings.t('att.myCheckIn'))],
-        ),
-      ),
-      Expanded(
-        child: TabBarView(
-          controller: _tab,
-          children: const [_TeamAttendanceTab(), _MyCheckInTab()],
-        ),
-      ),
-    ]);
+    return const _TeamAttendanceTab();
   }
 }
 
@@ -144,6 +102,24 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // ── Add Worker ──
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: () => showAddWorkerSheet(context, onAdded: _load),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: Text(AppStrings.t('workers.addWorker'),
+                        style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
                 // ── KPI Summary ──
                 _buildKpiRow(total, present, late, absent),
                 const SizedBox(height: 16),
@@ -512,214 +488,5 @@ class _ProjectGeofenceCard extends StatelessWidget {
   String _shortLoc(String loc) {
     final parts = loc.split(',');
     return parts.length >= 2 ? '${parts[parts.length - 2].trim()}, ${parts.last.trim()}' : loc;
-  }
-}
-
-// ══════════════════════ My Check-In Tab ══════════════════════
-class _MyCheckInTab extends StatefulWidget {
-  const _MyCheckInTab();
-  @override
-  State<_MyCheckInTab> createState() => _MyCheckInTabState();
-}
-
-class _MyCheckInTabState extends State<_MyCheckInTab> {
-  bool _loading = false;
-  bool _checkedIn = false;
-  int? _attendanceId;
-  String _statusMsg = 'Tap the button below to check in with GPS geofencing';
-  List _projects = [];
-  int? _selectedProject;
-
-  @override
-  void initState() {
-    super.initState();
-    AppColors.darkMode.addListener(_rebuild);
-    AppSettings.lang.addListener(_rebuild);
-    _loadProjects();
-  }
-
-  void _rebuild() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    AppColors.darkMode.removeListener(_rebuild);
-    AppSettings.lang.removeListener(_rebuild);
-    super.dispose();
-  }
-
-  Future<void> _loadProjects() async {
-    try {
-      _projects = await ApiService().getProjects();
-      if (_projects.isNotEmpty && mounted) {
-        setState(() => _selectedProject = _projects.first['project_id']);
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _doCheckIn() async {
-    if (kIsWeb) {
-      toast('GPS check-in is not supported in web browsers');
-      return;
-    }
-    setState(() { _loading = true; _statusMsg = 'Getting your location...'; });
-    try {
-      if (!await GeoHelper.isServiceEnabled()) {
-        await GpsNotificationService.requestEnable();
-        setState(() {
-          _statusMsg = 'Please enable GPS from the notification, then try again.';
-          _loading = false;
-        });
-        return;
-      }
-      final me = await ApiService().me();
-      final wid = me['worker_id'] as int? ?? 0;
-      final userType = (me['user_type'] as String? ?? '').toLowerCase();
-      final isWorker = wid != 0 && userType == 'worker';
-      if (!isWorker) {
-        // Site supervisors no longer need a worker profile — they check in
-        // through the supervisor attendance endpoint against their own project.
-        final pos = await GeoHelper.getCurrentPosition();
-        if (pos == null) {
-          setState(() { _statusMsg = 'Location permission denied'; _loading = false; });
-          return;
-        }
-        final r = await ApiService().supervisorCheckIn(
-          projectId: _selectedProject ?? 1,
-          lat: pos['lat']!,
-          lng: pos['lng']!,
-        );
-        setState(() {
-          _checkedIn = true;
-          _attendanceId = r['attendance_id'];
-          _statusMsg = 'Checked in successfully at ${_fmtNow()}';
-          _loading = false;
-        });
-        return;
-      }
-      final pos = await GeoHelper.getCurrentPosition();
-      if (pos == null) {
-        setState(() { _statusMsg = 'Location permission denied'; _loading = false; });
-        return;
-      }
-      final r = await ApiService().workerCheckIn(
-        projectId: _selectedProject ?? 1,
-        lat: pos['lat']!,
-        lng: pos['lng']!,
-      );
-      setState(() {
-        _checkedIn = true;
-        _attendanceId = r['attendance_id'];
-        _statusMsg = 'Checked in successfully at ${_fmtNow()}';
-        _loading = false;
-      });
-    } on DioException catch (e) {
-      setState(() { _statusMsg = e.message ?? 'Check-in failed'; _loading = false; });
-    } catch (e) {
-      setState(() { _statusMsg = 'Error: $e'; _loading = false; });
-    }
-  }
-
-  Future<void> _doCheckOut() async {
-    if (_attendanceId == null) return;
-    if (kIsWeb) { toast('GPS not available in browser'); return; }
-    setState(() { _loading = true; _statusMsg = 'Getting your location...'; });
-    try {
-      final pos = await GeoHelper.getCurrentPosition();
-      if (pos == null) { setState(() { _loading = false; }); return; }
-      final me = await ApiService().me();
-      final wid = me['worker_id'] as int? ?? 0;
-      final userType = (me['user_type'] as String? ?? '').toLowerCase();
-      if (wid != 0 && userType == 'worker') {
-        await ApiService().workerCheckOut(lat: pos['lat']!, lng: pos['lng']!);
-      } else {
-        await ApiService().supervisorCheckOut(lat: pos['lat']!, lng: pos['lng']!);
-      }
-      setState(() {
-        _checkedIn = false;
-        _attendanceId = null;
-        _statusMsg = 'Checked out at ${_fmtNow()}';
-        _loading = false;
-      });
-    } on DioException catch (e) {
-      setState(() { _statusMsg = e.message ?? 'Check-out failed'; _loading = false; });
-    }
-  }
-
-  String _fmtNow() {
-    final now = DateTime.now();
-    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        // Project selector
-        if (_projects.isNotEmpty)
-          sectionCard(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: DropdownButtonFormField<int>(
-              initialValue: _selectedProject,
-              decoration: const InputDecoration(labelText: 'Select Project'),
-              items: _projects.map<DropdownMenuItem<int>>((p) =>
-                  DropdownMenuItem(value: p['project_id'], child: Text(p['project_name']))).toList(),
-              onChanged: (v) => setState(() => _selectedProject = v),
-            ),
-          ),
-
-        // Check-in card
-        sectionCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(children: [
-            Container(
-              width: 90, height: 90,
-              decoration: BoxDecoration(
-                color: _checkedIn ? AppColors.greenLight : AppColors.accentLight,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                _checkedIn ? Icons.check_circle_rounded : Icons.location_on_rounded,
-                size: 44,
-                color: _checkedIn ? AppColors.green : AppColors.accent,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(_statusMsg, textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 13.5, color: AppColors.textSecondary)),
-            const SizedBox(height: 24),
-            if (kIsWeb)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: AppColors.yellowLight, borderRadius: BorderRadius.circular(10)),
-                child: Row(children: [
-                  Icon(Icons.info_outline, color: AppColors.yellow, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text('GPS check-in requires the mobile app',
-                      style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w600))),
-                ]),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: _loading ? null : (_checkedIn ? _doCheckOut : _doCheckIn),
-                  icon: _loading
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Icon(_checkedIn ? Icons.logout_rounded : Icons.login_rounded),
-                  label: Text(_checkedIn ? 'Check Out' : 'Check In'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _checkedIn ? AppColors.red : AppColors.accent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-          ]),
-        ),
-      ],
-    );
   }
 }

@@ -8,8 +8,34 @@ import '../l10n/app_strings.dart';
 /// Two independent buttons:
 ///   - Theme: moon icon when dark / sun icon when light, tap to toggle
 ///   - Language: "EN" / "BM" text button, tap to switch
-class AppSettingsActions extends StatelessWidget {
+class AppSettingsActions extends StatefulWidget {
   const AppSettingsActions({super.key});
+
+  @override
+  State<AppSettingsActions> createState() => _AppSettingsActionsState();
+}
+
+class _AppSettingsActionsState extends State<AppSettingsActions> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen to the theme / language notifiers directly so the buttons
+    // rebuild in place on every toggle — otherwise the icon/label snapshot
+    // goes stale after the first tap and the switch looks one-way only.
+    AppColors.darkMode.addListener(_onChanged);
+    AppSettings.lang.addListener(_onChanged);
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_onChanged);
+    AppSettings.lang.removeListener(_onChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
