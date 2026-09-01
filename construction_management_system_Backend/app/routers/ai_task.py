@@ -113,6 +113,14 @@ def _set_task_workers(db: Session, task: Task, worker_ids: List[int]) -> List[in
         worker = _validate_worker(db, task.project_id, wid)
         if worker and worker.worker_id not in valid_ids:
             valid_ids.append(worker.worker_id)
+    # Explicitly delete existing links before writing the new assignment, then
+    # flush so the DELETE is emitted before the new INSERTs. Under SQLAlchemy
+    # 2.0, replacing task.task_workers with a new list does NOT remove the old
+    # rows (delete-orphan is not applied on collection replacement), so without
+    # this the INSERT would violate uq_task_worker and return 500.
+    for link in list(task.task_workers):
+        db.delete(link)
+    db.flush()
     task.task_workers = [TaskWorker(worker_id=wid) for wid in valid_ids]
     task.assigned_worker_id = valid_ids[0] if valid_ids else None
     return valid_ids
