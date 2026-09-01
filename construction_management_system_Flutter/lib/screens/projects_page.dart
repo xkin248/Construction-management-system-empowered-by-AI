@@ -1146,7 +1146,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
       child: Text(priority,
-          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
     );
   }
 

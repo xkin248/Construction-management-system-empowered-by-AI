@@ -48,14 +48,20 @@ jobs:
         run: flutter build web --release --base-href=/${{ github.event.repository.name }}/
 
       # ── Deploy to GitHub Pages ────────────────────────────────
+      # Deploy only from the main branch. Tag-triggered runs still build
+      # the web bundle (compile verification) but skip publishing, because
+      # the github-pages environment protection rules reject tag refs.
       - name: ⚙️ Configure Pages
+        if: github.ref == 'refs/heads/main'
         uses: actions/configure-pages@v5
 
       - name: 📤 Upload Pages Artifact
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: construction_management_system_Flutter/build/web
 
       - name: 🚀 Deploy to GitHub Pages
+        if: github.ref == 'refs/heads/main'
         id: deployment
         uses: actions/deploy-pages@v4

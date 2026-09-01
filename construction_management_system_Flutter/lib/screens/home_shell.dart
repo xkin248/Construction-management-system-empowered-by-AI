@@ -303,7 +303,7 @@ class _NarrowLayout extends StatelessWidget {
             Text('BuildSmart',
                 style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             Text(_navT(_titles[idx.clamp(0, _titles.length - 1)]),
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
           ]),
         ]),
         actions: [

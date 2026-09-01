@@ -49,7 +49,7 @@ class AppStyles {
         height: 1.5,
       );
   static TextStyle get caption => TextStyle(
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w500,
         color: AppColors.textMuted,
         height: 1.4,

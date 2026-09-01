@@ -231,7 +231,7 @@ class _SplashGateState extends State<SplashGate> {
             const Text('BuildSmart', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             const Text('AI Construction System',
-                style: TextStyle(color: Color(0xFF757E90), fontSize: 11.5, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                style: TextStyle(color: Color(0xFF757E90), fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
             const SizedBox(height: 22),
             SizedBox(
                 width: 22,

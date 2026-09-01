@@ -313,9 +313,13 @@ class _TaskCardState extends State<_TaskCard> {
         Icon(Icons.calendar_today_outlined,
             size: 12, color: AppColors.textMuted),
         const SizedBox(width: 4),
-        Text(AppStrings.t('tasks.noDueDate'),
-            style:
-                GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        Flexible(
+          child: Text(AppStrings.t('tasks.noDueDate'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        ),
       ]);
     }
     final parsed = DateTime.tryParse(_dueDate!);
@@ -325,9 +329,13 @@ class _TaskCardState extends State<_TaskCard> {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.calendar_today_outlined, size: 12, color: color),
       const SizedBox(width: 4),
-      Text(display,
-          style: GoogleFonts.outfit(
-              fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+      Flexible(
+        child: Text(display,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(
+                fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+      ),
     ]);
   }
 
@@ -477,7 +485,7 @@ class _TaskCardState extends State<_TaskCard> {
                     (widget.task['trade'] as String)[0].toUpperCase() +
                         (widget.task['trade'] as String).substring(1),
                     style: GoogleFonts.outfit(
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.accent),
                   ),

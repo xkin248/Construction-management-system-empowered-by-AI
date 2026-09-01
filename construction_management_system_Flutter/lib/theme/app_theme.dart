@@ -156,7 +156,7 @@ Widget statusPill(String status, {String? label}) {
       (label ?? status).replaceAll('_', ' ').toUpperCase(),
       style: TextStyle(
         color: statusFg(s),
-        fontSize: 11,
+        fontSize: 12,
         fontWeight: FontWeight.w800,
         letterSpacing: 0.3,
       ),

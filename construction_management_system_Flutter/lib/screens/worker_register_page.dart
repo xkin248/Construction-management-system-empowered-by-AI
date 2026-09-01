@@ -374,7 +374,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             const SizedBox(height: 8),
                             Text('CIDB Construction 4.0',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF3D4A5C))),
+                                style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF3D4A5C))),
                             const SizedBox(height: 8),
                           ],
                         ),

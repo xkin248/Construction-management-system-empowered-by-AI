@@ -279,7 +279,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           Text('CIDB Construction 4.0',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.outfit(
-                                  fontSize: 11, color: const Color(0xFF3D4A5C))),
+                                  fontSize: 12, color: const Color(0xFF3D4A5C))),
                           const SizedBox(height: 8),
                         ],
                       ),
