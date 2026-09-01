@@ -524,7 +524,12 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ]),
         const SizedBox(height: 14),
-        if (data.any((v) => v > 0))
+        if (data.isNotEmpty)
+          // Always render the bar chart when the weekly payload exists, even if
+          // all values are 0 (LabeledBarChart handles all-zero with 4px stubs).
+          // Previously `data.any((v) => v > 0)` showed a "no data" placeholder
+          // on phones, making the bar chart invisible whenever the week had no
+          // attendance yet.
           LabeledBarChart(values: data, labels: labels, height: 140, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue)
         else
           Container(
