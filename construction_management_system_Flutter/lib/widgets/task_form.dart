@@ -28,9 +28,6 @@ class _TaskFormState extends State<TaskForm> {
 
   List _projects = [];
   bool _loadingProjects = true;
-  List _workers = [];
-  bool _loadingWorkers = true;
-  int? _workerId;
   bool _submitting = false;
 
   bool get _isEdit => widget.task != null;
@@ -45,18 +42,10 @@ class _TaskFormState extends State<TaskForm> {
         text: t?['estimated_hours']?.toString() ?? '');
     _priority = t?['priority'] as String? ?? 'medium';
     _projectId = t?['project_id'] as int? ?? widget.initialProjectId;
-    final assignedRaw = t?['assigned_workers'];
-    if (assignedRaw is List && assignedRaw.isNotEmpty) {
-      final first = assignedRaw.first;
-      if (first is Map && first['worker_id'] is int) {
-        _workerId = first['worker_id'] as int;
-      }
-    }
     if (t?['due_date'] != null && t!['due_date'].toString().isNotEmpty) {
       _due = DateTime.tryParse(t['due_date'].toString());
     }
     _loadProjects();
-    _loadWorkers();
   }
 
   Future<void> _loadProjects() async {
@@ -67,58 +56,6 @@ class _TaskFormState extends State<TaskForm> {
       }
     } catch (_) {}
     if (mounted) setState(() => _loadingProjects = false);
-  }
-
-  Future<void> _loadWorkers() async {
-    try {
-      final pid = _projectId;
-      _workers = await ApiService().getWorkers(pid: pid);
-      final known = _workers.any((w) => w['worker_id'] == _workerId);
-      if (!known) _workerId = null;
-    } catch (_) {}
-    if (mounted) setState(() => _loadingWorkers = false);
-  }
-
-  /// Picks a suitable worker automatically and fills the assignment field.
-  Future<void> _autoAssign() async {
-    if (_workers.isEmpty) {
-      await _loadWorkers();
-    }
-    final pick = _pickWorker();
-    if (pick == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: const Text('No workers available to assign'),
-            backgroundColor: AppColors.red));
-      }
-      return;
-    }
-    setState(() => _workerId = pick);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Auto-assigned to ${_workerName(pick)}'),
-          backgroundColor: AppColors.green));
-    }
-  }
-
-  int? _pickWorker() {
-    if (_workers.isEmpty) return null;
-    // Prefer a worker with a trade/role on file; fall back to the first.
-    for (final w in _workers) {
-      final id = w['worker_id'];
-      if (id is num && ((w['trade'] as String?) ?? '').isNotEmpty) {
-        return id as int;
-      }
-    }
-    final first = _workers.first['worker_id'];
-    return first is num ? first as int : null;
-  }
-
-  String _workerName(int? id) {
-    for (final w in _workers) {
-      if (w['worker_id'] == id) return (w['name'] as String?) ?? 'Worker';
-    }
-    return 'Worker';
   }
 
   Future<void> _pickDate() async {
@@ -142,7 +79,6 @@ class _TaskFormState extends State<TaskForm> {
         'priority': _priority,
         'due_date': _due?.toIso8601String().split('T').first,
         'estimated_hours': double.tryParse(_hours.text.trim()) ?? 0,
-        'worker_ids': _workerId != null ? [_workerId] : [],
       };
       if (_isEdit) {
         await ApiService().updateTask(widget.task!['task_id'], data);
@@ -240,47 +176,9 @@ class _TaskFormState extends State<TaskForm> {
                                           style: GoogleFonts.outfit(
                                               fontSize: 13))))
                               .toList(),
-                          onChanged: (v) {
-                            setState(() => _projectId = v);
-                            _loadWorkers();
-                          },
+                          onChanged: (v) =>
+                              setState(() => _projectId = v),
                         ),
-                  const SizedBox(height: 14),
-                  // ── Assign Worker (manual dropdown + auto-assign) ──
-                  _fieldLabel('Assign Worker'),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(
-                      child: _loadingWorkers
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 14),
-                              child: SizedBox(
-                                  height: 14, width: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2)))
-                          : DropdownButtonFormField<int>(
-                              initialValue: _workerId,
-                              isExpanded: true,
-                              decoration: _inputDeco(null),
-                              items: _workers
-                                  .map<DropdownMenuItem<int>>((w) =>
-                                      DropdownMenuItem(
-                                          value: w['worker_id'],
-                                          child: Text(w['name'] ?? '',
-                                              style: GoogleFonts.outfit(
-                                                  fontSize: 13))))
-                                  .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _workerId = v),
-                            ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: _submitting ? null : _autoAssign,
-                      tooltip: 'Auto assign worker',
-                      icon: Icon(Icons.auto_awesome_rounded,
-                          size: 20, color: AppColors.accent),
-                    ),
-                  ]),
                   const SizedBox(height: 14),
                   // ── Priority + Due Date row ──
                   Row(children: [
