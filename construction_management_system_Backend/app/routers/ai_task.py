@@ -41,6 +41,39 @@ def _recalc_project_progress(db: Session, project_id: int) -> None:
         project.progress = new_progress
         db.add(project)
 
+
+def _recalc_project_status(db: Session, project_id: int) -> None:
+    """Recompute project.status from its task set (status closed loop).
+
+    Rule: no tasks at all -> "planning"; every task completed (and at least one
+    exists) -> "completed"; any other task set (pending-only included) ->
+    "in_progress". Creating the first task therefore moves the project off the
+    planning board, and completing all tasks closes it.
+    The project is only marked dirty (db.add) when the value actually changes,
+    so no spurious writes hit the DB on unrelated task edits.
+
+    Values are lowercase to match models.Project.status default ("planning")
+    and the frontend statusPill rendering.
+    """
+    project = db.query(Project).filter(Project.project_id == project_id).first()
+    if not project:
+        return
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    if not tasks:
+        new_status = "planning"
+    elif all(t.status == "completed" for t in tasks):
+        new_status = "completed"
+    else:
+        # Any task exists (pending / in_progress / mixed): the project has left
+        # the planning board once at least one task row is created. Pending-only
+        # projects therefore count as in_progress, matching the user expectation
+        # that adding a new task moves the project off "planning".
+        new_status = "in_progress"
+    if (project.status or "").lower() != new_status:
+        project.status = new_status
+        db.add(project)
+
+
 def _normalize_status(value: Optional[str], progress: Optional[float] = None) -> str:
     if value:
         cleaned = str(value).strip().lower().replace(" ", "_")
@@ -220,6 +253,7 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
     db.flush()
     _set_task_workers(db, task, worker_ids)
     _recalc_project_progress(db, task.project_id)
+    _recalc_project_status(db, task.project_id)
     db.commit()
     db.refresh(task)
     task = db.query(Task).options(*_task_load_options()).get(task.task_id)
@@ -231,6 +265,7 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     task = db.query(Task).options(*_task_load_options()).get(task_id)
     if not task:
         raise HTTPException(404, "Task does not exist")
+    old_project_id = task.project_id
 
     if "task_name" in payload or "title" in payload:
         task.task_name = str(payload.get("task_name") or payload.get("title") or "").strip() or task.task_name
@@ -249,7 +284,9 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
         old_status = task.status
         task.status = _normalize_status(payload.get("status"), payload.get("progress"))
         if task.status != old_status:
+            db.flush()  # persist in-memory change so the recalc query sees it
             _recalc_project_progress(db, task.project_id)
+            _recalc_project_status(db, task.project_id)
 
     if "trade" in payload:
         task.trade = str(payload.get("trade") or "").strip() or None
@@ -273,6 +310,16 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
 
     if payload.get("ai_confidence") is not None:
         task.ai_confidence = float(payload["ai_confidence"])
+
+    # Task moved to another project: the source project lost one task (and the
+    # destination gained one), so both projects' progress/status must be
+    # recomputed. The destination may already have been recalculated above when
+    # status changed; re-running is idempotent (only dirty-adds on value change).
+    if task.project_id != old_project_id:
+        db.flush()  # persist the project_id change before the recalc queries
+        for pid in {old_project_id, task.project_id}:
+            _recalc_project_progress(db, pid)
+            _recalc_project_status(db, pid)
 
     db.commit()
     db.refresh(task)
