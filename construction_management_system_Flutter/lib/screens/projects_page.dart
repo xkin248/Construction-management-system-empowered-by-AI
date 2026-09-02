@@ -1069,38 +1069,48 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Row(children: [
-                    Container(
-                      width: 34, height: 34,
-                      decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
-                      child: Icon(
-                        status == 'completed' ? Icons.check_rounded : Icons.construction_rounded,
-                        size: 16, color: AppColors.green,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
+                        child: Icon(
+                          status == 'completed' ? Icons.check_rounded : Icons.construction_rounded,
+                          size: 16, color: AppColors.green,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(name,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(name,
                             maxLines: 1, overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${t['due_date'] ?? 'No due date'}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
-                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(width: 8),
+                      _priorityChip(priority),
+                      const SizedBox(width: 8),
+                      statusPill(status),
+                      const SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+                    ]),
+                    const SizedBox(height: 6),
+                    // Second row: due date · assigned worker (single line, never wraps vertically)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 46),
+                      child: Row(children: [
+                        Expanded(
+                          child: Text(
+                            '${t['due_date'] ?? 'No due date'}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
+                          ),
                         ),
+                        const SizedBox(width: 4),
+                        _quickStatusBtn(t, 'pending', Icons.radio_button_unchecked_rounded, AppColors.yellow),
+                        _quickStatusBtn(t, 'in_progress', Icons.play_arrow_rounded, AppColors.blue),
+                        _quickStatusBtn(t, 'completed', Icons.check_rounded, AppColors.green),
                       ]),
                     ),
-                    const SizedBox(width: 8),
-                    _priorityChip(priority),
-                    const SizedBox(width: 8),
-                    statusPill(status),
-                    const SizedBox(width: 2),
-                    _quickStatusBtn(t, 'pending', Icons.radio_button_unchecked_rounded, AppColors.yellow),
-                    _quickStatusBtn(t, 'in_progress', Icons.play_arrow_rounded, AppColors.blue),
-                    _quickStatusBtn(t, 'completed', Icons.check_rounded, AppColors.green),
-                    const SizedBox(width: 4),
-                    Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
                   ]),
                 ),
               ),

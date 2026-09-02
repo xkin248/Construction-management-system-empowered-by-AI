@@ -646,6 +646,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   List _assignedWorkers = [];    // currently-assigned workers (mutable)
   List _projectWorkers = [];     // all workers in the project
   late Map _task;
+  bool _autoAssigning = false;   // auto-assign request in flight
 
   @override
   void initState() {
@@ -698,6 +699,64 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       toast(AppStrings.t('tasks.unassignAll'));
     } catch (e) {
       toast('${AppStrings.t('tasks.assignFailed')}: $e');
+    }
+  }
+
+  /// Re-fetch this task from the server and sync its worker display.
+  Future<void> _refreshTaskFromServer() async {
+    final pid = _task['project_id'] as int?;
+    final tid = _task['task_id'];
+    if (pid == null || tid == null) return;
+    try {
+      final tasks = await ApiService().getTasks(pid);
+      Map? fresh;
+      for (final x in tasks) {
+        if (x['task_id'] == tid) {
+          fresh = Map.from(x);
+          break;
+        }
+      }
+      if (fresh == null || !mounted) return;
+      List assigned = [];
+      final raw = fresh['assigned_workers'];
+      if (raw is List && raw.isNotEmpty) {
+        assigned = raw.cast<Map>();
+      } else {
+        final single = fresh['assigned_worker'] as Map?;
+        if (single != null) assigned = [single];
+      }
+      setState(() {
+        _task = fresh!;
+        _assignedWorkers = assigned;
+      });
+    } catch (_) {
+      // Refresh is best-effort; keep showing the current (possibly stale) data.
+    }
+  }
+
+  Future<void> _autoAssign() async {
+    if (_autoAssigning) return;
+    final pid = _task['project_id'] as int?;
+    final tid = _task['task_id'] as int?;
+    if (pid == null || tid == null) {
+      toast('Auto assign unavailable for this task');
+      return;
+    }
+    setState(() => _autoAssigning = true);
+    try {
+      await ApiService().aiAutoAssign(
+            pid,
+            taskIds: [tid],
+            dryRun: false,
+          );
+      await _refreshTaskFromServer();
+      if (mounted) {
+        toast('Auto assign done — worker refreshed');
+      }
+    } catch (e) {
+      if (mounted) toast('Auto assign failed: $e');
+    } finally {
+      if (mounted) setState(() => _autoAssigning = false);
     }
   }
 
@@ -855,10 +914,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               child: Icon(Icons.event_outlined, size: 16, color: AppColors.yellow),
             ),
             const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-              Text(t['due_date'], style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
-            ]),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                Text(t['due_date'],
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
+              ]),
+            ),
           ])),
 
         // Assigned worker card
@@ -896,6 +959,47 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 Text(AppStrings.t('tasks.noWorkerAssigned'), style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13)),
               ]),
             ),
+          // Auto Assign (AI suggestion) button
+          if (!_autoAssigning) ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _autoAssign,
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Auto Assign Worker',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ] else ...[
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: null,
+                icon: SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                label: const Text('Assigning…',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           // Change / Assign button
           SizedBox(
             width: double.infinity,

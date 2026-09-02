@@ -70,6 +70,32 @@ class ErrorApp extends StatelessWidget {
                   style: TextStyle(color: Color(0xFF757E90), fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 24),
+                // Recovery exit: re-run the full app so SplashGate re-runs the
+                // startup flow (login check, API init, FCM) from scratch.
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () => runApp(const MyApp()),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F6EF7),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text(
+                      'Try Again',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () => runApp(const MyApp()),
+                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF757E90)),
+                  child: const Text('Retry',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
               ],
             ),
           ),

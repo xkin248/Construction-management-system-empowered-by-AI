@@ -45,7 +45,7 @@ const _bottomNavItems = [
   _NavItem('Dashboard', Icons.grid_view_outlined, Icons.grid_view_rounded),
   _NavItem('Projects', Icons.apartment_outlined, Icons.apartment_rounded),
   _NavItem('Tasks', Icons.check_circle_outline_rounded, Icons.check_circle_rounded),
-  _NavItem('Attendance', Icons.calendar_month_outlined, Icons.calendar_month_rounded),
+  _NavItem('Workers', Icons.badge_outlined, Icons.badge_rounded),
   _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
 ];
 
@@ -269,14 +269,15 @@ class _NarrowLayout extends StatelessWidget {
 
   // Map bottom nav index → page index
   int _bottomToPageIdx(int bottomIdx) {
-    const map = [0, 1, 2, 3, 5]; // Dashboard, Projects, Tasks, Attendance, Files
+    const map = [0, 1, 2, 4, 5]; // Dashboard, Projects, Tasks, Workers, Files
     return map[bottomIdx];
   }
 
   int _pageToBottomIdx(int pageIdx) {
-    if (pageIdx <= 3) return pageIdx;
-    if (pageIdx == 5) return 4; // Files
-    return -1; // Workers(4) / Notifications(6) are not in the bottom nav
+    if (pageIdx <= 2) return pageIdx; // Dashboard(0) / Projects(1) / Tasks(2)
+    if (pageIdx == 4) return 3;       // Workers → bottom nav index 3
+    if (pageIdx == 5) return 4;       // Files → bottom nav index 4
+    return -1; // Attendance(3) / Notifications(6) are not in the bottom nav (kept in wide sidebar / More menu)
   }
 
   @override
