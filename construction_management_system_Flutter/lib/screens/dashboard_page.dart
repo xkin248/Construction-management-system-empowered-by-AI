@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
+import '../utils/date_helper.dart';
 import '../widgets/charts.dart';
 import 'attendance_geo_helper.dart';
 
@@ -711,12 +712,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
 
   String _fmtDate(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
-    } catch (_) {
-      return iso;
-    }
+    final dt = DateTime.tryParse(iso);
+    return dt == null ? iso : DateHelper.formatShort(dt);
   }
 }

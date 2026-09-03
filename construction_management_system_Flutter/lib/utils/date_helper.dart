@@ -9,6 +9,15 @@ class DateHelper {
   static String formatTime(DateTime d) => DateFormat('HH:mm').format(d);
   static String formatDateTime(DateTime d) =>
       DateFormat('dd/MM/yyyy HH:mm').format(d);
+  static String formatShort(DateTime d) => DateFormat('dd MMM yyyy').format(d);
+  static String tryFormatShort(Object? value, {String fallback = ''}) {
+    if (value == null) return fallback;
+    final s = value.toString();
+    if (s.isEmpty) return fallback;
+    final d = DateTime.tryParse(s);
+    if (d == null) return fallback.isNotEmpty ? fallback : s;
+    return formatShort(d);
+  }
   static String? tryFormat(DateTime? d, [String pattern = 'dd/MM/yyyy']) =>
       d == null ? null : format(d, pattern);
   static double? hoursBetween(DateTime? a, DateTime? b) {

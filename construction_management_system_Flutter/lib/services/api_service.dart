@@ -309,11 +309,16 @@ class ApiService {
       Map.from((await dio.post('/tasks', data: d)).data);
   Future<Map> updateTask(int taskId, Map d) async =>
       Map.from((await dio.put('/tasks/$taskId', data: d)).data);
-  Future<Map> aiAutoAssign(int? projectId, {List<int>? taskIds, bool dryRun = false}) async =>
+  Future<Map> deleteTask(int taskId) async =>
+      Map.from((await dio.delete('/tasks/$taskId')).data);
+
+  Future<Map> aiAutoAssign(int? projectId,
+          {List<int>? taskIds, bool dryRun = false, bool sameProjectOnly = false}) async =>
       Map.from((await dio.post('/ai/tasks/auto-assign', data: {
         if (projectId != null) 'project_id': projectId,
         if (taskIds != null) 'task_ids': taskIds,
         'dry_run': dryRun,
+        'same_project_only': sameProjectOnly,
         'top_k': 3,
       })).data);
 

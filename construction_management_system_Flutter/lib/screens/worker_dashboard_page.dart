@@ -10,6 +10,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
+import '../utils/date_helper.dart';
 import 'attendance_geo_helper.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
@@ -459,7 +460,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(_fmtNow(),
                 style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
-            Text(DateTime.now().toString().substring(0, 10),
+            Text(DateHelper.formatShort(DateTime.now()),
                 style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
           ]),
         ],
@@ -825,7 +826,7 @@ class _TaskTile extends StatelessWidget {
               if (projectName.isNotEmpty)
                 _miniTag(Icons.apartment_rounded, projectName, AppColors.blue),
               if (task['due_date'] != null)
-                _miniTag(Icons.event_rounded, 'Due: ${task['due_date'].toString().substring(0, 10)}', AppColors.textSecondary),
+                _miniTag(Icons.event_rounded, 'Due: ${DateHelper.tryFormatShort(task['due_date'], fallback: task['due_date'].toString().substring(0, 10))}', AppColors.textSecondary),
             ],
           ),
           if (instructions.isNotEmpty) ...[

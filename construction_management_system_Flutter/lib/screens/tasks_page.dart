@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
 
@@ -324,7 +324,7 @@ class _TaskCardState extends State<_TaskCard> {
     }
     final parsed = DateTime.tryParse(_dueDate!);
     final display =
-        parsed != null ? DateFormat('dd/MM/yy').format(parsed) : _dueDate!;
+        parsed != null ? DateHelper.formatShort(parsed) : _dueDate!;
     final color = _dueColor();
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.calendar_today_outlined, size: 12, color: color),
@@ -647,6 +647,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   List _projectWorkers = [];     // all workers in the project
   late Map _task;
   bool _autoAssigning = false;   // auto-assign request in flight
+  bool _autoAssignSameProject = false; // restrict auto-assign to this project
 
   @override
   void initState() {
@@ -734,6 +735,37 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
   }
 
+  Future<void> _deleteTask() async {
+    final tid = widget.task['task_id'];
+    if (tid == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(AppStrings.t('tasks.deleteConfirm')),
+        content: Text(AppStrings.t('tasks.deleteConfirmBody')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(AppStrings.t('common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.red),
+            child: Text(AppStrings.t('common.delete')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await ApiService().deleteTask(tid as int);
+      toast(AppStrings.t('tasks.deleteSuccess'));
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      toast('${AppStrings.t('tasks.deleteFailed')}: $e');
+    }
+  }
+
   Future<void> _autoAssign() async {
     if (_autoAssigning) return;
     final pid = _task['project_id'] as int?;
@@ -748,6 +780,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             pid,
             taskIds: [tid],
             dryRun: false,
+            sameProjectOnly: _autoAssignSameProject,
           );
       await _refreshTaskFromServer();
       if (mounted) {
@@ -869,6 +902,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               onPressed: _unassign,
               child: Text(AppStrings.t('tasks.unassign'), style: GoogleFonts.outfit(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
             ),
+          IconButton(
+            onPressed: _deleteTask,
+            tooltip: AppStrings.t('common.delete'),
+            icon: Icon(Icons.delete_outline_rounded, color: AppColors.red, size: 20),
+          ),
         ],
       ),
       body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -917,7 +955,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                Text(t['due_date'],
+                Text(DateHelper.tryFormatShort(t['due_date']),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
               ]),
@@ -977,6 +1015,25 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 4),
+            Row(children: [
+              Expanded(
+                child: Text(AppStrings.t('tasks.autoAssignSameProject'),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ),
+              SizedBox(
+                height: 28,
+                child: FittedBox(
+                  child: Switch(
+                    value: _autoAssignSameProject,
+                    activeTrackColor: AppColors.green,
+                    onChanged: (v) =>
+                        setState(() => _autoAssignSameProject = v),
+                  ),
+                ),
+              ),
+            ]),
             const SizedBox(height: 8),
           ] else ...[
             const SizedBox(height: 4),

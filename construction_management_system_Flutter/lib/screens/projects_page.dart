@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
+import '../utils/date_helper.dart';
 import '../widgets/task_form.dart';
 import 'tasks_page.dart' show TaskDetailPage;
 
@@ -228,6 +229,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
     );
   }
 
+  Future<void> _markProjectComplete(Map p) async {
+    final pid = p['project_id'];
+    if (pid == null) return;
+    try {
+      await ApiService().updateProject(pid, {'status': 'completed'});
+      toast(AppStrings.t('proj.markCompletedDone'));
+      if (mounted) _load();
+    } catch (e) {
+      toast('${AppStrings.t('proj.markCompletedFailed')}: $e');
+    }
+  }
+
   Widget _projectCard(Map p, {bool inGrid = false}) {
     final progress = (p['progress'] as num? ?? 0).toDouble();
     final workerCount = p['worker_count'] ?? p['tracked_workers'] ?? 0;
@@ -250,6 +263,21 @@ class _ProjectsPageState extends State<ProjectsPage> {
               ),
               Row(mainAxisSize: MainAxisSize.min, children: [
                 statusPill(p['status'] ?? 'planning'),
+                if ((p['status'] ?? 'planning') != 'completed' && progress >= 100) ...[
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: () => _markProjectComplete(p),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.greenLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.check_circle_rounded,
+                          size: 14, color: AppColors.green),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 6),
                 // Edit button
                 GestureDetector(
@@ -306,7 +334,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
               Text('${progress.toStringAsFixed(0)}% complete',
                   style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
               if (p['end_date'] != null)
-                Text('Due ${p['end_date']}',
+                Text('Due ${DateHelper.tryFormatShort(p['end_date'])}',
                     style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
             ]),
           ]),
@@ -442,7 +470,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   }
 
   String _fmtDate(DateTime? d) => d == null ? t('Not set', 'Tidak ditetapkan')
-      : '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      : DateHelper.formatShort(d);
 
   @override
   Widget build(BuildContext context) {
@@ -830,6 +858,18 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     }
   }
 
+  Future<void> _markProjectComplete() async {
+    final p = project;
+    if (p == null) return;
+    try {
+      await ApiService().updateProject(p['project_id'], {'status': 'completed'});
+      toast(AppStrings.t('proj.markCompletedDone'));
+      if (mounted) _load();
+    } catch (e) {
+      toast('${AppStrings.t('proj.markCompletedFailed')}: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext c) {
     if (ld) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
@@ -876,6 +916,23 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Expanded(child: Text(p['project_name'] ?? '-',
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
+              if ((p['status'] ?? 'planning') != 'completed' &&
+                  ((p['progress'] ?? 0) as num).toDouble() >= 100) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: _markProjectComplete,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.check_circle_rounded, size: 14, color: AppColors.green),
+                      const SizedBox(width: 4),
+                      Text('Complete',
+                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                ),
+              ],
               statusPill(p['status'] ?? 'planning'),
             ]),
             const SizedBox(height: 6),
@@ -940,9 +997,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
         // Dates
         Row(children: [
-          Expanded(child: statCard(label: 'Start', value: p['start_date'] ?? '—')),
+          Expanded(child: statCard(label: 'Start', value: DateHelper.tryFormatShort(p['start_date'], fallback: '—'))),
           const SizedBox(width: 10),
-          Expanded(child: statCard(label: 'Due', value: p['end_date'] ?? '—')),
+          Expanded(child: statCard(label: 'Due', value: DateHelper.tryFormatShort(p['end_date'], fallback: '—'))),
         ]),
         const SizedBox(height: 16),
 
@@ -1058,10 +1115,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               padding: const EdgeInsets.only(bottom: 10),
               child: InkWell(
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => TaskDetailPage(task: Map<String, dynamic>.from(t))),
-                ),
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => TaskDetailPage(task: Map<String, dynamic>.from(t))),
+                  );
+                  if (mounted) _load();
+                },
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -1099,7 +1159,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       child: Row(children: [
                         Expanded(
                           child: Text(
-                            '${t['due_date'] ?? 'No due date'}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
+                            '${DateHelper.tryFormatShort(t['due_date'], fallback: 'No due date')}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),

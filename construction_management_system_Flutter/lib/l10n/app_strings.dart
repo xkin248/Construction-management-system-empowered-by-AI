@@ -316,6 +316,16 @@ class AppStrings {
     'gps.enableBody': ['Enable GPS to record your attendance location.', 'Aktifkan GPS untuk merekod lokasi kehadiran anda.'],
     'gps.allow': ['Allow', 'Benarkan'],
     'gps.later': ['Later', 'Nanti'],
+
+    // ============ Project status / task operations ============
+    'proj.markCompleted': ['Mark as completed', 'Tandakan selesai'],
+    'proj.markCompletedDone': ['Project marked as completed', 'Projek ditandakan sebagai selesai'],
+    'proj.markCompletedFailed': ['Failed to mark project completed', 'Gagal menandakan projek selesai'],
+    'tasks.deleteConfirm': ['Delete this task?', 'Padam tugasan ini?'],
+    'tasks.deleteConfirmBody': ['This permanently removes the task and its assignments.', 'Tindakan ini memadam tugasan dan penugasan pekerjanya secara kekal.'],
+    'tasks.deleteSuccess': ['Task deleted', 'Tugasan dipadam'],
+    'tasks.deleteFailed': ['Failed to delete task', 'Gagal memadam tugasan'],
+    'tasks.autoAssignSameProject': ['Only match workers in this project', 'Hanya padankan pekerja dalam projek ini'],
   };
 
   /// Look up a string by key for the current language.

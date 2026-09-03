@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../utils/date_helper.dart';
 
 class TaskForm extends StatefulWidget {
   /// Pre-filled task data for edit mode; null for create mode.
@@ -220,7 +220,7 @@ class _TaskFormState extends State<TaskForm> {
                               label: Text(
                                 _due == null
                                     ? 'Select'
-                                    : DateFormat('dd/MM/yy').format(_due!),
+                                    : DateHelper.formatShort(_due!),
                                 style: GoogleFonts.outfit(fontSize: 13),
                               ),
                               style: OutlinedButton.styleFrom(

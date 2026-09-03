@@ -1,3 +1,5 @@
+import '../utils/date_helper.dart';
+
 class FileItem {
   final int fileId;
   final String originalName;
@@ -63,10 +65,7 @@ class FileItem {
     return '${(fileSize / 1048576).toStringAsFixed(1)} MB';
   }
 
-  String get dateFormatted {
-    final d = createdAt.toLocal();
-    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-  }
+  String get dateFormatted => DateHelper.formatShort(createdAt.toLocal());
 
   String get categoryLabel {
     const map = {

@@ -9,6 +9,7 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
+import '../utils/date_helper.dart';
 import '../models/notification.dart';
 import 'projects_page.dart';
 import 'tasks_page.dart';
@@ -431,7 +432,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${r['report_date'] ?? ''} · ${r['weather'] ?? ''}',
+                        Text('${DateHelper.tryFormatShort(r['report_date'])} · ${r['weather'] ?? ''}',
                             style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
                         const SizedBox(height: 2),
                         Text(r['work_progress']?.toString() ?? 'No content',
