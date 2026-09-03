@@ -58,7 +58,8 @@ def ai_auto_assign_tasks(
         project_id=request.project_id,
         task_ids=request.task_ids,
         dry_run=request.dry_run,
-        top_k=request.top_k
+        top_k=request.top_k,
+        same_project_only=request.same_project_only,
     )
 
 

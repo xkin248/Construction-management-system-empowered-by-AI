@@ -310,6 +310,7 @@ class AIAutoAssignRequest(BaseModel):
     task_ids: Optional[List[int]] = None
     dry_run: bool = True
     top_k: int = 3
+    same_project_only: bool = False
 
 class AIAutoAssignItem(BaseModel):
     task_id: int

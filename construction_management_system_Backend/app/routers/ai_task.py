@@ -327,6 +327,32 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     return _serialize_task(task)
 
 
+@router.delete("/tasks/{task_id}")
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    """Delete a task together with its task_workers association rows, then
+    recompute the owning project's progress/status so the board stays in sync.
+
+    SessionLocal runs with autoflush=False, therefore the task deletion must be
+    flushed explicitly before the recalc queries re-read the project's task set.
+    """
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+    project_id = task.project_id
+    # task.task_workers has cascade="all, delete-orphan" on the model, but we
+    # delete the rows explicitly first (same pattern as _set_task_workers) so
+    # ORM bookkeeping never re-inserts stale links during the flush.
+    for link in list(task.task_workers):
+        db.delete(link)
+    db.flush()
+    db.delete(task)
+    db.flush()  # persist the delete so recalc queries see the reduced task set
+    _recalc_project_progress(db, project_id)
+    _recalc_project_status(db, project_id)
+    db.commit()
+    return {"status": "ok", "msg": f"Task {task_id} deleted successfully", "project_id": project_id}
+
+
 @router.post("/ai/tasks/match", response_model=List[AIMatchResult])
 def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)):
     workers = db.query(Worker).all()

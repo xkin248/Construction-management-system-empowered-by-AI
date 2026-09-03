@@ -553,7 +553,8 @@ def auto_assign_tasks(
     project_id: Optional[int] = None,
     task_ids: Optional[List[int]] = None,
     dry_run: bool = True,
-    top_k: int = 3
+    top_k: int = 3,
+    same_project_only: bool = False
 ) -> Dict[str, Any]:
     q = db.query(Task)
     if project_id is not None:
@@ -563,16 +564,21 @@ def auto_assign_tasks(
     q = q.filter(Task.status != "completed")
     tasks = q.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.task_id.asc()).all()
 
-    # Auto-assign matches against the whole worker pool (same as the analyze
-    # screen default) so tasks in projects without bound workers can still get
-    # matched. The trade matching itself guarantees the right trade wins.
-    workers = db.query(Worker).all()
+    # Auto-assign normally matches against the whole worker pool (same as the
+    # analyze screen default) so tasks in projects without bound workers can
+    # still get matched. When same_project_only=True the pool is restricted to
+    # workers bound to the requested project (requires project_id); the trade
+    # matching still guarantees the right trade wins within that pool.
+    if same_project_only and project_id is not None:
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).all()
     worker_ids = {w.worker_id for w in workers}
 
     assignments = []
     for t in tasks:
         task_info = {"task_name": t.task_name, "description": t.description or ""}
-        rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=False)
+        rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=same_project_only)
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])
 

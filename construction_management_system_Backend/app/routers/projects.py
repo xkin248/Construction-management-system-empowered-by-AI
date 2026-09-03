@@ -9,6 +9,24 @@ from app.schemas import ProjectCreate, ProjectOut, DashboardKPI
 
 router = APIRouter(tags=["🏗️ Project Management"])
 
+
+def _derived_project_status(project) -> str:
+    """Derive project.status from its task set (read-only, never persisted).
+
+    Mirrors ai_task._recalc_project_status so list/detail responses never show
+    a stale "planning" column for a project that already has tasks:
+    - no tasks -> "planning"
+    - tasks all completed -> "completed"
+    - any other task set (pending-only / in_progress / mixed) -> "in_progress"
+    """
+    tasks = list(project.tasks or [])
+    if not tasks:
+        return "planning"
+    if all(t.status == "completed" for t in tasks):
+        return "completed"
+    return "in_progress"
+
+
 @router.get("/projects", response_model=List[ProjectOut])
 def lp(db=Depends(get_db)):
     projects = db.query(Project).order_by(Project.project_id.desc()).all()
@@ -18,6 +36,7 @@ def lp(db=Depends(get_db)):
         if total > 0:
             done = sum(1 for t in p.tasks if t.status == "completed")
             p.progress = round(done / total * 100, 1)
+        p.status = _derived_project_status(p)  # read-derived, not written back
     return projects
 
 @router.post("/projects", response_model=ProjectOut)
@@ -34,7 +53,9 @@ def cp(d: ProjectCreate, db=Depends(get_db)):
 @router.get("/projects/{pid}", response_model=ProjectOut)
 def gp(pid:int, db=Depends(get_db)):
     p = db.query(Project).get(pid)
-    if not p: raise HTTPException(404,"Project does not exist"); return p
+    if not p: raise HTTPException(404,"Project does not exist")
+    p.status = _derived_project_status(p)  # read-derived, not written back
+    return p
 
 @router.put("/projects/{pid}", response_model=ProjectOut)
 def up(pid:int, d:ProjectCreate, db=Depends(get_db)):
