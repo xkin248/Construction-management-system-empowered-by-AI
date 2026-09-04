@@ -267,29 +267,43 @@ def analyze_task(
 
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
-
     task_text = f"{task_name} {description}".lower()
 
-    # Trade is no longer accepted from the task form: the required role is
-    # decided purely from title + description via keyword & semantic matching.
-    semantic_scores = _semantic_trade_scores(task_text)
-    # 1. Keyword detection first (TASK_KEYWORDS substring match — reliable, no false positives).
-    detected_trades = _detect_trade_groups(task_text)
-    # 1b. Ambiguous multi-hit: resolve with semantic scores when possible.
-    detected_trades = _resolve_detected_trades(task_text, detected_trades, semantic_scores)
-    # 2. Semantic detection as a supplement — only when keywords found nothing AND
-    #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
-    #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
-    #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
-    if not detected_trades:
-        if semantic_scores:
-            best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
-            sorted_scores = sorted(semantic_scores.values(), reverse=True)
-            gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
-            if best_score >= 0.6 and gap >= 0.15:
-                detected_trades = {best_trade}
+    # 1. Explicit trade selection (user picked a trade from the dropdown when
+    #    creating/editing a task) takes priority over any keyword/semantic
+    #    guess: map the raw value to its canonical group. If it maps, skip
+    #    keyword/semantic detection entirely; if it does not map, ignore it
+    #    and fall through to the normal text-based detection.
+    explicit = (task_info.get("trade") or "").strip().lower()
+    explicit_group = _worker_trade_group(explicit) if explicit else None
+    if explicit_group:
+        detected_trades = {explicit_group}
+        semantic_scores = {explicit_group: 1.0}
+        trade_source = "explicit"
     else:
-        semantic_scores = {canonical: 1.0 for canonical in detected_trades}
+        semantic_scores = _semantic_trade_scores(task_text)
+        # 2. Keyword detection first (TASK_KEYWORDS substring match — reliable, no false positives).
+        detected_trades = _detect_trade_groups(task_text)
+        # 2b. Ambiguous multi-hit: resolve with semantic scores when possible.
+        detected_trades = _resolve_detected_trades(task_text, detected_trades, semantic_scores)
+        # 3. Semantic detection as a supplement — only when keywords found nothing AND
+        #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
+        #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
+        #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
+        if not detected_trades:
+            if semantic_scores:
+                best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
+                sorted_scores = sorted(semantic_scores.values(), reverse=True)
+                gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
+                if best_score >= 0.6 and gap >= 0.15:
+                    detected_trades = {best_trade}
+        else:
+            semantic_scores = {canonical: 1.0 for canonical in detected_trades}
+        trade_source = "semantic"
+
+    # Vague-text guard: no explicit trade AND nothing keyword/semantic could
+    # identify (e.g. "test"/"test") -> never auto-assign such a task.
+    low_confidence = explicit_group is None and not detected_trades
 
     suggested_workers = []
     matched_any = False
@@ -353,17 +367,30 @@ def analyze_task(
     else:
         duration_estimate = "Based on task complexity, estimated 1-3 days"
 
+    if low_confidence:
+        notice = (
+            "Task title/description is too vague to identify a required trade "
+            "(e.g. test). Edit the task with a specific title/description or "
+            "select an explicit trade — no worker will be auto-assigned."
+        )
+    elif not matched_any and detected_trades:
+        notice = "No workers match the required trade ({}), showing alternative candidates".format(
+            "/".join(sorted(detected_trades))
+        )
+    else:
+        notice = ""
+
     return {
         "suggested_workers": suggested_workers[:5],
         "estimated_duration": duration_estimate,
         "priority_suggestion": priority,
         "safety_notes": "Please ensure construction workers wear the necessary safety protective equipment and follow on-site safety regulations.",
         "matched_trades": sorted(detected_trades),
-        "trade_source": "semantic",
+        "trade_source": trade_source,
         "semantic_used": bool(semantic_scores),
-        "notice": "" if matched_any or not detected_trades else "No workers match the required trade ({}), showing alternative candidates".format(
-            "/".join(sorted(detected_trades))
-        ),
+        "notice": notice,
+        "low_confidence": low_confidence,
+        "assignable": not low_confidence,
     }
 
 
@@ -536,10 +563,14 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
                 out["suggested_workers"] = out["suggested_workers"][:top_k]
                 out["semantic_used"] = True
                 out["matched_trades"] = base_for_trades.get("matched_trades") or []
+                out["low_confidence"] = base_for_trades.get("low_confidence", False)
+                out["assignable"] = base_for_trades.get("assignable", True)
                 return out
             if isinstance(parsed, list):
                 return {"suggested_workers": parsed[:top_k], "semantic_used": True,
-                        "matched_trades": base_for_trades.get("matched_trades") or []}
+                        "matched_trades": base_for_trades.get("matched_trades") or [],
+                        "low_confidence": base_for_trades.get("low_confidence", False),
+                        "assignable": base_for_trades.get("assignable", True)}
         except Exception:
             pass
 
@@ -577,10 +608,46 @@ def auto_assign_tasks(
 
     assignments = []
     for t in tasks:
-        task_info = {"task_name": t.task_name, "description": t.description or ""}
+        task_info = {"task_name": t.task_name, "description": t.description or "", "trade": t.trade or ""}
         rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=same_project_only)
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])
+
+        # Vague-task guard: text could not identify a required trade and there
+        # is no explicit trade -> never auto-assign (prevents e.g. "test/test"
+        # being dumped on an arbitrary worker).
+        if rec.get("low_confidence"):
+            assignments.append({
+                "task_id": t.task_id,
+                "task_name": t.task_name,
+                "assigned_worker_id": None,
+                "assigned_worker_ids": [],
+                "suggested_workers": [],
+                "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+                "skipped": True,
+                "skip_reason": "Task text too vague to identify required trade; set explicit trade or specific description",
+            })
+            continue
+
+        # Missing-trade guard: the task demands a trade but no worker in the
+        # current pool belongs to it -> skip rather than assign a wrong-trade
+        # worker (would repeat the old "electric task assigned to carpenter" bug).
+        if matched_trades:
+            pool_trade_hit = any(_worker_trade_group(w.trade) in matched_trades for w in workers)
+            if not pool_trade_hit:
+                assignments.append({
+                    "task_id": t.task_id,
+                    "task_name": t.task_name,
+                    "assigned_worker_id": None,
+                    "assigned_worker_ids": [],
+                    "suggested_workers": [],
+                    "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+                    "skipped": True,
+                    "skip_reason": "No worker with required trade ({}) is available in the worker pool; add a worker with that trade or edit the task".format(
+                        "/".join(sorted(matched_trades))
+                    ),
+                })
+                continue
 
         # Re-evaluate tasks that already have a full assignment: skip them only
         # when the currently assigned workers actually match the task demand.
@@ -630,6 +697,8 @@ def auto_assign_tasks(
             "assigned_worker_ids": chosen_ids,
             "suggested_workers": suggested,
             "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+            "skipped": False,
+            "skip_reason": None,
         })
 
     if not dry_run:

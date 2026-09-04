@@ -319,6 +319,8 @@ class AIAutoAssignItem(BaseModel):
     assigned_worker_ids: List[int] = []
     suggested_workers: List[Dict[str, Any]] = []
     ai_used: bool = False
+    skipped: bool = False
+    skip_reason: Optional[str] = None
 
 class AIAutoAssignResponse(BaseModel):
     project_id: int
