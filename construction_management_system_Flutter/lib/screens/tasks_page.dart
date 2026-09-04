@@ -776,12 +776,34 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
     setState(() => _autoAssigning = true);
     try {
-      await ApiService().aiAutoAssign(
+      final result = await ApiService().aiAutoAssign(
             pid,
             taskIds: [tid],
             dryRun: false,
             sameProjectOnly: _autoAssignSameProject,
           );
+      // Backend guards against mis-assignment: low-confidence/vague tasks are
+      // skipped with a reason instead of being randomly assigned.
+      Map? skipped;
+      final assignments = result['assignments'];
+      if (assignments is List && assignments.isNotEmpty) {
+        for (final x in assignments) {
+          if (x is Map && x['task_id'] == tid) {
+            if (x['skipped'] == true) skipped = Map.from(x);
+            break;
+          }
+        }
+        skipped ??= (assignments.first is Map &&
+                (assignments.first as Map)['skipped'] == true)
+            ? Map.from(assignments.first as Map)
+            : null;
+      }
+      if (skipped != null) {
+        final reason = (skipped['skip_reason'] as String?) ??
+            'task text is too vague or no matching trade worker is available';
+        if (mounted) _showAutoAssignSkipped(reason);
+        return;
+      }
       await _refreshTaskFromServer();
       if (mounted) {
         toast('Auto assign done — worker refreshed');
@@ -791,6 +813,27 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     } finally {
       if (mounted) setState(() => _autoAssigning = false);
     }
+  }
+
+  void _showAutoAssignSkipped(String reason) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Not auto-assigned'),
+        content: Text(
+          '$reason\n\nEdit the task to select a Required Trade, or make the '
+          'name/description more specific — Auto Assign will then match workers '
+          'by trade and will never randomly assign.',
+          style: GoogleFonts.outfit(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openAssignSheet() {

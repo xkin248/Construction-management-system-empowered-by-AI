@@ -34,6 +34,12 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _supCheckedIn = false;
   String _supMsg = AppStrings.t('dash.checkinHint');
 
+  // AI Progress Prediction — manual trigger only (never on refresh, to save tokens).
+  int? _predProjectId;
+  bool _predLoading = false;
+  Map? _prediction;
+  int? _predictionPid; // project id that _prediction belongs to (avoid stale display)
+
   @override
   void initState() {
     super.initState();
@@ -326,6 +332,10 @@ class _DashboardPageState extends State<DashboardPage> {
               _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0),
             ]);
           }),
+          const SizedBox(height: 20),
+
+          // ── AI Progress Prediction (manual trigger, mobile friendly) ──
+          _buildPredictionSection(),
           const SizedBox(height: 20),
 
           // ── Productivity by Project ──
@@ -715,4 +725,364 @@ class _DashboardPageState extends State<DashboardPage> {
     final dt = DateTime.tryParse(iso);
     return dt == null ? iso : DateHelper.formatShort(dt);
   }
+
+  // ── AI Progress Prediction (manual trigger only — never auto-refreshed) ──
+  Future<void> _runPrediction() async {
+    final pid = _predProjectId;
+    if (pid == null) {
+      toast('Select a project first');
+      return;
+    }
+    if (_predLoading) return;
+    setState(() => _predLoading = true);
+    try {
+      final res = await ApiService().progressPrediction(pid);
+      if (!mounted) return;
+      setState(() {
+        _prediction = res;
+        _predictionPid = pid;
+      });
+    } on DioException catch (e) {
+      toast('Prediction failed: ${e.message ?? e}');
+    } catch (e) {
+      toast('Prediction failed: $e');
+    } finally {
+      if (mounted) setState(() => _predLoading = false);
+    }
+  }
+
+  double? _predNum(Map m, String key) {
+    final v = m[key];
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
+  }
+
+  Color _trendColor(String trend) {
+    switch (trend.toLowerCase()) {
+      case 'ahead':
+        return AppColors.green;
+      case 'behind':
+        return AppColors.yellow;
+      case 'critical':
+        return AppColors.red;
+      default:
+        return AppColors.blue;
+    }
+  }
+
+  Widget _buildPredictionSection() {
+    final showResult = !_predLoading &&
+        _predProjectId != null &&
+        _prediction != null &&
+        _predictionPid == _predProjectId;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.purpleLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.auto_awesome_rounded,
+                size: 18, color: AppColors.purple),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('AI Progress Prediction',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary)),
+              Text('Manual — calls the AI only when you tap Update (auto-refresh disabled, saves tokens)',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        LayoutBuilder(builder: (ctx, cs) {
+          final wide = cs.maxWidth >= 480;
+          final picker = DropdownButtonFormField<int?>(
+            initialValue: _predProjectId,
+            isExpanded: true,
+            decoration: InputDecoration(
+              isDense: true,
+              hintText: 'Select project',
+              hintStyle:
+                  GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+              filled: true,
+              fillColor: AppColors.bgMain,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.accent)),
+            ),
+            items: [
+              for (final p in projects)
+                if (p['project_id'] != null)
+                  DropdownMenuItem<int?>(
+                    value: (p['project_id'] as num).toInt(),
+                    child: Text(
+                      p['project_name']?.toString() ?? 'Project',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.outfit(fontSize: 13),
+                    ),
+                  ),
+            ],
+            onChanged: (v) => setState(() => _predProjectId = v),
+          );
+          final updateBtn = SizedBox(
+            width: wide ? null : double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: _predLoading ? null : _runPrediction,
+              icon: _predLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: Text(
+                _predLoading ? 'Predicting...' : 'Update Prediction',
+                style:
+                    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          );
+          if (wide) {
+            return Row(children: [
+              Expanded(child: picker),
+              const SizedBox(width: 12),
+              updateBtn,
+            ]);
+          }
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            picker,
+            const SizedBox(height: 10),
+            updateBtn,
+          ]);
+        }),
+        const SizedBox(height: 14),
+        if (_predLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2.5)),
+          )
+        else if (showResult)
+          _predictionResultBlock(_prediction!)
+        else
+          Text(
+            'Select a project and tap Update to see AI completion estimates.',
+            style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted),
+          ),
+      ]),
+    );
+  }
+
+  Widget _predictionResultBlock(Map pred) {
+    final current = _predNum(pred, 'current_progress') ?? 0;
+    final scheduled = _predNum(pred, 'scheduled_progress');
+    final gap = _predNum(pred, 'progress_gap');
+    final trend = (pred['trend'] as String? ?? 'on_track').toLowerCase();
+    final tc = _trendColor(trend);
+    final confRaw = pred['confidence'] ?? pred['ai_confidence'];
+    final confidence = confRaw is num
+        ? confRaw.toDouble()
+        : double.tryParse(confRaw?.toString() ?? '');
+    final aiUsed = pred['ai_used'] == true;
+    final daysLeft = (pred['estimated_days_remaining'] as num?)?.toInt();
+    final velocity = pred['velocity'];
+    final weeksLeft = velocity is Map
+        ? _predNum(velocity, 'estimated_weeks_remaining')
+        : null;
+    final risk = pred['risk_factors'] is List
+        ? (pred['risk_factors'] as List).take(3).toList()
+        : <dynamic>[];
+    final recs = pred['recommendations'] is List
+        ? (pred['recommendations'] as List).take(3).toList()
+        : <dynamic>[];
+    final milestones = pred['milestones'] is List
+        ? (pred['milestones'] as List).take(3).toList()
+        : <dynamic>[];
+    final insights = pred['ai_insights']?.toString();
+    final chips = <Widget>[
+      if (pred['predicted_completion_date'] != null)
+        _predChip('Finish: ${_fmtDate(pred['predicted_completion_date'].toString())}', AppColors.accentLight, AppColors.accentDark),
+      if (daysLeft != null)
+        _predChip('~$daysLeft day(s) left', AppColors.blueLight, AppColors.blue),
+      if (weeksLeft != null && weeksLeft < 900)
+        _predChip('~${weeksLeft.toStringAsFixed(0)} weeks est.', AppColors.purpleLight, AppColors.purple),
+      if (confidence != null)
+        _predChip('Confidence ${confidence.toStringAsFixed(0)}%', AppColors.greenLight, AppColors.green),
+    ];
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (insights != null && insights.trim().isNotEmpty) ...[
+        Text(insights.trim(),
+            style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
+        const SizedBox(height: 12),
+      ],
+      _predBarRow('Current', current, AppColors.accent),
+      if (scheduled != null) ...[
+        const SizedBox(height: 6),
+        _predBarRow('Scheduled', scheduled.clamp(0, 100).toDouble(), AppColors.border),
+      ],
+      const SizedBox(height: 10),
+      Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: tc.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(trend.toUpperCase(),
+              style: GoogleFonts.outfit(
+                  fontSize: 11, fontWeight: FontWeight.w800, color: tc)),
+        ),
+        if (gap != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            gap >= 0 ? '+${gap.toStringAsFixed(1)}% vs plan (ahead)' : '${gap.toStringAsFixed(1)}% vs plan (behind)',
+            style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: gap >= 0 ? AppColors.green : AppColors.yellow),
+          ),
+        ],
+      ]),
+      if (chips.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: chips),
+      ],
+      if (milestones.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Text('Milestones', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        const SizedBox(height: 6),
+        for (final ms in milestones)
+          if (ms is Map)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _predBarRow(
+                ms['label']?.toString() ?? '',
+                (_predNum(ms, 'predicted_progress') ?? 0).clamp(0, 100).toDouble(),
+                AppColors.purple,
+                compact: true,
+              ),
+            ),
+      ],
+      if (risk.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text('Risk factors', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.red)),
+        const SizedBox(height: 4),
+        _predDotList(risk, AppColors.red),
+      ],
+      if (recs.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text('Recommendations', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.green)),
+        const SizedBox(height: 4),
+        _predDotList(recs, AppColors.green),
+      ],
+      if (!aiUsed) ...[
+        const SizedBox(height: 10),
+        Text('Rule-based estimate (Gemini not enabled)',
+            style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
+      ],
+    ]);
+  }
+
+  Widget _predChip(String text, Color bg, Color fg) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        child: Text(text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+      );
+
+  Widget _predBarRow(String label, double v, Color color, {bool compact = false}) {
+    final value = v.clamp(0, 100).toDouble();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Expanded(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(
+                    fontSize: compact ? 11.5 : 12.5,
+                    color: AppColors.textSecondary))),
+        const SizedBox(width: 8),
+        Text('${value.toStringAsFixed(0)}%',
+            style: GoogleFonts.outfit(
+                fontSize: compact ? 11.5 : 12.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary)),
+      ]),
+      const SizedBox(height: 4),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: LinearProgressIndicator(
+          value: value / 100,
+          minHeight: compact ? 4 : 7,
+          backgroundColor: AppColors.border,
+          valueColor: AlwaysStoppedAnimation(color),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _predDotList(List items, Color color) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration:
+                        BoxDecoration(color: color, shape: BoxShape.circle),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(item?.toString() ?? '',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                ),
+              ]),
+            ),
+        ],
+      );
 }

@@ -25,6 +25,7 @@ class _TaskFormState extends State<TaskForm> {
   DateTime? _due;
   int? _projectId;
   String _priority = 'medium';
+  String? _trade;
 
   List _projects = [];
   bool _loadingProjects = true;
@@ -42,6 +43,7 @@ class _TaskFormState extends State<TaskForm> {
         text: t?['estimated_hours']?.toString() ?? '');
     _priority = t?['priority'] as String? ?? 'medium';
     _projectId = t?['project_id'] as int? ?? widget.initialProjectId;
+    _trade = t?['trade'] as String?;
     if (t?['due_date'] != null && t!['due_date'].toString().isNotEmpty) {
       _due = DateTime.tryParse(t['due_date'].toString());
     }
@@ -70,15 +72,27 @@ class _TaskFormState extends State<TaskForm> {
 
   Future<void> _submit() async {
     if (!(_fk.currentState?.validate() ?? false)) return;
+    // Pre-flight guard: placeholder-ish task text without an explicit trade
+    // would be skipped by AI Auto-Assign. Let the user choose instead of
+    // silently creating a task that can never be auto-assigned.
+    final title = _title.text.trim();
+    final desc = _desc.text.trim();
+    final vague =
+        _isVagueText(title) || (desc.isNotEmpty && _isVagueText(desc));
+    if (_trade == null && vague) {
+      final proceed = await _confirmVagueSubmission();
+      if (proceed != true || !mounted) return;
+    }
     setState(() => _submitting = true);
     try {
       final data = {
-        'task_name': _title.text.trim(),
-        'description': _desc.text.trim(),
+        'task_name': title,
+        'description': desc,
         'project_id': _projectId,
         'priority': _priority,
         'due_date': _due?.toIso8601String().split('T').first,
         'estimated_hours': double.tryParse(_hours.text.trim()) ?? 0,
+        if (_trade != null) 'trade': _trade,
       };
       if (_isEdit) {
         await ApiService().updateTask(widget.task!['task_id'], data);
@@ -179,6 +193,39 @@ class _TaskFormState extends State<TaskForm> {
                           onChanged: (v) =>
                               setState(() => _projectId = v),
                         ),
+                  const SizedBox(height: 14),
+                  // ── Required Trade ──
+                  _fieldLabel('Required Trade'),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: _trade ?? '',
+                    isExpanded: true,
+                    decoration: _inputDeco(null),
+                    items: [
+                      DropdownMenuItem(
+                        value: '',
+                        child: Text('None / Not sure',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                color: AppColors.textMuted)),
+                      ),
+                      ..._kTrades.map((t) => DropdownMenuItem(
+                            value: t.$1,
+                            child: Text(t.$2,
+                                style:
+                                    GoogleFonts.outfit(fontSize: 13)),
+                          )),
+                    ],
+                    onChanged: (v) => setState(
+                        () => _trade = (v == null || v.isEmpty) ? null : v),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Tip: selecting a trade lets AI Auto-Assign match workers by '
+                    'trade instead of guessing from the task title.',
+                    style: GoogleFonts.outfit(
+                        fontSize: 11, color: AppColors.textMuted),
+                  ),
                   const SizedBox(height: 14),
                   // ── Priority + Due Date row ──
                   Row(children: [
@@ -306,4 +353,67 @@ class _TaskFormState extends State<TaskForm> {
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: AppColors.red)),
       );
+
+  /// Heuristic: placeholder-ish text the AI would fail to interpret
+  /// (empty, <3 chars, common junk words, or pure repeated characters).
+  bool _isVagueText(String? raw) {
+    final s = raw?.trim() ?? '';
+    if (s.isEmpty) return true;
+    if (s.length < 3) return true;
+    final lower = s.toLowerCase();
+    const placeholders = {
+      'test', 'abc', 'xxx', 'asd', '123', 'todo', 'testing', 'testinggg',
+      'test1', 'task', 'task1', 'demo', 'foo', 'bar', 'qwerty', 'lorem',
+      'placeholder', 'n/a', 'na', 'none',
+    };
+    if (placeholders.contains(lower)) return true;
+    final runs = lower.runes.toList();
+    if (runs.length >= 3 && runs.every((r) => r == runs.first)) return true;
+    return false;
+  }
+
+  Future<bool?> _confirmVagueSubmission() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Task info too vague — AI may not auto-assign'),
+        content: const Text(
+            'This task name/description looks like a placeholder (e.g. "test"). '
+            'Without a clear name or an explicit Required Trade, AI Auto-Assign '
+            'will skip this task instead of guessing, so it may stay unassigned.\n\n'
+            'Add a specific task name/description, or pick a Required Trade above.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Back to edit'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.red),
+            child: const Text('Submit anyway'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+/// Canonical trade values consumed by AI Auto-Assign (value = canonical lowercase).
+const List<(String, String)> _kTrades = [
+  ('carpenter', 'Carpenter'),
+  ('electrical', 'Electrician'),
+  ('plumbing', 'Plumber'),
+  ('masonry', 'Mason'),
+  ('painting', 'Painter'),
+  ('welding', 'Welder'),
+  ('hvac', 'HVAC Technician'),
+  ('roofing', 'Roofer'),
+  ('tiling', 'Tiler'),
+  ('drywall', 'Drywall Installer'),
+  ('glazing', 'Glazier'),
+  ('flooring', 'Flooring Installer'),
+  ('equipment', 'Equipment Operator'),
+  ('laborer', 'General Laborer'),
+  ('insulation', 'Insulation Installer'),
+  ('supervision', 'Site Supervisor'),
+];
