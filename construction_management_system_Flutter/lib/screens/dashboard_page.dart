@@ -279,6 +279,10 @@ class _DashboardPageState extends State<DashboardPage> {
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
+        // Experiment: force all dashboard sections to stay laid out & painted
+        // up front so scrolling does not rebuild/recycle viewport tiles (which
+        // renders blank on some devices). Revisit once root cause is confirmed.
+        cacheExtent: 100000,
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
           // ── Load error banner with retry ──
