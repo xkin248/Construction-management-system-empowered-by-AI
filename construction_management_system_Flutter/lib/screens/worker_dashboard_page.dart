@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
 import '../utils/date_helper.dart';
@@ -112,7 +113,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
   Future<void> _loadProjects() async {
     try {
-      _projects = await ApiService().getProjects();
+      _projects = await ProjectCache.get(ApiService());
       if (_projects.isNotEmpty && _selectedProjectId == null) {
         final sp = await SharedPreferences.getInstance();
         final savedPid = sp.getInt('project_id');

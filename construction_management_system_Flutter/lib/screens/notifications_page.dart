@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../models/notification.dart';
@@ -26,15 +27,20 @@ class NotificationsPage extends StatefulWidget {
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsPageState extends State<NotificationsPage> {
+class _NotificationsPageState extends State<NotificationsPage>
+    with WidgetsBindingObserver {
   bool _loading = true;
   int _unreadCount = 0;
   List<NotificationItem> _items = [];
   NotificationSettings? _settings;
   Timer? _pollTimer;
+  TabController? _tabController;
 
   bool _repLoading = false;
   bool _issLoading = false;
+  // Tracks whether reports/issues have been loaded at least once
+  bool _repLoaded = false;
+  bool _issLoaded = false;
   List projects = [];
   List reports = [];
   List issues = [];
@@ -54,12 +60,18 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
     _loadRole();
-    _load();
-    _loadReports();
-    _loadIssues();
+    _load(); // load notifications eagerly (lightweight)
+    // Reports & Issues are loaded lazily on first tab visit (avoids 500 toast
+    // when the reports API is unavailable, and saves unnecessary requests).
+    _startPoll();
+  }
+
+  void _startPoll() {
+    _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) => _refreshCount());
   }
 
@@ -81,9 +93,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     _pollTimer?.cancel();
+    _tabController?.removeListener(_onTabChanged);
+    _tabController?.dispose();
     _workProgress.dispose();
     _materials.dispose();
     _issuesEnc.dispose();
@@ -91,6 +106,34 @@ class _NotificationsPageState extends State<NotificationsPage> {
     _issTitle.dispose();
     _issDesc.dispose();
     super.dispose();
+  }
+
+  /// Pause polling when app is backgrounded, resume when foregrounded.
+  /// This prevents unnecessary network requests (and battery drain) when
+  /// the user is not actively using the app.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startPoll();
+      _refreshCount(); // immediate refresh after returning to foreground
+    } else if (state == AppLifecycleState.paused ||
+               state == AppLifecycleState.detached) {
+      _pollTimer?.cancel();
+      _pollTimer = null;
+    }
+  }
+
+  void _onTabChanged() {
+    if (_tabController == null || !_tabController!.indexIsChanging) return;
+    final i = _tabController!.index;
+    if (!_isWorker) {
+      // tab 1 = Daily Reports, tab 2 = Issues
+      if (i == 1 && !_repLoaded) _loadReports();
+      if (i == 2 && !_issLoaded) _loadIssues();
+    } else {
+      // worker: tab 1 = Issues
+      if (i == 1 && !_issLoaded) _loadIssues();
+    }
   }
 
   Future<void> _load() async {
@@ -256,71 +299,81 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Build tab list once so DefaultTabController length never mismatches.
+    final tabs = [
+      Tab(text: AppStrings.t('notif.title')),
+      if (!_isWorker) Tab(text: AppStrings.t('notif.dailyReports')),
+      Tab(text: AppStrings.t('notif.issues')),
+    ];
+    final tabViews = [
+      _buildNotificationsTab(),
+      if (!_isWorker) _buildReportsTab(),
+      _buildIssuesTab(),
+    ];
     return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: AppColors.bgMain,
-        appBar: AppBar(
-          title: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(AppStrings.t('notif.title'),
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
-            if (_unreadCount > 0) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppColors.red,
-                  borderRadius: BorderRadius.circular(10),
+      length: tabs.length,
+      child: Builder(builder: (ctx) {
+        // Attach listener once after the DefaultTabController is created.
+        final controller = DefaultTabController.of(ctx);
+        if (_tabController != controller) {
+          _tabController?.removeListener(_onTabChanged);
+          _tabController = controller;
+          _tabController!.addListener(_onTabChanged);
+        }
+        return Scaffold(
+          backgroundColor: AppColors.bgMain,
+          appBar: AppBar(
+            title: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(AppStrings.t('notif.title'),
+                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
+              if (_unreadCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('$_unreadCount',
+                      style: GoogleFonts.outfit(
+                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
                 ),
-                child: Text('$_unreadCount',
-                    style: GoogleFonts.outfit(
-                        color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+              ],
+            ]),
+            actions: [
+              if (_items.any((e) => !e.isRead))
+                TextButton.icon(
+                  onPressed: _markAllRead,
+                  icon: const Icon(Icons.done_all_rounded, size: 18),
+                  label: Text(AppStrings.t('notif.markAllRead')),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                ),
+              IconButton(
+                icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+                tooltip: 'Notification settings',
+                onPressed: _openSettings,
               ),
             ],
-          ]),
-          actions: [
-            if (_items.any((e) => !e.isRead))
-              TextButton.icon(
-                onPressed: _markAllRead,
-                icon: const Icon(Icons.done_all_rounded, size: 18),
-                label: Text(AppStrings.t('notif.markAllRead')),
-                style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-              ),
-            IconButton(
-              icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-              tooltip: 'Notification settings',
-              onPressed: _openSettings,
+            bottom: TabBar(
+              indicatorColor: AppColors.accent,
+              labelColor: AppColors.accent,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+              tabs: tabs,
             ),
-          ],
-          bottom: TabBar(
-            indicatorColor: AppColors.accent,
-            labelColor: AppColors.accent,
-            unselectedLabelColor: AppColors.textSecondary,
-            labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
-            tabs: [
-              Tab(text: AppStrings.t('notif.title')),
-              if (!_isWorker) Tab(text: AppStrings.t('notif.dailyReports')),
-              Tab(text: AppStrings.t('notif.issues')),
-            ],
           ),
-        ),
-        body: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
-            child: SizedBox(
-              width: double.infinity,
-              child: TabBarView(
-                children: [
-                  _buildNotificationsTab(),
-                  if (!_isWorker) _buildReportsTab(),
-                  _buildIssuesTab(),
-                ],
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+              child: SizedBox(
+                width: double.infinity,
+                child: TabBarView(children: tabViews),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 
@@ -600,13 +653,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _loadReports() async {
     setState(() => _repLoading = true);
     try {
-      projects = await ApiService().getProjects();
+      if (projects.isEmpty) {
+        projects = await ProjectCache.get(ApiService());
+      }
       if (projects.isNotEmpty) {
         _repPid ??= projects.first['project_id'] as int;
         reports = await ApiService().getReports(_repPid!);
       }
+      _repLoaded = true;
     } catch (e) {
-      toast('Failed to load reports: $e');
+      // Only show toast when the user is actually looking at this tab
+      if (mounted && (_tabController?.index == (_isWorker ? -1 : 1))) {
+        toast('Failed to load reports: $e');
+      }
     } finally {
       if (mounted) setState(() => _repLoading = false);
     }
@@ -639,10 +698,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
   Future<void> _loadIssues() async {
     setState(() => _issLoading = true);
     try {
-      projects = await ApiService().getProjects();
+      if (projects.isEmpty) {
+        projects = await ProjectCache.get(ApiService());
+      }
       _issPid ??= projects.isNotEmpty ? projects.first['project_id'] as int : null;
       // Load issues in every status so the history stays visible/traceable.
       issues = await ApiService().getIssues();
+      _issLoaded = true;
     } catch (e) {
       toast('Failed to load issues: $e');
     } finally {

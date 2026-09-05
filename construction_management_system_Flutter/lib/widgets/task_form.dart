@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/project_cache.dart';
 import '../utils/date_helper.dart';
 
 class TaskForm extends StatefulWidget {
@@ -52,7 +53,7 @@ class _TaskFormState extends State<TaskForm> {
 
   Future<void> _loadProjects() async {
     try {
-      _projects = await ApiService().getProjects();
+      _projects = await ProjectCache.get(ApiService());
       if (!_isEdit && _projects.isNotEmpty && _projectId == null) {
         _projectId = _projects.first['project_id'];
       }

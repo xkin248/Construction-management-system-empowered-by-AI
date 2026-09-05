@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
@@ -45,7 +46,7 @@ class _TasksPageState extends State<TasksPage> {
   Future<void> _load() async {
     setState(() => ld = true);
     try {
-      projects = await ApiService().getProjects();
+      projects = await ProjectCache.get(ApiService());
       if (projects.isNotEmpty) {
         // Default to ALL projects so a supervisor sees every task instead of
         // only the first project's tasks. A project filter dropdown is still

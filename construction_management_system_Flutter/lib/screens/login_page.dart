@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
+import '../services/token_storage.dart';
 import '../l10n/app_strings.dart';
 import 'home_shell.dart';
 import 'worker_home_shell.dart';
@@ -48,18 +48,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => ld = true);
     try {
       final r = await ApiService().login(a: _email.text, p: _pwd.text);
-      final sp = await SharedPreferences.getInstance();
-      await sp.setString('token', r['access_token']);
+
+      // Save JWT securely (Android Keystore / iOS Keychain via
+      // flutter_secure_storage). Non-sensitive role data goes to SharedPrefs.
+      await TokenStorage.saveToken(r['access_token']);
 
       final userType = r['user_type'] ?? 'supervisor';
       final user     = Map<String, dynamic>.from(r['user'] ?? {});
       final role     = user['role']?.toString().toLowerCase() ?? '';
 
-      await sp.setString('user_type', userType);
-      await sp.setString('user_role', role);
-      if (user['worker_id']     != null) await sp.setInt('worker_id',     user['worker_id']     as int);
-      if (user['supervisor_id'] != null) await sp.setInt('supervisor_id', user['supervisor_id'] as int);
-      if (user['project_id']    != null) await sp.setInt('project_id',    user['project_id']    as int);
+      await TokenStorage.saveUserMeta(
+        userType: userType,
+        role: role,
+        workerId:     user['worker_id']     as int?,
+        supervisorId: user['supervisor_id'] as int?,
+        projectId:    user['project_id']    as int?,
+      );
 
       ApiService().ut(r['access_token']);
 

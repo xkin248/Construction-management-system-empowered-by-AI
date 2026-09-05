@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
@@ -211,7 +212,7 @@ class _DashboardPageState extends State<DashboardPage> {
     await Future.wait([
       safe('kpi', ApiService().kpi(), (v) => kpi = v as Map),
       safe('attendance', ApiService().attendanceToday(), (v) => attSummary = v as Map),
-      safe('projects', ApiService().getProjects(), (v) => projects = v as List),
+      safe('projects', ProjectCache.get(ApiService()), (v) => projects = v as List),
       safe('weekly', ApiService().getWeeklyAttendanceStats(), (v) {
         final weekly = v as Map;
         _weeklyAtt = List<Map>.from(weekly['days'] ?? []);
@@ -319,7 +320,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
 
           // ── KPI Cards Row ──
-          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent),
+          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct),
           const SizedBox(height: 20),
 
           // ── Charts Row ──
@@ -423,7 +424,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // ── KPI row builder ──
-  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent) {
+  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct) {
     return LayoutBuilder(builder: (ctx, cs) {
       final isWide = cs.maxWidth > 600;
       final cards = [
@@ -437,14 +438,21 @@ class _DashboardPageState extends State<DashboardPage> {
         _kpiCard(
           label: 'Active Tasks',
           value: '$activeTasks',
-          sub: '2 completed today',
+          // Show real completed + in-progress counts from the KPI response.
+          sub: completed > 0 || inProgress > 0
+              ? '$completed done · $inProgress in progress'
+              : '$activeTasks pending',
           icon: Icons.assignment_rounded,
           iconColor: AppColors.blue,
         ),
         _kpiCard(
           label: 'Overall Productivity',
           value: '$productivity%',
-          sub: '+4% from last week',
+          // No reliable week-over-week delta from the API — omit rather than
+          // show fake '+4%' that misleads users.
+          sub: totalTasks > 0
+              ? '$completedPct% tasks completed'
+              : null,
           icon: Icons.trending_up_rounded,
           iconColor: AppColors.green,
           valueColor: AppColors.green,
@@ -452,7 +460,10 @@ class _DashboardPageState extends State<DashboardPage> {
         _kpiCard(
           label: 'Alerts',
           value: '$alerts',
-          sub: '2 attendance • 1 safety',
+          // Use real count — avoids '2 attendance • 1 safety' static hardcoding.
+          sub: alerts == 0
+              ? 'No open issues'
+              : alerts == 1 ? '1 open issue' : '$alerts open issues',
           icon: Icons.warning_amber_rounded,
           iconColor: AppColors.red,
         ),

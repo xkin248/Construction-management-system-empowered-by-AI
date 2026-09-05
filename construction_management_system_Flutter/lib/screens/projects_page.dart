@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
@@ -145,10 +146,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     setState(() => ld = true);
     try {
-      projects = await ApiService().getProjects();
+      projects = await ProjectCache.get(ApiService(), forceRefresh: forceRefresh);
     } catch (e) {
       toast('Failed to load projects: $e');
     } finally {
@@ -164,7 +165,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
       builder: (_) => _ProjectFormSheet(
         existing: existing,
         onSaved: () {
-          _load();
+          // Invalidate cache so other pages (Dashboard, Tasks, etc.) get
+          // fresh project data after a create / update.
+          ProjectCache.invalidate();
+          _load(forceRefresh: true);
         },
       ),
     );
@@ -848,7 +852,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Future<void> _load() async {
     setState(() => ld = true);
     try {
-      final all = await ApiService().getProjects();
+      final all = await ProjectCache.get(ApiService());
       project = all.firstWhere((p) => p['project_id'] == widget.projectId, orElse: () => null);
       tasks = await ApiService().getTasks(widget.projectId);
     } catch (e) {
@@ -863,6 +867,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     if (p == null) return;
     try {
       await ApiService().updateProject(p['project_id'], {'status': 'completed'});
+      ProjectCache.invalidate(); // refresh list for other pages
       toast(AppStrings.t('proj.markCompletedDone'));
       if (mounted) _load();
     } catch (e) {

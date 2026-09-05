@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'services/api_service.dart';
 import 'services/fcm_service.dart';
+import 'services/token_storage.dart';
 import 'screens/login_page.dart';
 import 'screens/home_shell.dart';
 import 'screens/worker_home_shell.dart';
@@ -201,16 +201,15 @@ class _SplashGateState extends State<SplashGate> {
 
   Future<void> _boot() async {
     try {
-      final sp = await SharedPreferences.getInstance();
-      final token = sp.getString('token');
-      final userType = sp.getString('user_type');
-      final userRole = sp.getString('user_role');
+      final token    = await TokenStorage.getToken();
+      final userType = await TokenStorage.getUserType();
+      final userRole = await TokenStorage.getUserRole();
       ApiService().init(
         token: token,
         onUnauthorized: () async {
-          final sp2 = await SharedPreferences.getInstance();
-          await sp2.clear();
-          navigatorKey.currentState?.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
+          await TokenStorage.clearAll();
+          navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
         },
       );
       // FCM push setup: Firebase init + notification permission + token

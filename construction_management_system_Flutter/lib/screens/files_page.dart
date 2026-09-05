@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../models/file.dart';
 
@@ -65,7 +66,7 @@ class _FilesPageState extends State<FilesPage> {
           ? const ['drawings', 'photos']
           : <String?>[_selectedCategory];
       final futures = <Future>[
-        ApiService().getProjects(),
+        ProjectCache.get(ApiService()),
         ...cats.map((c) => ApiService().getFiles(
               pid: _selectedProjectId,
               category: c,

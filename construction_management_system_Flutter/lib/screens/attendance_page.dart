@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_cache.dart';
 import '../widgets/charts.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../l10n/app_strings.dart';
@@ -61,7 +62,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     try {
       final results = await Future.wait([
         ApiService().attendanceToday(),
-        ApiService().getProjects(),
+        ProjectCache.get(ApiService()),
       ]);
       summary = results[0] as Map;
       projects = results[1] as List;

@@ -24,11 +24,23 @@ def list_reports(
     current_user: CurrentUser = Depends(cu)
 ):
     """Only return reports submitted by the current supervisor (private)."""
-    sid = _require_supervisor(current_user)
-    return db.query(DailyReport).filter(
-        DailyReport.project_id == pid,
-        DailyReport.submitted_by == sid
-    ).order_by(DailyReport.report_date.desc()).all()
+    try:
+        sid = _require_supervisor(current_user)
+    except HTTPException:
+        raise  # Re-raise 403 as-is so the client gets a proper 403, not 500
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Auth check failed: {exc}") from exc
+
+    try:
+        return (
+            db.query(DailyReport)
+            .filter(DailyReport.project_id == pid, DailyReport.submitted_by == sid)
+            .order_by(DailyReport.report_date.desc())
+            .all()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to query reports: {exc}") from exc
+
 
 
 @router.post("/daily-reports", response_model=DailyReportOut)
