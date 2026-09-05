@@ -230,7 +230,12 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext c) {
     if (ld) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: AppColors.bgMain,
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2.5),
+        ),
+      );
     }
 
     final onSite = kpi['today_attendance'] ?? 0;
@@ -272,6 +277,7 @@ class _DashboardPageState extends State<DashboardPage> {
         return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
           // ── Load error banner with retry ──
@@ -762,12 +768,29 @@ class _DashboardPageState extends State<DashboardPage> {
     switch (trend.toLowerCase()) {
       case 'ahead':
         return AppColors.green;
+      case 'on_track':
+        return AppColors.blue;
       case 'behind':
         return AppColors.yellow;
       case 'critical':
         return AppColors.red;
       default:
         return AppColors.blue;
+    }
+  }
+
+  IconData _trendIcon(String trend) {
+    switch (trend.toLowerCase()) {
+      case 'ahead':
+        return Icons.trending_up_rounded;
+      case 'on_track':
+        return Icons.trending_flat_rounded;
+      case 'behind':
+        return Icons.trending_down_rounded;
+      case 'critical':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.trending_flat_rounded;
     }
   }
 
@@ -812,6 +835,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ]),
         const SizedBox(height: 14),
+        // ── Project picker + Update button (single-col on <480px) ──
         LayoutBuilder(builder: (ctx, cs) {
           final wide = cs.maxWidth >= 480;
           final picker = DropdownButtonFormField<int?>(
@@ -849,11 +873,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
             ],
-            onChanged: (v) => setState(() => _predProjectId = v),
+            onChanged: _predLoading ? null : (v) => setState(() => _predProjectId = v),
           );
+          // Button: spinner is INSIDE the icon slot; no separate loading block below
           final updateBtn = SizedBox(
             width: wide ? null : double.infinity,
-            height: 48,
+            height: 46,
             child: ElevatedButton.icon(
               onPressed: _predLoading ? null : _runPrediction,
               icon: _predLoading
@@ -864,15 +889,16 @@ class _DashboardPageState extends State<DashboardPage> {
                           strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.auto_awesome_rounded, size: 18),
               label: Text(
-                _predLoading ? 'Predicting...' : 'Update Prediction',
+                _predLoading ? 'Predicting…' : 'Update',
                 style:
                     GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
+                backgroundColor: _predLoading ? AppColors.accent.withValues(alpha: 0.6) : AppColors.accent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
             ),
           );
@@ -890,13 +916,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ]);
         }),
         const SizedBox(height: 14),
-        if (_predLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 18),
-            child: Center(
-                child: CircularProgressIndicator(strokeWidth: 2.5)),
-          )
-        else if (showResult)
+        if (showResult)
           _predictionResultBlock(_prediction!)
         else
           Text(
@@ -933,87 +953,168 @@ class _DashboardPageState extends State<DashboardPage> {
         ? (pred['milestones'] as List).take(3).toList()
         : <dynamic>[];
     final insights = pred['ai_insights']?.toString();
-    final chips = <Widget>[
-      if (pred['predicted_completion_date'] != null)
-        _predChip('Finish: ${_fmtDate(pred['predicted_completion_date'].toString())}', AppColors.accentLight, AppColors.accentDark),
-      if (daysLeft != null)
-        _predChip('~$daysLeft day(s) left', AppColors.blueLight, AppColors.blue),
-      if (weeksLeft != null && weeksLeft < 900)
-        _predChip('~${weeksLeft.toStringAsFixed(0)} weeks est.', AppColors.purpleLight, AppColors.purple),
-      if (confidence != null)
-        _predChip('Confidence ${confidence.toStringAsFixed(0)}%', AppColors.greenLight, AppColors.green),
-    ];
+    final completionDate = pred['predicted_completion_date']?.toString();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // ── AI narrative insight ──
       if (insights != null && insights.trim().isNotEmpty) ...[
         Text(insights.trim(),
             style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
         const SizedBox(height: 12),
       ],
-      _predBarRow('Current', current, AppColors.accent),
+
+      // ── Current vs Scheduled progress bars ──
+      _predBarRow('Current Progress', current, AppColors.accent),
       if (scheduled != null) ...[
         const SizedBox(height: 6),
-        _predBarRow('Scheduled', scheduled.clamp(0, 100).toDouble(), AppColors.border),
+        _predBarRow('Scheduled Progress', scheduled.clamp(0, 100).toDouble(), AppColors.blue.withValues(alpha: 0.6)),
       ],
-      const SizedBox(height: 10),
-      Row(children: [
+
+      // ── Gap indicator ──
+      if (gap != null) ...[
+        const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: (gap >= 0 ? AppColors.green : AppColors.yellow).withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: (gap >= 0 ? AppColors.green : AppColors.yellow).withValues(alpha: 0.30),
+            ),
+          ),
+          child: Row(children: [
+            Icon(
+              gap >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+              size: 16,
+              color: gap >= 0 ? AppColors.green : AppColors.yellow,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                gap >= 0
+                    ? '+${gap.toStringAsFixed(1)}% ahead of schedule'
+                    : '${gap.toStringAsFixed(1)}% behind schedule',
+                style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: gap >= 0 ? AppColors.green : AppColors.yellow),
+              ),
+            ),
+          ]),
+        ),
+      ],
+
+      const SizedBox(height: 10),
+
+      // ── Trend badge + predicted completion date ──
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        // Trend badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: tc.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(trend.toUpperCase(),
-              style: GoogleFonts.outfit(
-                  fontSize: 11, fontWeight: FontWeight.w800, color: tc)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(_trendIcon(trend), size: 13, color: tc),
+            const SizedBox(width: 5),
+            Text(trend.replaceAll('_', ' ').toUpperCase(),
+                style: GoogleFonts.outfit(
+                    fontSize: 11, fontWeight: FontWeight.w800, color: tc)),
+          ]),
         ),
-        if (gap != null) ...[
-          const SizedBox(width: 8),
-          Text(
-            gap >= 0 ? '+${gap.toStringAsFixed(1)}% vs plan (ahead)' : '${gap.toStringAsFixed(1)}% vs plan (behind)',
-            style: GoogleFonts.outfit(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: gap >= 0 ? AppColors.green : AppColors.yellow),
+        // Predicted completion date
+        if (completionDate != null)
+          _predChip(
+            '📅 Est. finish: ${_fmtDate(completionDate)}',
+            AppColors.accentLight,
+            AppColors.accentDark,
           ),
-        ],
+        // Days remaining
+        if (daysLeft != null)
+          _predChip('~$daysLeft day(s) left', AppColors.blueLight, AppColors.blue),
+        // Weeks estimate
+        if (weeksLeft != null && weeksLeft < 900)
+          _predChip('~${weeksLeft.toStringAsFixed(0)} wks est.', AppColors.purpleLight, AppColors.purple),
+        // Confidence
+        if (confidence != null)
+          _predChip(
+            'Confidence ${confidence.toStringAsFixed(0)}%',
+            confidence >= 70 ? AppColors.greenLight : AppColors.yellowLight,
+            confidence >= 70 ? AppColors.green : AppColors.yellow,
+          ),
       ]),
-      if (chips.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 8, children: chips),
+
+      // ── Rule-based notice ──
+      if (!aiUsed) ...[
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.yellowLight,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(children: [
+            Icon(Icons.info_outline_rounded, size: 14, color: AppColors.yellow),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Rule-based estimate — Gemini AI not enabled for this project.',
+                style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.yellow),
+              ),
+            ),
+          ]),
+        ),
       ],
+
+      // ── Milestones mini progress bars ──
       if (milestones.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        Text('Milestones', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+        const SizedBox(height: 14),
+        Text('Milestones',
+            style: GoogleFonts.outfit(
+                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
         const SizedBox(height: 6),
         for (final ms in milestones)
           if (ms is Map)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: _predBarRow(
-                ms['label']?.toString() ?? '',
-                (_predNum(ms, 'predicted_progress') ?? 0).clamp(0, 100).toDouble(),
+                ms['label']?.toString() ?? ms['name']?.toString() ?? '',
+                (_predNum(ms, 'predicted_progress') ?? _predNum(ms, 'progress') ?? 0)
+                    .clamp(0, 100)
+                    .toDouble(),
                 AppColors.purple,
                 compact: true,
               ),
             ),
       ],
+
+      // ── Risk factors (top 3) ──
       if (risk.isNotEmpty) ...[
-        const SizedBox(height: 6),
-        Text('Risk factors', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.red)),
+        const SizedBox(height: 10),
+        Row(children: [
+          Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.red),
+          const SizedBox(width: 6),
+          Text('Risk Factors',
+              style: GoogleFonts.outfit(
+                  fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.red)),
+        ]),
         const SizedBox(height: 4),
         _predDotList(risk, AppColors.red),
       ],
+
+      // ── Recommendations (top 3) ──
       if (recs.isNotEmpty) ...[
-        const SizedBox(height: 6),
-        Text('Recommendations', style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.green)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Icon(Icons.lightbulb_outline_rounded, size: 14, color: AppColors.green),
+          const SizedBox(width: 6),
+          Text('Recommendations',
+              style: GoogleFonts.outfit(
+                  fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.green)),
+        ]),
         const SizedBox(height: 4),
         _predDotList(recs, AppColors.green),
-      ],
-      if (!aiUsed) ...[
-        const SizedBox(height: 10),
-        Text('Rule-based estimate (Gemini not enabled)',
-            style: GoogleFonts.outfit(fontSize: 11, color: AppColors.textMuted)),
       ],
     ]);
   }
