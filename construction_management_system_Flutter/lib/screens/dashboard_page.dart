@@ -279,10 +279,6 @@ class _DashboardPageState extends State<DashboardPage> {
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        // Experiment: force all dashboard sections to stay laid out & painted
-        // up front so scrolling does not rebuild/recycle viewport tiles (which
-        // renders blank on some devices). Revisit once root cause is confirmed.
-        cacheExtent: 100000,
         padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         children: [
           // ── Load error banner with retry ──
@@ -319,12 +315,13 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
           // ── Supervisor Quick Check-in ──
           if (_isSupervisor) ...[
-            _buildQuickCheckInCard(),
+            RepaintBoundary(child: _buildQuickCheckInCard()),
             const SizedBox(height: 20),
           ],
 
           // ── KPI Cards Row ──
-          _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct),
+          RepaintBoundary(
+            child: _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct)),
           const SizedBox(height: 20),
 
           // ── Charts Row ──
@@ -332,28 +329,28 @@ class _DashboardPageState extends State<DashboardPage> {
             final isWide = cs.maxWidth > 600;
             if (isWide) {
               return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(flex: 3, child: _weeklyAttCard(weeklyData, weekLabels)),
+                Expanded(flex: 3, child: RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels))),
                 const SizedBox(width: 16),
-                SizedBox(width: 240, child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
+                SizedBox(width: 240, child: RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0))),
               ]);
             }
             return Column(children: [
-              _weeklyAttCard(weeklyData, weekLabels),
+              RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels)),
               const SizedBox(height: 16),
-              _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0),
+              RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
             ]);
           }),
           const SizedBox(height: 20),
 
           // ── AI Progress Prediction (manual trigger, mobile friendly) ──
-          _buildPredictionSection(),
+          RepaintBoundary(child: _buildPredictionSection()),
           const SizedBox(height: 20),
 
           // ── Productivity by Project ──
           _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
           const SizedBox(height: 12),
           if (projects.isEmpty)
-            Padding(padding: EdgeInsets.all(20), child: Center(child: Text(AppStrings.t('proj.noProjects'), style: TextStyle(color: AppColors.textMuted))))
+            _emptyBox(AppStrings.t('proj.noProjects'), icon: Icons.folder_open_outlined)
           else
             ...projects.take(4).map((p) => _projectProductivityRow(p)),
           const SizedBox(height: 24),
@@ -362,7 +359,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
           const SizedBox(height: 12),
           if (upcoming.isEmpty)
-            Padding(padding: EdgeInsets.all(20), child: Center(child: Text(AppStrings.t('dash.noDueProjects'), style: TextStyle(color: AppColors.textMuted))))
+            _emptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
           const SizedBox(height: 24),
@@ -476,10 +473,18 @@ class _DashboardPageState extends State<DashboardPage> {
       if (isWide) {
         return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 14)]).toList()..removeLast());
       }
+      // Mobile: single column full-width cards.
+      // v1.20 fix — the previous 2x2 grid left the whole dashboard blank after
+      // scrolling on Honor 50 (GPU/driver related paint failure). Full-width
+      // cards do not trigger it.
       return Column(children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
+        cards[0],
         const SizedBox(height: 12),
-        Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
+        cards[1],
+        const SizedBox(height: 12),
+        cards[2],
+        const SizedBox(height: 12),
+        cards[3],
       ]);
     });
   }
@@ -630,17 +635,44 @@ class _DashboardPageState extends State<DashboardPage> {
         Text(pct, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ]);
 
-  Widget _sectionHeader(String title, {String? sub}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        if (sub != null)
-          Text(sub,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+  Widget _sectionHeader(String title, {String? sub}) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Container(width: 3.5, height: 16, decoration: BoxDecoration(
+          color: AppColors.accent,
+          borderRadius: BorderRadius.circular(2),
+        )),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            if (sub != null)
+              Text(sub,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+          ]),
+        ),
       ]);
+
+  /// Compact empty-state block used across dashboard list sections.
+  Widget _emptyBox(String message, {IconData icon = Icons.inbox_outlined}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(children: [
+          Icon(icon, size: 26, color: AppColors.textMuted.withValues(alpha: 0.6)),
+          const SizedBox(height: 8),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+        ]),
+      );
 
   Widget _projectProductivityRow(Map p) {
     final progress = (p['progress'] as num? ?? 0).toDouble();

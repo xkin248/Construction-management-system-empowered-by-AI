@@ -197,10 +197,27 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     child: projects.isEmpty
                         ? ListView(children: [
                             Padding(
-                              padding: EdgeInsets.all(40),
+                              padding: const EdgeInsets.all(40),
                               child: Center(
-                                child: Text(AppStrings.t('proj.noProjects'),
-                                    style: TextStyle(color: AppColors.textMuted)),
+                                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                  Container(
+                                    width: 76, height: 76,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent.withValues(alpha: 0.08),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.account_tree_outlined, size: 34, color: AppColors.textMuted),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(AppStrings.t('proj.noProjects'),
+                                      style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textMuted)),
+                                  const SizedBox(height: 16),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _openProjectForm(),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: Text(AppStrings.t('proj.newProject')),
+                                  ),
+                                ]),
                               ),
                             )
                           ])

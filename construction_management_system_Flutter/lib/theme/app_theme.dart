@@ -361,6 +361,69 @@ ThemeData buildAppTheme() => ThemeData(
         indicatorColor: AppColors.accent,
         labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
       ),
+      // ── Shared component polish (kept in sync across light & dark) ──
+      iconTheme: IconThemeData(color: AppColors.textSecondary),
+      listTileTheme: ListTileThemeData(
+        iconColor: AppColors.textSecondary,
+        textColor: AppColors.textPrimary,
+        titleTextStyle: GoogleFonts.outfit(
+          color: AppColors.textPrimary, fontSize: 14.5, fontWeight: FontWeight.w600,
+        ),
+        subtitleTextStyle: GoogleFonts.outfit(
+          color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF262D3D),
+        contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w500),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppColors.border),
+        ),
+        textStyle: GoogleFonts.outfit(color: AppColors.textPrimary, fontSize: 14),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? Colors.white : AppColors.textMuted),
+        trackColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : Colors.transparent),
+        side: BorderSide(color: AppColors.textMuted, width: 1.6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: AppColors.accent,
+        linearTrackColor: AppColors.border,
+        circularTrackColor: AppColors.border,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) => AppColors.border),
+        radius: const Radius.circular(8),
+        thickness: const WidgetStatePropertyAll(5),
+      ),
     );
 
 ThemeData buildDarkTheme() => ThemeData(
@@ -462,5 +525,68 @@ ThemeData buildDarkTheme() => ThemeData(
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
         labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+      ),
+      // ── Shared component polish (kept in sync across light & dark) ──
+      iconTheme: IconThemeData(color: AppColors.textSecondary),
+      listTileTheme: ListTileThemeData(
+        iconColor: AppColors.textSecondary,
+        textColor: AppColors.textPrimary,
+        titleTextStyle: GoogleFonts.outfit(
+          color: AppColors.textPrimary, fontSize: 14.5, fontWeight: FontWeight.w600,
+        ),
+        subtitleTextStyle: GoogleFonts.outfit(
+          color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF262D3D),
+        contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w500),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppColors.border),
+        ),
+        textStyle: GoogleFonts.outfit(color: AppColors.textPrimary, fontSize: 14),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? Colors.white : AppColors.textMuted),
+        trackColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
+        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : Colors.transparent),
+        side: BorderSide(color: AppColors.textMuted, width: 1.6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: AppColors.accent,
+        linearTrackColor: AppColors.border,
+        circularTrackColor: AppColors.border,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) => AppColors.border),
+        radius: const Radius.circular(8),
+        thickness: const WidgetStatePropertyAll(5),
       ),
     );

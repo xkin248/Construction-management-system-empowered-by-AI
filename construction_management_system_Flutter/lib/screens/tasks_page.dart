@@ -109,14 +109,6 @@ class _TasksPageState extends State<TasksPage> {
   Widget build(BuildContext c) {
     return Scaffold(
       backgroundColor: AppColors.bgMain,
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: AppColors.bgCard,
-        elevation: 0,
-        titleSpacing: 16,
-        title: Text(AppStrings.t('tasks.title'), style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 18)),
-        actions: const [],
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openNewTask,
         icon: const Icon(Icons.add),
@@ -142,7 +134,27 @@ class _TasksPageState extends State<TasksPage> {
                 child: ld
                     ? const Center(child: CircularProgressIndicator())
                     : _filtered.isEmpty
-                        ? Center(child: Text(AppStrings.t('tasks.noTasks'), style: GoogleFonts.outfit(color: AppColors.textMuted)))
+                        ? Center(
+                            child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              Container(
+                                width: 76, height: 76,
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.08),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.task_alt_rounded, size: 34, color: AppColors.textMuted),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(AppStrings.t('tasks.noTasks'),
+                                  style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textMuted)),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _openNewTask,
+                                icon: const Icon(Icons.add, size: 18),
+                                label: Text(AppStrings.t('tasks.newTask')),
+                              ),
+                            ]),
+                          )
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: LayoutBuilder(builder: (ctx, constraints) {
@@ -257,6 +269,7 @@ class _TasksPageState extends State<TasksPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       height: 48,
+      width: 172,
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(10),

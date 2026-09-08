@@ -66,7 +66,8 @@ final _pages = <Widget>[
   const AttendancePage(),  // 3 Attendance
   const WorkersPage(),     // 4 Workers
   const FilesPage(),       // 5 Files
-  const NotificationsPage(), // 6 Notifications
+  // Notifications(6) is opened as a full-screen page (push) from the shell,
+  // so it keeps its own TabBar AppBar and never nests inside this Scaffold.
 ];
 
 final _titles = _mainMenu.map((e) => e.label).toList();
@@ -159,6 +160,12 @@ class _HomeShellState extends State<HomeShell> {
 
   void _go(int i, {bool fromDrawer = false}) {
     if (fromDrawer) Navigator.pop(context);
+    if (i == 6) {
+      // Notifications has its own TabBar AppBar -> open as full screen page
+      // instead of nesting inside this shell (avoids double app bar).
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
+      return;
+    }
     setState(() => idx = i);
   }
 

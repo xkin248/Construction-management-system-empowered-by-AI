@@ -38,7 +38,9 @@ const _workerMenu = [
 final _workerPages = <Widget>[
   const WorkerDashboardPage(),
   const _WorkerAttendanceTab(),
-  const NotificationsPage(),
+  // Notifications opens as a full-screen page (push) to keep its own TabBar AppBar
+  // from double-stacking under this shell's AppBar.
+  const SizedBox.shrink(),
   const ProfilePage(),
 ];
 
@@ -65,6 +67,12 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
   }
 
   void _go(int i) {
+    if (i == 2) {
+      // Notifications has its own TabBar AppBar -> open as full screen page
+      // instead of nesting under this shell's AppBar (avoids double bar).
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
+      return;
+    }
     setState(() => idx = i);
   }
 

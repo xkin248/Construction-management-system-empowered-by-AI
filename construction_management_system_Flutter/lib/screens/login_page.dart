@@ -116,6 +116,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         child: SafeArea(
           child: Stack(
             children: [
+              // Ambient accent glow behind the card (subtle, non-blocking).
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        radius: 0.9,
+                        colors: [
+                          AppColors.accent.withValues(alpha: 0.10),
+                          Colors.transparent,
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.45, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               LayoutBuilder(builder: (ctx, constraints) {
             final isNarrow = constraints.maxWidth < 400;
             final hPad    = isNarrow ? 16.0 : 24.0;
@@ -177,6 +195,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                // Accent divider line at the top of the card.
+                                Center(
+                                  child: Container(
+                                    width: 44, height: 3.5,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.accent.withValues(alpha: 0.25),
+                                          AppColors.accent,
+                                          AppColors.accent.withValues(alpha: 0.25),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
                                 // Role badge
                                 Center(
                                   child: Container(

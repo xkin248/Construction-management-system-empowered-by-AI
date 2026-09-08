@@ -1,20 +1,17 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 访问后端 API 所需 -->
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required to access the backend API -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- ✅ GPS 围栏签到所需 -->
+    <!-- Required for geofenced site check-in -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- ✅ FCM 通知（Android 13+ 需运行时请求，见 main.dart） -->
+    <!-- FCM notifications (runtime permission required on Android 13+, see main.dart) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="BuildSmart"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
-        <!-- Disable Impeller rendering backend (fixes missing UI sections on some GPU/driver combos) -->
-        <meta-data
-            android:name="io.flutter.embedding.android.EnableImpeller"
-            android:value="false" />
+        <!-- Impeller ON (v1.20 fix: Skia backend leaves dashboard blank after scroll on Honor 50) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

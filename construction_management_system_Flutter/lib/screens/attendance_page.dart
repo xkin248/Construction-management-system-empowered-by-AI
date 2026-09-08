@@ -154,7 +154,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
                 // ── Project Geofence Cards ──
                 if (projects.isNotEmpty) ...[
-                  _sectionLabel("Today's Attendance Rate — All Projects"),
+                  _sectionLabel("Project Check-in Zones"),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 130,
@@ -267,8 +267,12 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
         Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
       ]);
 
-  Widget _sectionLabel(String s) => Text(s,
-      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
+  Widget _sectionLabel(String s) => Row(children: [
+        Container(width: 3.5, height: 15, decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 8),
+        Text(s,
+            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+      ]);
 
   Widget _buildFilterRow() {
     return Column(children: [
@@ -320,13 +324,26 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   Widget _buildWorkerTable(List filtered) {
     if (filtered.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(32),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 40),
+        alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.border),
         ),
-        child: Center(child: Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.outfit(color: AppColors.textMuted))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 64, height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.person_search_rounded, size: 28, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 14),
+          Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+        ]),
       );
     }
     return LayoutBuilder(builder: (ctx, constraints) {

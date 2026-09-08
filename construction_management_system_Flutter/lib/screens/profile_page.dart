@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
@@ -61,19 +62,31 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColors.bgCard,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(AppStrings.t('profile.title')),
+        title: Text(AppStrings.t('profile.title'),
+            style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
       ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(16), children: [
               sectionCard(
+                padding: const EdgeInsets.fromLTRB(16, 26, 16, 22),
                 child: Column(children: [
-                  initialsAvatar(user?['full_name'] ?? '?', radius: 34),
-                  const SizedBox(height: 12),
-                  Text(user?['full_name'] ?? '-', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                  Container(
+                    width: 46, height: 3.5,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  initialsAvatar(user?['full_name'] ?? '?', radius: 38),
+                  const SizedBox(height: 14),
+                  Text(user?['full_name'] ?? '-',
+                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
                   const SizedBox(height: 4),
-                  Text(user?['email'] ?? '', style: TextStyle(color: AppColors.textMuted, fontSize: 14)),
-                  const SizedBox(height: 8),
+                  Text(user?['email'] ?? '',
+                      style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
+                  const SizedBox(height: 12),
                   statusPill(user?['role'] ?? 'site_supervisor', label: (user?['role'] ?? '').toString().replaceAll('_', ' ')),
                 ]),
               ),
@@ -86,7 +99,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     title: Text(AppStrings.t('profile.phone')),
                     trailing: Text(user?['phone'] ?? '-', style: TextStyle(color: AppColors.textMuted)),
                   ),
-                  const Divider(height: 1),
+                  const Divider(height: 1, indent: 56),
+                  ListTile(
+                    leading: Icon(Icons.badge_outlined, color: AppColors.textSecondary),
+                    title: Text(AppStrings.t('profile.role')),
+                    trailing: Text((user?['role'] ?? '-').toString().replaceAll('_', ' '),
+                        style: TextStyle(color: AppColors.textMuted)),
+                  ),
+                  const Divider(height: 1, indent: 56),
                   ListTile(
                     leading: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
                     title: Text(AppStrings.t('profile.appSettings')),
