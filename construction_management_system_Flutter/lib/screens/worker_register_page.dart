@@ -33,8 +33,11 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   String? _selectedSkill;
   bool ld = false, obscure = true, obscure2 = true;
 
-  late final AnimationController _anim =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 550));
+  // Nullable + lazy getter: never create a ticker from a deactivated element
+  // (e.g. dispose() running before the controller was ever used).
+  AnimationController? _animCtrl;
+  AnimationController get _anim =>
+      _animCtrl ??= AnimationController(vsync: this, duration: const Duration(milliseconds: 550));
   late final Animation<double> _fade  = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(
     begin: const Offset(0, 0.10), end: Offset.zero,
@@ -57,7 +60,8 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
     _pwd2.dispose(); _phone.dispose(); _ic.dispose();
     _emailFocus.dispose(); _pwdFocus.dispose(); _pwd2Focus.dispose();
     _phoneFocus.dispose(); _icFocus.dispose();
-    _anim.dispose();
+    _animCtrl?.dispose();
+    _animCtrl = null;
     super.dispose();
   }
 

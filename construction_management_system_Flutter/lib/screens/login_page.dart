@@ -22,8 +22,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _pwd   = TextEditingController();
   bool ld = false, obscure = true;
 
-  late final AnimationController _anim =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+  // Nullable + lazy getter: never create a ticker from a deactivated element
+  // (e.g. dispose() running before the controller was ever used).
+  AnimationController? _animCtrl;
+  AnimationController get _anim =>
+      _animCtrl ??= AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
   late final Animation<double> _fade  = CurvedAnimation(parent: _anim, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(
     begin: const Offset(0, 0.12), end: Offset.zero,
@@ -97,7 +100,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     AppColors.darkMode.removeListener(_onDarkChanged);
     _email.dispose();
     _pwd.dispose();
-    _anim.dispose();
+    _animCtrl?.dispose();
+    _animCtrl = null;
     super.dispose();
   }
 
@@ -155,14 +159,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           Container(
                             width: 68, height: 68,
                             decoration: BoxDecoration(
-                              color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.accent.withValues(alpha: 0.4),
-                                  blurRadius: 24, offset: const Offset(0, 8),
-                                ),
-                              ],
+                              gradient: AppColors.brandGradient,
+                              borderRadius: AppRadius.rLg,
+                              boxShadow:
+                                  AppShadows.accent(AppColors.accent, alpha: 0.32, blur: 26, dy: 10),
                             ),
                             child: const Center(
                               child: Icon(Icons.construction_rounded, color: Colors.white, size: 34),
@@ -171,26 +171,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           const SizedBox(height: 16),
                           Text('BuildSmart',
                               style: GoogleFonts.outfit(
-                                  fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white)),
+                                  fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.darkTextPrimary)),
                           const SizedBox(height: 4),
                           Text('AI Construction Management System',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.outfit(
-                                  fontSize: 12, color: const Color(0xFF757E90), letterSpacing: 0.3)),
+                                  fontSize: 12, color: AppColors.darkTextSecondary, letterSpacing: 0.3)),
                           const SizedBox(height: 24),
                           // ── Login Card ──
                           Container(
                             padding: EdgeInsets.all(cardPad),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1A1F2E),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: const Color(0xFF2A3045)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.3),
-                                  blurRadius: 32, offset: const Offset(0, 8),
-                                ),
-                              ],
+                              color: AppColors.darkSurface,
+                              borderRadius: AppRadius.rLg,
+                              border: Border.all(color: AppColors.darkBorder),
+                              boxShadow: AppShadows.darkMd,
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -207,7 +202,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                           AppColors.accent.withValues(alpha: 0.25),
                                         ],
                                       ),
-                                      borderRadius: BorderRadius.circular(2),
+                                      borderRadius: AppRadius.rPill,
                                     ),
                                   ),
                                 ),
@@ -218,7 +213,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                                     decoration: BoxDecoration(
                                       color: AppColors.accent.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: AppRadius.rPill,
                                       border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                                     ),
                                     child: Text(AppStrings.t('login.roleBadge'),
@@ -232,13 +227,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 Text(AppStrings.t('login.email'),
                                     style: GoogleFonts.outfit(
                                         fontSize: 13, fontWeight: FontWeight.w600,
-                                        color: const Color(0xFFC8CDD8))),
+                                        color: AppColors.darkTextSecondary)),
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _email,
                                   keyboardType: TextInputType.emailAddress,
                                   textInputAction: TextInputAction.next,
-                                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+                                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextPrimary),
                                   decoration: _fieldDeco('you@buildsmart.my'),
                                 ),
                                 const SizedBox(height: 16),
@@ -247,19 +242,19 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 Text(AppStrings.t('login.password'),
                                     style: GoogleFonts.outfit(
                                         fontSize: 13, fontWeight: FontWeight.w600,
-                                        color: const Color(0xFFC8CDD8))),
+                                        color: AppColors.darkTextSecondary)),
                                 const SizedBox(height: 8),
                                 TextField(
                                   controller: _pwd,
                                   obscureText: obscure,
                                   onSubmitted: (_) => _login(),
                                   textInputAction: TextInputAction.done,
-                                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+                                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextPrimary),
                                   decoration: _fieldDeco('••••••••').copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
                                         obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                                        size: 19, color: const Color(0xFF4A5568),
+                                        size: 19, color: AppColors.darkTextMuted,
                                       ),
                                       onPressed: () => setState(() => obscure = !obscure),
                                     ),
@@ -267,27 +262,36 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 ),
                                 const SizedBox(height: 24),
 
-                                // Sign in button
+                                // Sign in button (gradient CTA)
                                 SizedBox(
                                   height: 52,
-                                  child: ElevatedButton(
-                                    onPressed: ld ? null : _login,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: Colors.white,
-                                      disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.5),
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14)),
-                                      elevation: 0,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      gradient: AppColors.brandGradient,
+                                      borderRadius: AppRadius.rBtn,
+                                      boxShadow: AppShadows.accent(AppColors.accent, alpha: 0.28, blur: 20, dy: 8),
                                     ),
-                                    child: ld
-                                        ? const SizedBox(
-                                            height: 20, width: 20,
-                                            child: CircularProgressIndicator(
-                                                color: Colors.white, strokeWidth: 2.2))
-                                        : Text(AppStrings.t('login.signIn'),
-                                            style: GoogleFonts.outfit(
-                                                fontSize: 15.5, fontWeight: FontWeight.w700)),
+                                    child: ElevatedButton(
+                                      onPressed: ld ? null : _login,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.transparent,
+                                        foregroundColor: Colors.white,
+                                        disabledBackgroundColor: Colors.transparent,
+                                        disabledForegroundColor: Colors.white70,
+                                        shadowColor: Colors.transparent,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius: AppRadius.rBtn),
+                                      ),
+                                      child: ld
+                                          ? const SizedBox(
+                                              height: 20, width: 20,
+                                              child: CircularProgressIndicator(
+                                                  color: Colors.white, strokeWidth: 2.2))
+                                          : Text(AppStrings.t('login.signIn'),
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 15.5, fontWeight: FontWeight.w700)),
+                                    ),
                                   ),
                                 ),
                               ],
@@ -302,7 +306,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             child: RichText(
                               textAlign: TextAlign.center,
                               text: TextSpan(
-                                style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90)),
+                                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
                                 children: [
                                   TextSpan(text: AppStrings.t('login.noWorkerAccount')),
                                   TextSpan(
@@ -318,7 +322,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           Text('CIDB Construction 4.0',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.outfit(
-                                  fontSize: 12, color: const Color(0xFF3D4A5C))),
+                                  fontSize: 12, color: AppColors.darkTextMuted)),
                           const SizedBox(height: 8),
                         ],
                       ),
@@ -337,18 +341,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   InputDecoration _fieldDeco(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF4A5568)),
+        hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextMuted),
         filled: true,
-        fillColor: const Color(0xFF0D1117),
+        fillColor: AppColors.darkBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF2A3045))),
+            borderRadius: AppRadius.rMd,
+            borderSide: const BorderSide(color: AppColors.darkBorder)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF2A3045))),
+            borderRadius: AppRadius.rMd,
+            borderSide: const BorderSide(color: AppColors.darkBorder)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppColors.accent, width: 1.5)),
+            borderRadius: AppRadius.rMd,
+            borderSide: BorderSide(color: AppColors.accent, width: 1.6)),
       );
 }

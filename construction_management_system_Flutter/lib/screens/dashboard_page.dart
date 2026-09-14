@@ -273,8 +273,8 @@ class _DashboardPageState extends State<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isPhone = constraints.maxWidth < 600;
-        final hPad = isPhone ? 14.0 : 20.0;
-        final vPad = isPhone ? 14.0 : 20.0;
+        final hPad = isPhone ? 16.0 : 24.0;
+        final vPad = isPhone ? 16.0 : 24.0;
         return RefreshIndicator(
       onRefresh: () => _load(forceRefresh: true),
       child: ListView(
@@ -287,7 +287,7 @@ class _DashboardPageState extends State<DashboardPage> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.redLight,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppRadius.rSm,
                 border: Border.all(color: AppColors.red.withValues(alpha: 0.35)),
               ),
               child: Row(children: [
@@ -316,13 +316,13 @@ class _DashboardPageState extends State<DashboardPage> {
           // ── Supervisor Quick Check-in ──
           if (_isSupervisor) ...[
             RepaintBoundary(child: _buildQuickCheckInCard()),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
           ],
 
           // ── KPI Cards Row ──
           RepaintBoundary(
             child: _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct)),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // ── Charts Row ──
           LayoutBuilder(builder: (ctx, cs) {
@@ -340,11 +340,11 @@ class _DashboardPageState extends State<DashboardPage> {
               RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
             ]);
           }),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // ── AI Progress Prediction (manual trigger, mobile friendly) ──
           RepaintBoundary(child: _buildPredictionSection()),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // ── Productivity by Project ──
           _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
@@ -362,10 +362,6 @@ class _DashboardPageState extends State<DashboardPage> {
             _emptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
           else
             ...upcoming.map((p) => _upcomingProjectCard(p)),
-          const SizedBox(height: 24),
-
-          // ── Recent activity / status kept minimal — AI prediction blocks removed ──
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -381,8 +377,9 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Row(children: [
         Container(
@@ -442,7 +439,7 @@ class _DashboardPageState extends State<DashboardPage> {
           // Show real completed + in-progress counts from the KPI response.
           sub: completed > 0 || inProgress > 0
               ? '$completed done · $inProgress in progress'
-              : '$activeTasks pending',
+              : null,
           icon: Icons.assignment_rounded,
           iconColor: AppColors.blue,
         ),
@@ -473,29 +470,188 @@ class _DashboardPageState extends State<DashboardPage> {
       if (isWide) {
         return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 14)]).toList()..removeLast());
       }
-      // Mobile: single column full-width cards.
-      // v1.20 fix — the previous 2x2 grid left the whole dashboard blank after
-      // scrolling on Honor 50 (GPU/driver related paint failure). Full-width
-      // cards do not trigger it.
+      // Mobile: full-width hero card + compact metric rows.
+      // Single-column layout is kept on purpose — the previous 2x2 grid left
+      // the whole dashboard blank after scrolling on Honor 50 (GPU/driver
+      // related paint drop). Full-width cards do not trigger it.
       return Column(children: [
-        cards[0],
+        _heroAttendanceCard(
+          rate: todayRate,
+          onSite: onSite,
+          totalWorkers: totalWorkers,
+          present: present,
+          late: late,
+          absent: absent,
+        ),
         const SizedBox(height: 12),
-        cards[1],
-        const SizedBox(height: 12),
-        cards[2],
-        const SizedBox(height: 12),
-        cards[3],
+        _compactMetricCard(
+          label: 'Active Tasks',
+          value: '$activeTasks',
+          sub: totalTasks > 0 ? '$completed done · $inProgress in progress' : null,
+          icon: Icons.assignment_rounded,
+          iconColor: AppColors.blue,
+        ),
+        const SizedBox(height: 10),
+        _compactMetricCard(
+          label: 'Overall Productivity',
+          value: '$productivity%',
+          sub: totalTasks > 0 ? '$completedPct% of tasks completed' : null,
+          icon: Icons.trending_up_rounded,
+          iconColor: AppColors.green,
+          valueColor: AppColors.green,
+        ),
+        const SizedBox(height: 10),
+        _compactMetricCard(
+          label: 'Alerts',
+          value: '$alerts',
+          sub: alerts == 0
+              ? 'No open issues'
+              : (alerts == 1 ? '1 open issue' : '$alerts open issues'),
+          icon: Icons.warning_amber_rounded,
+          iconColor: AppColors.red,
+          valueColor: alerts > 0 ? AppColors.red : null,
+        ),
       ]);
     });
   }
 
-  Widget _kpiCard({required String label, required String value, String? sub, required IconData icon, required Color iconColor, Color? valueColor}) {
+  /// Hero attendance card — the single most important number on the page.
+  Widget _heroAttendanceCard({
+    required int rate,
+    required int onSite,
+    required int totalWorkers,
+    required int present,
+    required int late,
+    required int absent,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.accentLight,
+              borderRadius: AppRadius.rSm,
+            ),
+            child: Icon(Icons.fact_check_rounded, size: 20, color: AppColors.accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              AppStrings.t('dash.todayAttendanceRate'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                  fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text('$rate%',
+              style: GoogleFonts.outfit(
+                  fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.accent)),
+        ]),
+        const SizedBox(height: 14),
+        ClipRRect(
+          borderRadius: AppRadius.rXs,
+          child: LinearProgressIndicator(
+            value: rate.clamp(0, 100) / 100,
+            minHeight: 8,
+            backgroundColor: AppColors.border,
+            valueColor: AlwaysStoppedAnimation(AppColors.accent),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _metricChip('$onSite/$totalWorkers on site', AppColors.accent),
+          _metricChip('$present present', AppColors.green),
+          _metricChip('$late late', AppColors.yellow),
+          _metricChip('$absent absent', AppColors.red),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _metricChip(String text, Color color) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: AppRadius.rLg,
+        ),
+        child: Text(text,
+            style: GoogleFonts.outfit(
+                fontSize: 11.5, fontWeight: FontWeight.w600, color: color)),
+      );
+
+  /// Compact single-line metric card (icon + label/sub + value on the right).
+  Widget _compactMetricCard({
+    required String label,
+    required String value,
+    String? sub,
+    required IconData icon,
+    required Color iconColor,
+    Color? valueColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Row(children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.10),
+            borderRadius: AppRadius.rSm,
+          ),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.outfit(
+                    fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            if (sub != null) ...[
+              const SizedBox(height: 2),
+              Text(sub,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+            ],
+          ]),
+        ),
+        const SizedBox(width: 10),
+        Text(value,
+            style: GoogleFonts.outfit(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: valueColor ?? AppColors.textPrimary)),
+      ]),
+    );
+  }
+
+  Widget _kpiCard({required String label, required String value, String? sub, required IconData icon, required Color iconColor, Color? valueColor}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -507,20 +663,20 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           const SizedBox(width: 6),
           Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 15, color: iconColor),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), borderRadius: AppRadius.rSm),
+            child: Icon(icon, size: 16, color: iconColor),
           ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(value,
-              style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
+              style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
         ),
         if (sub != null) ...[
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           Text(sub,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -536,8 +692,9 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -560,21 +717,21 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
           ),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         if (data.isNotEmpty)
           // Always render the bar chart when the weekly payload exists, even if
           // all values are 0 (LabeledBarChart handles all-zero with 4px stubs).
           // Previously `data.any((v) => v > 0)` showed a "no data" placeholder
           // on phones, making the bar chart invisible whenever the week had no
           // attendance yet.
-          LabeledBarChart(values: data, labels: labels, height: 140, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue)
+          LabeledBarChart(values: data, labels: labels, height: 150, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue)
         else
           Container(
-            height: 140,
+            height: 150,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: AppColors.bgCard,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.rSm,
               border: Border.all(color: AppColors.border),
             ),
             child: Text(AppStrings.t('dash.noAttendanceData'),
@@ -594,30 +751,32 @@ class _DashboardPageState extends State<DashboardPage> {
           ]
         : [DonutSlice(1, AppColors.border, 'Empty')];
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(AppStrings.t('dash.taskDistribution'),
             style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        const SizedBox(height: 2),
         Text(AppStrings.t('dash.allActiveProjects'),
-            style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 16),
+            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+        const SizedBox(height: 18),
         Center(
           child: SimpleDonutChart(
-            size: 110,
+            size: 118,
             slices: slices,
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 18),
         if (hasTasks) ...[
           _legendRow('Completed', '$completedPct%', AppColors.green),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _legendRow('In Progress', '$inProgressPct%', AppColors.accent),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           _legendRow('Pending', '$pendingPct%', AppColors.textMuted),
         ] else
           Center(
@@ -629,16 +788,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _legendRow(String label, String pct, Color color) => Row(children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary))),
-        Text(pct, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
+        Text(pct, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ]);
 
   Widget _sectionHeader(String title, {String? sub}) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Container(width: 3.5, height: 16, decoration: BoxDecoration(
           color: AppColors.accent,
-          borderRadius: BorderRadius.circular(2),
+          borderRadius: AppRadius.rPill,
         )),
         const SizedBox(width: 8),
         Expanded(
@@ -662,7 +821,7 @@ class _DashboardPageState extends State<DashboardPage> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.rMd,
           border: Border.all(color: AppColors.border),
         ),
         child: Column(children: [
@@ -678,10 +837,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final progress = (p['progress'] as num? ?? 0).toDouble();
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -696,7 +855,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ]),
         const SizedBox(height: 8),
         ClipRRect(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: AppRadius.rXs,
           child: LinearProgressIndicator(
             value: progress / 100,
             minHeight: 6,
@@ -743,16 +902,16 @@ class _DashboardPageState extends State<DashboardPage> {
     final color = overdue ? AppColors.red : (dueToday ? AppColors.yellow : AppColors.green);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rSm),
           child: Icon(overdue ? Icons.event_busy_rounded : (dueToday ? Icons.event_available_rounded : Icons.event_rounded), size: 18, color: color),
         ),
         const SizedBox(width: 12),
@@ -850,8 +1009,9 @@ class _DashboardPageState extends State<DashboardPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -859,7 +1019,7 @@ class _DashboardPageState extends State<DashboardPage> {
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: AppColors.purpleLight,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.rSm,
             ),
             child: Icon(Icons.auto_awesome_rounded,
                 size: 18, color: AppColors.purple),
@@ -881,7 +1041,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ]),
           ),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         // ── Project picker + Update button (single-col on <480px) ──
         LayoutBuilder(builder: (ctx, cs) {
           final wide = cs.maxWidth >= 480;
@@ -898,13 +1058,13 @@ class _DashboardPageState extends State<DashboardPage> {
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.accent)),
             ),
             items: [
@@ -944,7 +1104,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 backgroundColor: _predLoading ? AppColors.accent.withValues(alpha: 0.6) : AppColors.accent,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: AppRadius.rSm),
                 padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
             ),
@@ -962,7 +1122,7 @@ class _DashboardPageState extends State<DashboardPage> {
             updateBtn,
           ]);
         }),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         if (showResult)
           _predictionResultBlock(_prediction!)
         else
@@ -1024,7 +1184,7 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: (gap >= 0 ? AppColors.green : AppColors.yellow).withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.rSm,
             border: Border.all(
               color: (gap >= 0 ? AppColors.green : AppColors.yellow).withValues(alpha: 0.30),
             ),
@@ -1060,7 +1220,7 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: tc.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: AppRadius.rLg,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(_trendIcon(trend), size: 13, color: tc),
@@ -1099,7 +1259,7 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: AppColors.yellowLight,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: AppRadius.rXs,
           ),
           child: Row(children: [
             Icon(Icons.info_outline_rounded, size: 14, color: AppColors.yellow),
@@ -1196,7 +1356,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ]),
       const SizedBox(height: 4),
       ClipRRect(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: AppRadius.rXs,
         child: LinearProgressIndicator(
           value: value / 100,
           minHeight: compact ? 4 : 7,

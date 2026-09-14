@@ -64,6 +64,7 @@ class _WorkersPageState extends State<WorkersPage> {
   Widget build(BuildContext c) {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
+          heroTag: const ValueKey('fab_workers'),
           onPressed: _openAddWorker,
           icon: const Icon(Icons.add),
           label: Text(AppStrings.t('workers.addWorker'))),

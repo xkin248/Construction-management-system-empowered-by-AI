@@ -128,28 +128,39 @@ class _NarrowLayout extends StatelessWidget {
         ],
       ),
       body: pages,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          border: Border(top: BorderSide(color: AppColors.border)),
-          boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
-        ),
-        child: SafeArea(
-          child: BottomNavigationBar(
-            currentIndex: idx.clamp(0, _workerPages.length - 1),
-            onTap: onNav,
-            backgroundColor: AppColors.bgCard,
-            selectedItemColor: AppColors.green,
-            unselectedItemColor: AppColors.textMuted,
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
-            items: _workerMenu
-                .map((e) => BottomNavigationBarItem(
-                      icon: Icon(e.icon),
-                      label: _navT(e.label),
-                      tooltip: _navT(e.label),
-                    ))
-                .toList(),
+      // Floating rounded nav bar (Bento style). The bottom inset is owned by
+      // SafeArea inside the bar, and the outer padding keeps a 10px gap from
+      // the screen edge. Navigation behaviour itself is untouched.
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: AppRadius.rLg,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.md,
+          ),
+          child: ClipRRect(
+            borderRadius: AppRadius.rLg,
+            child: SafeArea(
+              top: false,
+              child: BottomNavigationBar(
+                currentIndex: idx.clamp(0, _workerPages.length - 1),
+                onTap: onNav,
+                backgroundColor: Colors.transparent,
+                selectedItemColor: AppColors.accent,
+                unselectedItemColor: AppColors.textMuted,
+                type: BottomNavigationBarType.fixed,
+                elevation: 0,
+                items: _workerMenu
+                    .map((e) => BottomNavigationBarItem(
+                          icon: Icon(e.icon),
+                          label: _navT(e.label),
+                          tooltip: _navT(e.label),
+                        ))
+                    .toList(),
+              ),
+            ),
           ),
         ),
       ),

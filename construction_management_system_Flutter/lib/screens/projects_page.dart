@@ -179,6 +179,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     return Scaffold(
       backgroundColor: AppColors.bgMain,
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: const ValueKey('fab_projects'),
         onPressed: () => _openProjectForm(),
         icon: const Icon(Icons.add),
         label: Text(AppStrings.t('proj.newProject')),

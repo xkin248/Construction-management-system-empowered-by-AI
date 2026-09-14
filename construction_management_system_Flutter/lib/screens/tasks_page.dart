@@ -110,6 +110,7 @@ class _TasksPageState extends State<TasksPage> {
     return Scaffold(
       backgroundColor: AppColors.bgMain,
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: const ValueKey('fab_tasks'),
         onPressed: _openNewTask,
         icon: const Icon(Icons.add),
         label: Text(AppStrings.t('tasks.newTask')),
@@ -633,16 +634,29 @@ class _SpinningOrIcon extends StatefulWidget {
 }
 
 class _SpinningOrIconState extends State<_SpinningOrIcon> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+  // Nullable on purpose: the controller (and its ticker) must only be created
+  // from a live element. A `late final` initializer would run inside dispose()
+  // when the widget never started spinning, and creating a ticker on an already
+  // deactivated element throws "Looking up a deactivated widget's ancestor is
+  // unsafe" (happens when the whole tree is destroyed on logout).
+  AnimationController? _ctrl;
+
+  // Same duration / repeat behaviour as before, created on first use.
+  AnimationController get _controller =>
+      _ctrl ??= AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl?.dispose();
+    _ctrl = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!widget.spin) return Icon(widget.icon, size: 20, color: widget.color);
     return RotationTransition(
-      turns: _ctrl,
+      turns: _controller,
       child: Icon(widget.icon, size: 20, color: widget.color),
     );
   }

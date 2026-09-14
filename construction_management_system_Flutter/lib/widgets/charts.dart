@@ -23,7 +23,7 @@ class SimpleBarChart extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Container(
                 height: h < 4 ? 4 : h,
-                decoration: BoxDecoration(color: color ?? AppColors.accent, borderRadius: const BorderRadius.vertical(top: Radius.circular(4))),
+                decoration: BoxDecoration(color: color ?? AppColors.accent, borderRadius: AppRadius.topXs),
               ),
             ),
           );
@@ -83,7 +83,7 @@ class LabeledBarChart extends StatelessWidget {
                       height: h < 4 ? 4 : h,
                       decoration: BoxDecoration(
                         color: isLast ? (highlightColor ?? AppColors.blue) : (color ?? AppColors.blue),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
+                        borderRadius: AppRadius.topXs,
                       ),
                     ),
                   ),
@@ -169,7 +169,7 @@ class DualBarChart extends StatelessWidget {
                               height: hA < 4 ? 4 : hA,
                               decoration: BoxDecoration(
                                 color: (colorA ?? AppColors.blue).withValues(alpha: 0.7),
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                                borderRadius: AppRadius.topXs,
                               ),
                             ),
                           ),
@@ -179,7 +179,7 @@ class DualBarChart extends StatelessWidget {
                               height: hB < 4 ? 4 : hB,
                               decoration: BoxDecoration(
                                 color: (colorB ?? AppColors.green).withValues(alpha: 0.9),
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+                                borderRadius: AppRadius.topXs,
                               ),
                             ),
                           ),
@@ -225,7 +225,7 @@ class StackedProgressBar extends StatelessWidget {
     final total = present + late + absent;
     if (total == 0) return const SizedBox(height: 10);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: AppRadius.rXs,
       child: SizedBox(
         height: 14,
         child: Row(children: [

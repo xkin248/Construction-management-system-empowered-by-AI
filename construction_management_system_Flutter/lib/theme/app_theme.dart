@@ -1,6 +1,90 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// ---------------------------------------------------------------------------
+// Radius tokens - one shared scale for every surface in the app.
+// ---------------------------------------------------------------------------
+class AppRadius {
+  AppRadius._();
+
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 24;
+  static const double pill = 999;
+
+  static const BorderRadius rXs = BorderRadius.all(Radius.circular(xs));
+  static const BorderRadius rSm = BorderRadius.all(Radius.circular(sm));
+  static const BorderRadius rMd = BorderRadius.all(Radius.circular(md));
+  static const BorderRadius rLg = BorderRadius.all(Radius.circular(lg));
+  static const BorderRadius rXl = BorderRadius.all(Radius.circular(xl));
+  static const BorderRadius rPill = BorderRadius.all(Radius.circular(pill));
+
+  /// Top-only rounding used by chart bars.
+  static const BorderRadius topXs = BorderRadius.vertical(top: Radius.circular(xs));
+
+  /// Control radius shared by buttons, inputs and snackbars.
+  static const double control = 14;
+  static const BorderRadius rBtn = BorderRadius.all(Radius.circular(control));
+  static const BorderRadius bInput = BorderRadius.all(Radius.circular(control));
+
+  /// Dialog and bottom-sheet rounding.
+  static const double dialog = 22;
+  static const double sheet = 28;
+  static const BorderRadius rSheet = BorderRadius.all(Radius.circular(dialog));
+  static const BorderRadius bSheet = BorderRadius.vertical(top: Radius.circular(sheet));
+}
+
+// ---------------------------------------------------------------------------
+// Elevation tokens - three levels, resolved per brightness at call time.
+// ---------------------------------------------------------------------------
+class AppShadows {
+  AppShadows._();
+
+  /// Small lift: cards, list rows, KPI tiles.
+  static List<BoxShadow> get sm => AppColors.isDark
+      ? const [BoxShadow(color: Color(0x66000000), blurRadius: 2, offset: Offset(0, 1))]
+      : const [BoxShadow(color: Color(0x0F0F172A), blurRadius: 2, offset: Offset(0, 1))];
+
+  /// Medium lift: floating nav bars, panels, sheets.
+  static List<BoxShadow> get md => AppColors.isDark
+      ? const [BoxShadow(color: Color(0x80000000), blurRadius: 20, offset: Offset(0, 6))]
+      : const [BoxShadow(color: Color(0x140F172A), blurRadius: 20, offset: Offset(0, 6))];
+
+  /// Large lift: hero panels and dialogs.
+  static List<BoxShadow> get lg => AppColors.isDark
+      ? const [BoxShadow(color: Color(0x99000000), blurRadius: 40, offset: Offset(0, 16))]
+      : const [BoxShadow(color: Color(0x1F0F172A), blurRadius: 40, offset: Offset(0, 16))];
+
+  /// Accent-tinted glow for brand blocks and primary calls to action.
+  static List<BoxShadow> accent(
+    Color color, {
+    double alpha = 0.30,
+    double blur = 18,
+    double dy = 8,
+  }) =>
+      [BoxShadow(color: color.withValues(alpha: alpha), blurRadius: blur, offset: Offset(0, dy))];
+
+  /// Fixed dark shadow for always-dark screens (login / splash).
+  static const List<BoxShadow> darkMd = [
+    BoxShadow(color: Color(0x80000000), blurRadius: 24, offset: Offset(0, 10)),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Motion tokens - shared durations and easing for token-driven transitions.
+// ---------------------------------------------------------------------------
+class AppDuration {
+  AppDuration._();
+
+  static const Duration fast = Duration(milliseconds: 150);
+  static const Duration base = Duration(milliseconds: 220);
+  static const Duration slow = Duration(milliseconds: 320);
+
+  static const Curve ease = Curves.easeOutCubic;
+}
+
 class AppColors {
   /// Global dark-mode switch. Set by the app when the system brightness changes.
   /// A ValueNotifier so root pages can listen and rebuild with the new palette
@@ -13,27 +97,39 @@ class AppColors {
   static Color get sidebarBg => isDark ? const Color(0xFF0B0F16) : const Color(0xFF10141C);
   static Color get sidebarHover => isDark ? const Color(0xFF1A212E) : const Color(0xFF1F2634);
   static Color get accent => const Color(0xFFE8490F);
-  static Color get accentLight => const Color(0xFFFFF3E8);
-  static Color get accentDark => const Color(0xFFCA3D0A);
-  static Color get bgMain => isDark ? const Color(0xFF0F131A) : const Color(0xFFF4F6FB);
-  static Color get bgCard => isDark ? const Color(0xFF171C26) : const Color(0xFFFFFFFF);
-  static Color get textPrimary => isDark ? const Color(0xFFF2F4F8) : const Color(0xFF1A1F2E);
-  static Color get textSecondary => isDark ? const Color(0xFFB7BFD0) : const Color(0xFF4B5563);
-  static Color get textMuted => isDark ? const Color(0xFF8A93A6) : const Color(0xFF6B7280);
+  static Color get accentDark => const Color(0xFFC93D0C);
+  /// Soft accent wash: solid tint in light mode, ~14% translucent in dark mode.
+  static Color get accentLight => isDark ? const Color(0x24E8490F) : const Color(0xFFFFF4EC);
+  static Color get bgMain => isDark ? const Color(0xFF0D1117) : const Color(0xFFF5F7FA);
+  static Color get bgCard => isDark ? const Color(0xFF161C26) : const Color(0xFFFFFFFF);
+  static Color get textPrimary => isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+  static Color get textSecondary => isDark ? const Color(0xFFAAB4C4) : const Color(0xFF475569);
+  static Color get textMuted => isDark ? const Color(0xFF7D8798) : const Color(0xFF7C8798);
   static Color get textSidebar => const Color(0xFFC8CDD8);
   static Color get textSidebarMuted => isDark ? const Color(0xFF9AA3B5) : const Color(0xFF757E90);
-  static Color get border => isDark ? const Color(0xFF242C3D) : const Color(0xFFE8ECF4);
-  static Color get borderLight => isDark ? const Color(0xFF1C2230) : const Color(0xFFF0F4FB);
-  static Color get green => const Color(0xFF22C55E);
-  static Color get greenLight => const Color(0xFFDCFCE7);
-  static Color get yellow => const Color(0xFFEAB308);
-  static Color get yellowLight => const Color(0xFFFEF9C3);
+  static Color get border => isDark ? const Color(0xFF242C3A) : const Color(0xFFE6EAF2);
+  static Color get borderLight => isDark ? const Color(0xFF1C232F) : const Color(0xFFEFF2F7);
+  // Semantic colors. The "Light" variants are solid tints in light mode and a
+  // ~16% translucent wash in dark mode, so status chips never glare on dark.
+  static Color get green => const Color(0xFF16A34A);
+  static Color get greenLight => isDark ? const Color(0x2916A34A) : const Color(0xFFDCFCE7);
+  static Color get yellow => const Color(0xFFF59E0B);
+  static Color get yellowLight => isDark ? const Color(0x29F59E0B) : const Color(0xFFFEF3C7);
   static Color get red => const Color(0xFFEF4444);
-  static Color get redLight => const Color(0xFFFEE2E2);
-  static Color get blue => const Color(0xFF3B82F6);
-  static Color get blueLight => const Color(0xFFDBEAFE);
-  static Color get purple => const Color(0xFF8B5CF6);
-  static Color get purpleLight => const Color(0xFFF3E8FF);
+  static Color get redLight => isDark ? const Color(0x29EF4444) : const Color(0xFFFEE2E2);
+  static Color get blue => const Color(0xFF2563EB);
+  static Color get blueLight => isDark ? const Color(0x292563EB) : const Color(0xFFDBEAFE);
+  static Color get purple => const Color(0xFF7C3AED);
+  static Color get purpleLight => isDark ? const Color(0x297C3AED) : const Color(0xFFF3E8FF);
+
+  // Fixed dark-surface palette. Always-dark screens (login, splash, error
+  // screens) read these constants so they never flip with the theme mode.
+  static const Color darkBg = Color(0xFF0D1117);
+  static const Color darkSurface = Color(0xFF161C26);
+  static const Color darkBorder = Color(0xFF242C3A);
+  static const Color darkTextPrimary = Color(0xFFF1F5F9);
+  static const Color darkTextSecondary = Color(0xFFAAB4C4);
+  static const Color darkTextMuted = Color(0xFF7D8798);
 
   // Sidebar width for adaptive layout
   static const double sidebarWidth = 240.0;
@@ -41,31 +137,37 @@ class AppColors {
   // ── Backward-compatibility aliases ──
   static Color get primary => const Color(0xFFE8490F);
   static Color get primaryLight => const Color(0xFFFB923C);
-  static Color get primaryDark => const Color(0xFFCA3D0A);
+  static Color get primaryDark => const Color(0xFFC93D0C);
   static Color get accentOrange => const Color(0xFFE8490F);
   static Color get accentOrangeLight => const Color(0xFFFB923C);
-  static Color get success => const Color(0xFF22C55E);
-  static Color get successLight => const Color(0xFFDCFCE7);
-  static Color get warning => const Color(0xFFEAB308);
+  static Color get success => const Color(0xFF16A34A);
+  static Color get successLight => greenLight;
+  static Color get warning => const Color(0xFFF59E0B);
   static Color get danger => const Color(0xFFEF4444);
-  static Color get info => const Color(0xFF3B82F6);
+  static Color get info => const Color(0xFF2563EB);
   static Color get bgColor => bgMain;
   static Color get cardColor => bgCard;
   static Color get sidebarColor => sidebarBg;
   static Color get borderColor => border;
 
+  /// Brand gradient (accent -> accentDark) used by logo blocks and CTA buttons.
+  static LinearGradient get brandGradient => const LinearGradient(
+        colors: [Color(0xFFE8490F), Color(0xFFC93D0C)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      );
   static LinearGradient get primaryGradient => const LinearGradient(
-        colors: [Color(0xFFE8490F), Color(0xFFFB923C)],
+        colors: [Color(0xFFE8490F), Color(0xFFC93D0C)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
   static LinearGradient get accentGradient => const LinearGradient(
-        colors: [Color(0xFFE8490F), Color(0xFFFB923C)],
+        colors: [Color(0xFFE8490F), Color(0xFFC93D0C)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
   static LinearGradient get successGradient => const LinearGradient(
-        colors: [Color(0xFF22C55E), Color(0xFF86EFAC)],
+        colors: [Color(0xFF16A34A), Color(0xFF4ADE80)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
@@ -97,52 +199,74 @@ final List<Color> avatarPalette = [
 Color avatarColor(String seed) =>
     avatarPalette[seed.codeUnits.fold(0, (a, b) => a + b) % avatarPalette.length];
 
-final Map<String, Color> _statusColor = {
-  'checked_in': AppColors.green,
-  'present': AppColors.green,
-  'completed': AppColors.green,
-  'active': AppColors.green,
-  'resolved': AppColors.green,
-  'on_track': AppColors.green,
-  'checked_out': AppColors.blue,
-  'in_progress': AppColors.blue,
-  'left_early': AppColors.yellow,
-  'late': AppColors.yellow,
-  'pending': AppColors.yellow,
-  'at_risk': AppColors.yellow,
-  'absent': AppColors.red,
-  'rejected': AppColors.red,
-  'open': AppColors.red,
-  'high': AppColors.red,
-  'critical': AppColors.red,
-  'delayed': AppColors.red,
-  'medium': AppColors.yellow,
-  'low': AppColors.blue,
-};
-final Map<String, Color> _statusBg = {
-  'checked_in': AppColors.greenLight,
-  'present': AppColors.greenLight,
-  'completed': AppColors.greenLight,
-  'active': AppColors.greenLight,
-  'resolved': AppColors.greenLight,
-  'on_track': AppColors.greenLight,
-  'checked_out': AppColors.blueLight,
-  'in_progress': AppColors.blueLight,
-  'left_early': AppColors.yellowLight,
-  'late': AppColors.yellowLight,
-  'pending': AppColors.yellowLight,
-  'at_risk': AppColors.yellowLight,
-  'absent': AppColors.redLight,
-  'rejected': AppColors.redLight,
-  'open': AppColors.redLight,
-  'high': AppColors.redLight,
-  'critical': AppColors.redLight,
-  'delayed': AppColors.redLight,
-  'medium': AppColors.yellowLight,
-  'low': AppColors.blueLight,
-};
-Color statusFg(String s) => _statusColor[s.toLowerCase()] ?? AppColors.textMuted;
-Color statusBgOf(String s) => _statusBg[s.toLowerCase()] ?? AppColors.border;
+// Base semantic color for a status key, or null when the key is unknown.
+Color? _statusBase(String s) {
+  switch (s) {
+    case 'checked_in':
+    case 'present':
+    case 'completed':
+    case 'active':
+    case 'resolved':
+    case 'on_track':
+      return AppColors.green;
+    case 'checked_out':
+    case 'in_progress':
+    case 'low':
+      return AppColors.blue;
+    case 'left_early':
+    case 'late':
+    case 'pending':
+    case 'at_risk':
+    case 'medium':
+      return AppColors.yellow;
+    case 'absent':
+    case 'rejected':
+    case 'open':
+    case 'high':
+    case 'critical':
+    case 'delayed':
+      return AppColors.red;
+    default:
+      return null;
+  }
+}
+
+// Chip background for a status. The semantic "Light" getters resolve to a solid
+// tint in light mode and a ~16% translucent wash in dark mode, so the same call
+// renders correctly in both brightness modes.
+Color _statusWash(String s) {
+  switch (s) {
+    case 'checked_in':
+    case 'present':
+    case 'completed':
+    case 'active':
+    case 'resolved':
+    case 'on_track':
+      return AppColors.greenLight;
+    case 'checked_out':
+    case 'in_progress':
+    case 'low':
+      return AppColors.blueLight;
+    case 'left_early':
+    case 'late':
+    case 'pending':
+    case 'at_risk':
+    case 'medium':
+      return AppColors.yellowLight;
+    case 'absent':
+    case 'rejected':
+    case 'open':
+    case 'high':
+    case 'critical':
+    case 'delayed':
+      return AppColors.redLight;
+    default:
+      return AppColors.border;
+  }
+}
+
+Color statusFg(String s) => _statusBase(s.toLowerCase()) ?? AppColors.textMuted;
+Color statusBgOf(String s) => _statusWash(s.toLowerCase());
 
 Widget statusPill(String status, {String? label}) {
   final s = status.toLowerCase();
@@ -164,6 +288,8 @@ Widget statusPill(String status, {String? label}) {
   );
 }
 
+// Translucent surface used by cards. Light mode: hairline border + soft lift.
+// Dark mode: same recipe with a stronger shadow so depth survives on dark bg.
 Widget sectionCard({
   required Widget child,
   EdgeInsetsGeometry? padding,
@@ -174,8 +300,9 @@ Widget sectionCard({
       padding: padding ?? const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
       ),
       child: child,
     );
@@ -213,25 +340,27 @@ Widget statCard({
                 color: AppColors.textSecondary,
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
+                letterSpacing: 0.1,
               ),
             ),
           ),
           if (icon != null)
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
                 color: (iconColor ?? AppColors.accent).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.rSm,
               ),
-              child: Icon(icon, size: 15, color: iconColor ?? AppColors.accent),
+              child: Icon(icon, size: 16, color: iconColor ?? AppColors.accent),
             ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(
           value,
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
+            height: 1.1,
             color: AppColors.textPrimary,
           ),
         ),
@@ -245,19 +374,20 @@ Widget statCard({
 }
 
 TextTheme _buildTextTheme(TextTheme base) {
+  // Slightly looser line heights keep dense data screens readable.
   return GoogleFonts.outfitTextTheme(base).copyWith(
-    displayLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-    displayMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-    headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-    headlineMedium: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    headlineSmall: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    titleLarge: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-    titleMedium: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-    bodyLarge: GoogleFonts.outfit(fontSize: 15, color: AppColors.textPrimary),
-    bodyMedium: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary),
-    bodySmall: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
-    labelLarge: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
-    labelSmall: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.4),
+    displayLarge: GoogleFonts.outfit(fontSize: 34, fontWeight: FontWeight.w800, height: 1.2, color: AppColors.textPrimary),
+    displayMedium: GoogleFonts.outfit(fontSize: 26, fontWeight: FontWeight.w800, height: 1.2, color: AppColors.textPrimary),
+    headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, height: 1.25, color: AppColors.textPrimary),
+    headlineMedium: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
+    headlineSmall: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
+    titleLarge: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
+    titleMedium: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.35, color: AppColors.textPrimary),
+    bodyLarge: GoogleFonts.outfit(fontSize: 15, height: 1.4, color: AppColors.textPrimary),
+    bodyMedium: GoogleFonts.outfit(fontSize: 14, height: 1.4, color: AppColors.textSecondary),
+    bodySmall: GoogleFonts.outfit(fontSize: 13, height: 1.4, color: AppColors.textMuted),
+    labelLarge: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3),
+    labelSmall: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.4, height: 1.3),
   );
 }
 
@@ -274,6 +404,7 @@ ThemeData buildAppTheme() => ThemeData(
         backgroundColor: AppColors.bgCard,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.outfit(
           color: AppColors.textPrimary,
@@ -287,7 +418,7 @@ ThemeData buildAppTheme() => ThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.rLg,
           side: BorderSide(color: AppColors.border),
         ),
       ),
@@ -295,9 +426,12 @@ ThemeData buildAppTheme() => ThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
+          disabledForegroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          minimumSize: const Size(0, 50),
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
           textStyle: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
@@ -305,8 +439,9 @@ ThemeData buildAppTheme() => ThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(color: AppColors.border),
+          minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -320,15 +455,15 @@ ThemeData buildAppTheme() => ThemeData(
         fillColor: AppColors.bgMain,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.accent, width: 1.6),
         ),
         labelStyle: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 14),
@@ -340,7 +475,24 @@ ThemeData buildAppTheme() => ThemeData(
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
-        elevation: 10,
+        elevation: 0,
+      ),
+      // Material 3 navigation bar: selected pill + accent icon/label.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: AppColors.accentLight,
+        elevation: 0,
+        height: 68,
+        labelTextStyle: WidgetStateProperty.resolveWith((s) => GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+            )),
+        iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
+              size: 22,
+              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+            )),
       ),
       dividerTheme: DividerThemeData(
         color: AppColors.border,
@@ -348,18 +500,31 @@ ThemeData buildAppTheme() => ThemeData(
         space: 1,
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rPill),
         side: BorderSide(color: AppColors.border),
+        backgroundColor: AppColors.bgCard,
+        selectedColor: AppColors.accentLight,
+        labelStyle: GoogleFonts.outfit(
+          fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSheet),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: AppColors.accent,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: AppColors.accentLight,
+          borderRadius: AppRadius.rPill,
+        ),
         labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+        unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       // ── Shared component polish (kept in sync across light & dark) ──
       iconTheme: IconThemeData(color: AppColors.textSecondary),
@@ -372,20 +537,20 @@ ThemeData buildAppTheme() => ThemeData(
         subtitleTextStyle: GoogleFonts.outfit(
           color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFF262D3D),
         contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w500),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: AppColors.bgCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.rMd,
           side: BorderSide(color: AppColors.border),
         ),
         textStyle: GoogleFonts.outfit(color: AppColors.textPrimary, fontSize: 14),
@@ -395,13 +560,14 @@ ThemeData buildAppTheme() => ThemeData(
             s.contains(WidgetState.selected) ? Colors.white : AppColors.textMuted),
         trackColor: WidgetStateProperty.resolveWith((s) =>
             s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
-        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((s) =>
             s.contains(WidgetState.selected) ? AppColors.accent : Colors.transparent),
         side: BorderSide(color: AppColors.textMuted, width: 1.6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rXs),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith((s) =>
@@ -415,14 +581,13 @@ ThemeData buildAppTheme() => ThemeData(
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: AppColors.bgCard,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.bSheet),
       ),
       scrollbarTheme: ScrollbarThemeData(
         thumbColor: WidgetStateProperty.resolveWith((s) => AppColors.border),
         radius: const Radius.circular(8),
-        thickness: const WidgetStatePropertyAll(5),
+        thickness: const WidgetStatePropertyAll(6),
       ),
     );
 
@@ -439,6 +604,7 @@ ThemeData buildDarkTheme() => ThemeData(
         backgroundColor: AppColors.bgCard,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
+        scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         titleTextStyle: GoogleFonts.outfit(
           color: AppColors.textPrimary,
@@ -452,7 +618,7 @@ ThemeData buildDarkTheme() => ThemeData(
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: AppRadius.rLg,
           side: BorderSide(color: AppColors.border),
         ),
       ),
@@ -460,9 +626,12 @@ ThemeData buildDarkTheme() => ThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
+          disabledForegroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          minimumSize: const Size(0, 50),
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
           textStyle: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700),
         ),
       ),
@@ -470,8 +639,9 @@ ThemeData buildDarkTheme() => ThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: BorderSide(color: AppColors.border),
+          minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -485,15 +655,15 @@ ThemeData buildDarkTheme() => ThemeData(
         fillColor: AppColors.bgMain,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.bInput,
           borderSide: BorderSide(color: AppColors.accent, width: 1.6),
         ),
         labelStyle: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 14),
@@ -505,7 +675,24 @@ ThemeData buildDarkTheme() => ThemeData(
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
-        elevation: 10,
+        elevation: 0,
+      ),
+      // Material 3 navigation bar: selected pill + accent icon/label.
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: AppColors.bgCard,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: AppColors.accentLight,
+        elevation: 0,
+        height: 68,
+        labelTextStyle: WidgetStateProperty.resolveWith((s) => GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+            )),
+        iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
+              size: 22,
+              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+            )),
       ),
       dividerTheme: DividerThemeData(
         color: AppColors.border,
@@ -513,18 +700,31 @@ ThemeData buildDarkTheme() => ThemeData(
         space: 1,
       ),
       chipTheme: ChipThemeData(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rPill),
         side: BorderSide(color: AppColors.border),
+        backgroundColor: AppColors.bgCard,
+        selectedColor: AppColors.accentLight,
+        labelStyle: GoogleFonts.outfit(
+          fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary,
+        ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSheet),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: AppColors.accent,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: AppColors.accentLight,
+          borderRadius: AppRadius.rPill,
+        ),
         labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14),
+        unselectedLabelStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       // ── Shared component polish (kept in sync across light & dark) ──
       iconTheme: IconThemeData(color: AppColors.textSecondary),
@@ -537,20 +737,20 @@ ThemeData buildDarkTheme() => ThemeData(
         subtitleTextStyle: GoogleFonts.outfit(
           color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: const Color(0xFF262D3D),
         contentTextStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w500),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rBtn),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: AppColors.bgCard,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.rMd,
           side: BorderSide(color: AppColors.border),
         ),
         textStyle: GoogleFonts.outfit(color: AppColors.textPrimary, fontSize: 14),
@@ -560,13 +760,14 @@ ThemeData buildDarkTheme() => ThemeData(
             s.contains(WidgetState.selected) ? Colors.white : AppColors.textMuted),
         trackColor: WidgetStateProperty.resolveWith((s) =>
             s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
-        trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? AppColors.accent : AppColors.border),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((s) =>
             s.contains(WidgetState.selected) ? AppColors.accent : Colors.transparent),
         side: BorderSide(color: AppColors.textMuted, width: 1.6),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rXs),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith((s) =>
@@ -580,13 +781,12 @@ ThemeData buildDarkTheme() => ThemeData(
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: AppColors.bgCard,
         surfaceTintColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
+        showDragHandle: true,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.bSheet),
       ),
       scrollbarTheme: ScrollbarThemeData(
         thumbColor: WidgetStateProperty.resolveWith((s) => AppColors.border),
         radius: const Radius.circular(8),
-        thickness: const WidgetStatePropertyAll(5),
+        thickness: const WidgetStatePropertyAll(6),
       ),
     );

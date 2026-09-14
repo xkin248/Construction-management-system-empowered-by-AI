@@ -303,7 +303,7 @@ class _NarrowLayout extends StatelessWidget {
         title: Row(children: [
           Container(
             width: 28, height: 28,
-            decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(7)),
+            decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rXs),
             child: const Center(child: Icon(Icons.construction_rounded, color: Colors.white, size: 15)),
           ),
           const SizedBox(width: 8),
@@ -349,27 +349,34 @@ class _NarrowLayout extends StatelessWidget {
         ],
       ),
       body: pages,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          border: Border(top: BorderSide(color: AppColors.border)),
-          boxShadow: [BoxShadow(color: Color(0x0A000000), blurRadius: 12, offset: Offset(0, -2))],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 68,
-            child: Row(
-              children: List.generate(_bottomNavItems.length, (i) {
-                final item = _bottomNavItems[i];
-                final isSelected = _pageToBottomIdx(idx) == i;
-                return Expanded(
-                  child: _BottomNavBtn(
-                    item: item,
-                    selected: isSelected,
-                    onTap: () => onNav(_bottomToPageIdx(i)),
-                  ),
-                );
-              }),
+      // Floating rounded nav bar (Bento style). Navigation indices and page
+      // switching stay identical; only the surface styling changed.
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: AppRadius.rLg,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.md,
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                children: List.generate(_bottomNavItems.length, (i) {
+                  final item = _bottomNavItems[i];
+                  final isSelected = _pageToBottomIdx(idx) == i;
+                  return Expanded(
+                    child: _BottomNavBtn(
+                      item: item,
+                      selected: isSelected,
+                      onTap: () => onNav(_bottomToPageIdx(i)),
+                    ),
+                  );
+                }),
+              ),
             ),
           ),
         ),
@@ -392,16 +399,27 @@ class _BottomNavBtn extends StatelessWidget {
       child: InkWell(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        duration: AppDuration.base,
+        curve: AppDuration.ease,
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Icon(
-              selected ? item.activeIcon : item.icon,
-              key: ValueKey(selected),
-              size: 22,
-              color: selected ? AppColors.accent : AppColors.textMuted,
+          // Selected item gets a pill highlight behind the icon.
+          AnimatedContainer(
+            duration: AppDuration.base,
+            curve: AppDuration.ease,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.accentLight : Colors.transparent,
+              borderRadius: AppRadius.rPill,
+            ),
+            child: AnimatedSwitcher(
+              duration: AppDuration.base,
+              child: Icon(
+                selected ? item.activeIcon : item.icon,
+                key: ValueKey(selected),
+                size: 20,
+                color: selected ? AppColors.accent : AppColors.textMuted,
+              ),
             ),
           ),
           const SizedBox(height: 3),
@@ -557,9 +575,9 @@ class _NavTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: Material(
         color: selected ? AppColors.accent : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.rSm,
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppRadius.rSm,
           hoverColor: selected ? Colors.transparent : AppColors.sidebarHover,
           onTap: onTap,
           child: Padding(
@@ -631,13 +649,13 @@ class _TopBar extends StatelessWidget {
               fillColor: AppColors.bgMain,
               contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
             ),
           ),
@@ -692,7 +710,7 @@ class _ProjectChipState extends State<_ProjectChip> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppRadius.rSm,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),

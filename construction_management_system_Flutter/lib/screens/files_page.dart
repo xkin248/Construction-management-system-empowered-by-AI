@@ -436,6 +436,7 @@ class _FilesPageState extends State<FilesPage> {
         width: 56,
         height: 56,
         child: FloatingActionButton(
+          heroTag: const ValueKey('fab_files'),
           onPressed: _openUpload,
           backgroundColor: AppColors.accent,
           child: const Icon(Icons.upload_file_rounded, color: Colors.white),
