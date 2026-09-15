@@ -298,20 +298,20 @@ class _NarrowLayout extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         centerTitle: false,
         title: Row(children: [
           Container(
             width: 28, height: 28,
             decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rXs),
-            child: const Center(child: Icon(Icons.construction_rounded, color: Colors.white, size: 15)),
+            child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 15)),
           ),
           const SizedBox(width: 8),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('BuildSmart',
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             Text(_navT(_titles[idx.clamp(0, _titles.length - 1)]),
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
+                style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted)),
           ]),
         ]),
         actions: [
@@ -336,7 +336,7 @@ class _NarrowLayout extends StatelessWidget {
                       radius: 16,
                       backgroundColor: avatarColor(userName.isNotEmpty ? userName : 'U'),
                       child: Text(initStr,
-                          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                          style: GoogleFonts.inter(color: AppColors.onAccent, fontWeight: FontWeight.w800, fontSize: 13)),
                     )
                   : CircleAvatar(
                       radius: 16,
@@ -352,7 +352,7 @@ class _NarrowLayout extends StatelessWidget {
       // Floating rounded nav bar (Bento style). Navigation indices and page
       // switching stay identical; only the surface styling changed.
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.bgCard,
@@ -401,15 +401,15 @@ class _BottomNavBtn extends StatelessWidget {
       child: AnimatedContainer(
         duration: AppDuration.base,
         curve: AppDuration.ease,
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           // Selected item gets a pill highlight behind the icon.
           AnimatedContainer(
             duration: AppDuration.base,
             curve: AppDuration.ease,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              color: selected ? AppColors.accentLight : Colors.transparent,
+              color: selected ? AppColors.accentLight : AppColors.transparent,
               borderRadius: AppRadius.rPill,
             ),
             child: AnimatedSwitcher(
@@ -422,13 +422,13 @@ class _BottomNavBtn extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 3),
+          const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
               _navT(item.label),
               maxLines: 1,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: selected ? AppColors.accent : AppColors.textMuted,
@@ -481,20 +481,20 @@ class _SidebarContent extends StatelessWidget {
         children: [
           // Logo
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 20, 18, 12),
+            padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
             child: Row(children: [
               Container(
                 width: 38, height: 38,
-                decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(10)),
-                child: const Center(child: Icon(Icons.construction_rounded, color: Colors.white, size: 20)),
+                decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rMd),
+                child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 20)),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('BuildSmart',
-                      style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
+                      style: GoogleFonts.inter(color: AppColors.onAccent, fontWeight: FontWeight.w800, fontSize: 15)),
                   Text('AI Construction System',
-                      style: GoogleFonts.outfit(color: AppColors.textSidebarMuted, fontSize: 14)),
+                      style: GoogleFonts.inter(color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),
               ),
             ]),
@@ -502,7 +502,7 @@ class _SidebarContent extends StatelessWidget {
           Container(height: 1, color: AppColors.sidebarHover),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
                 _sectionLabel('MAIN MENU'),
                 ..._mainMenu.asMap().entries.map((e) => _NavTile(
@@ -517,19 +517,19 @@ class _SidebarContent extends StatelessWidget {
           Container(height: 1, color: AppColors.sidebarHover),
           // User row
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Row(children: [
               initialsAvatar(userName.isNotEmpty ? userName : '?', radius: 16),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(userName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                          color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                      style: GoogleFonts.inter(
+                          color: AppColors.onAccent, fontWeight: FontWeight.w700, fontSize: 14)),
                   Text(role.replaceAll('_', ' '),
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                           color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),
               ),
@@ -546,9 +546,9 @@ class _SidebarContent extends StatelessWidget {
   }
 
   Widget _sectionLabel(String s) => Padding(
-        padding: const EdgeInsets.fromLTRB(10, 14, 10, 4),
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 4),
         child: Text(s,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 color: AppColors.textSidebarMuted,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
@@ -572,30 +572,30 @@ class _NavTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 2),
+      padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? AppColors.accent : Colors.transparent,
+        color: selected ? AppColors.accent : AppColors.transparent,
         borderRadius: AppRadius.rSm,
         child: InkWell(
           borderRadius: AppRadius.rSm,
-          hoverColor: selected ? Colors.transparent : AppColors.sidebarHover,
+          hoverColor: selected ? AppColors.transparent : AppColors.sidebarHover,
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(children: [
-              Icon(item.icon, size: 18, color: selected ? Colors.white : AppColors.textSidebar),
+              Icon(item.icon, size: 18, color: selected ? AppColors.onAccent : AppColors.textSidebar),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(_navT(item.label),
-                    style: GoogleFonts.outfit(
-                        color: selected ? Colors.white : AppColors.textSidebar,
+                    style: GoogleFonts.inter(
+                        color: selected ? AppColors.onAccent : AppColors.textSidebar,
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600)),
               ),
               if (showNotificationBadge)
                 Container(
                   width: 8, height: 8,
-                  margin: const EdgeInsets.only(left: 2),
+                  margin: const EdgeInsets.only(left: 4),
                   decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
                 ),
             ]),
@@ -635,7 +635,7 @@ class _TopBar extends StatelessWidget {
       child: Row(children: [
         Expanded(
           child: Text(_navT(title),
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
         SizedBox(
@@ -643,11 +643,11 @@ class _TopBar extends StatelessWidget {
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search projects, workers...',
-              hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
+              hintStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
               prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
               filled: true,
               fillColor: AppColors.bgMain,
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               border: OutlineInputBorder(
                   borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
@@ -681,8 +681,8 @@ class _TopBar extends StatelessWidget {
             radius: 17,
             backgroundColor: userName.isNotEmpty ? avatarColor(userName) : AppColors.accent,
             child: Text(initStr,
-                style: GoogleFonts.outfit(
-                    color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
+                style: GoogleFonts.inter(
+                    color: AppColors.onAccent, fontWeight: FontWeight.w800, fontSize: 13)),
           ),
         ),
       ]),
@@ -707,16 +707,16 @@ class _ProjectChipState extends State<_ProjectChip> {
       onSelected: widget.onChanged,
       itemBuilder: (_) => _projects.map((p) => PopupMenuItem(value: p, child: Text(p))).toList(),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           border: Border.all(color: AppColors.border),
           borderRadius: AppRadius.rSm,
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           Text(widget.currentProject.isEmpty ? 'All Projects' : widget.currentProject,
-              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(width: 4),
           Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
         ]),

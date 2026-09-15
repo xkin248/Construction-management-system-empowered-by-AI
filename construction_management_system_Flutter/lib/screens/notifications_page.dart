@@ -230,8 +230,8 @@ class _NotificationsPageState extends State<NotificationsPage>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           title: Text(AppStrings.t('notif.settingsTitle'),
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
           content: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               _switch('Attendance', _settings?.notifAttendance ?? true,
@@ -278,7 +278,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(label,
-          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       value: value,
       activeThumbColor: AppColors.accent,
       onChanged: onChanged,
@@ -325,18 +325,18 @@ class _NotificationsPageState extends State<NotificationsPage>
           appBar: AppBar(
             title: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(AppStrings.t('notif.title'),
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 17)),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
               if (_unreadCount > 0) ...[
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.red,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppRadius.rMd,
                   ),
                   child: Text('$_unreadCount',
-                      style: GoogleFonts.outfit(
-                          color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+                      style: GoogleFonts.inter(
+                          color: AppColors.onAccent, fontSize: 13, fontWeight: FontWeight.w800)),
                 ),
               ],
             ]),
@@ -358,7 +358,7 @@ class _NotificationsPageState extends State<NotificationsPage>
               indicatorColor: AppColors.accent,
               labelColor: AppColors.accent,
               unselectedLabelColor: AppColors.textSecondary,
-              labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+              labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
               tabs: tabs,
             ),
           ),
@@ -400,8 +400,8 @@ class _NotificationsPageState extends State<NotificationsPage>
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(AppStrings.t('notif.submitDailyReport'),
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-              const SizedBox(height: 14),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+              const SizedBox(height: 16),
               if (projects.length > 1) ...[
                 DropdownButtonFormField<int>(
                   initialValue: _repPid,
@@ -454,31 +454,31 @@ class _NotificationsPageState extends State<NotificationsPage>
                 onPressed: _submitReport,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
                 child: Text(AppStrings.t('notif.submitReport')),
               ),
             ]),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Text(AppStrings.t('notif.recentReports'),
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-          const SizedBox(height: 10),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
           if (reports.isEmpty)
             Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(24),
               child: Center(child: Text(AppStrings.t('notif.noReports'),
                   style: TextStyle(color: AppColors.textMuted))),
             )
           else
             ...reports.map((r) => _sectionCard(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: Row(children: [
                     Container(
-                      padding: const EdgeInsets.all(9),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: AppColors.accentLight,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: AppRadius.rMd,
                       ),
                       child: Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
                     ),
@@ -486,17 +486,17 @@ class _NotificationsPageState extends State<NotificationsPage>
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text('${DateHelper.tryFormatShort(r['report_date'])} · ${r['weather'] ?? ''}',
-                            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
-                        const SizedBox(height: 2),
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                        const SizedBox(height: 4),
                         Text(r['work_progress']?.toString() ?? 'No content',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
                       ]),
                     ),
                     Text('${r['manpower_count'] ?? 0}\nworkers',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
                   ]),
                 )),
         ],
@@ -514,8 +514,8 @@ class _NotificationsPageState extends State<NotificationsPage>
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(AppStrings.t('notif.reportIssue'),
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-              const SizedBox(height: 14),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+              const SizedBox(height: 16),
               if (projects.length > 1) ...[
                 DropdownButtonFormField<int>(
                   initialValue: _issPid,
@@ -541,7 +541,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                     onChanged: (v) => setState(() => _severity = v!),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: DropdownButtonFormField<String>(
                     initialValue: _category,
@@ -564,32 +564,32 @@ class _NotificationsPageState extends State<NotificationsPage>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.red,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
                 child: Text(AppStrings.t('notif.reportIssueSubmit')),
               ),
             ]),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
           Text(AppStrings.t('notif.activeIssues'),
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-          const SizedBox(height: 10),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
           if (issues.isEmpty)
             Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(24),
               child: Center(child: Text(AppStrings.t('notif.noIssues'),
                   style: TextStyle(color: AppColors.textMuted))),
             )
           else
             ...issues.map((iss) => _sectionCard(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       Expanded(
                         child: Text(iss['title']?.toString() ?? '-',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textPrimary)),
+                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textPrimary)),
                       ),
                       _statusPill(iss['priority']?.toString() ?? 'low'),
                     ]),
@@ -597,7 +597,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                     Text(iss['description']?.toString() ?? '',
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
                     const SizedBox(height: 8),
                     Row(children: [
                       _statusPill(iss['incident_type']?.toString() ?? 'general'),
@@ -622,7 +622,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: child,
@@ -632,10 +632,10 @@ class _NotificationsPageState extends State<NotificationsPage>
   Widget _statusPill(String text) {
     final color = text == 'high' ? AppColors.red : (text == 'medium' ? AppColors.yellow : AppColors.green);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: AppRadius.rMd),
       child: Text(text[0].toUpperCase() + text.substring(1),
-          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
     );
   }
 
@@ -643,10 +643,10 @@ class _NotificationsPageState extends State<NotificationsPage>
     final resolved = status.toLowerCase() == 'resolved';
     final color = resolved ? AppColors.green : AppColors.red;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: AppRadius.rMd),
       child: Text(resolved ? 'Resolved' : 'Open',
-          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
     );
   }
 
@@ -750,20 +750,20 @@ class _NotificationsPageState extends State<NotificationsPage>
             width: 72, height: 72,
             decoration: BoxDecoration(
               color: AppColors.accentLight,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppRadius.rMd,
             ),
             child: Icon(Icons.notifications_none_rounded,
                 size: 36, color: AppColors.accent),
           ),
           const SizedBox(height: 16),
           Text(AppStrings.t('notif.noNotifications'),
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary)),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(AppStrings.t('notif.allCaughtUp'),
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 13, color: AppColors.textMuted)),
         ]),
       );
@@ -778,12 +778,12 @@ class _NotificationsPageState extends State<NotificationsPage>
         }
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: unread ? AppColors.bgCard : AppColors.bgMain,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.rMd,
           border: Border.all(
-              color: unread ? AppColors.border : Colors.transparent),
+              color: unread ? AppColors.border : AppColors.transparent),
         ),
         child: IntrinsicHeight(
           child: Row(
@@ -796,14 +796,14 @@ class _NotificationsPageState extends State<NotificationsPage>
                   decoration: BoxDecoration(
                     color: AppColors.accent,
                     borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomLeft: Radius.circular(12)),
+                        topLeft: Radius.circular(AppRadius.md),
+                        bottomLeft: Radius.circular(AppRadius.md)),
                   ),
                 ),
               // Content
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -813,7 +813,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                         decoration: BoxDecoration(
                           color: _iconColor(item.notificationType)
                               .withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: AppRadius.rMd,
                         ),
                         child: Icon(
                           _typeIcon(item.notificationType),
@@ -830,24 +830,24 @@ class _NotificationsPageState extends State<NotificationsPage>
                             Text(item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.inter(
                                     fontSize: 13.5,
                                     fontWeight:
                                         unread ? FontWeight.w700 : FontWeight.w600,
                                     color: unread
                                         ? AppColors.textPrimary
                                         : AppColors.textSecondary)),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 4),
                             Text(item.content,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.inter(
                                     fontSize: 14,
                                     color: AppColors.textMuted,
                                     height: 1.35)),
-                            const SizedBox(height: 6),
+                            const SizedBox(height: 8),
                             Text(item.relativeTime,
-                                style: GoogleFonts.outfit(
+                                style: GoogleFonts.inter(
                                     fontSize: 14,
                                     color: AppColors.textMuted)),
                           ],

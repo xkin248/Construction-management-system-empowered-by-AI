@@ -147,7 +147,7 @@ class _TasksPageState extends State<TasksPage> {
                               ),
                               const SizedBox(height: 16),
                               Text(AppStrings.t('tasks.noTasks'),
-                                  style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textMuted)),
+                                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
                               const SizedBox(height: 16),
                               OutlinedButton.icon(
                                 onPressed: _openNewTask,
@@ -162,7 +162,7 @@ class _TasksPageState extends State<TasksPage> {
                               final wide = constraints.maxWidth >= AppBreakpoints.phone;
                               if (!wide) {
                                 return ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                                   itemCount: _filtered.length,
                                   itemBuilder: (ctx, i) => _TaskCard(
                                     task: _filtered[i],
@@ -171,7 +171,7 @@ class _TasksPageState extends State<TasksPage> {
                                 );
                               }
                               return GridView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   mainAxisSpacing: AppSpacing.md,
@@ -204,13 +204,13 @@ class _TasksPageState extends State<TasksPage> {
           onChanged: (v) => setState(() => _searchQuery = v),
           decoration: InputDecoration(
             hintText: 'Search tasks...',
-            hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+            hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
             prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
             filled: true, fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 0),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent)),
+            border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent)),
           ),
         ),
       ),
@@ -268,19 +268,19 @@ class _TasksPageState extends State<TasksPage> {
   Widget _dropdown(List<String> items, String value, ValueChanged<String?> onChanged, String hint) {
     final v = items.contains(value) ? value : items.first;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       height: 48,
       width: 172,
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: DropdownButton<String>(
         value: v,
         underline: const SizedBox(),
         isExpanded: true,
-        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         items: items.map((s) => DropdownMenuItem(value: s, child: Text('$hint: ${_displayOf(s)}'))).toList(),
         onChanged: onChanged,
       ),
@@ -333,7 +333,7 @@ class _TaskCardState extends State<_TaskCard> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style:
-                  GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                  GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
         ),
       ]);
     }
@@ -348,7 +348,7 @@ class _TaskCardState extends State<_TaskCard> {
         child: Text(display,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 13, fontWeight: FontWeight.w600, color: color)),
       ),
     ]);
@@ -428,13 +428,13 @@ class _TaskCardState extends State<_TaskCard> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Navigable section (header + progress + worker/due) ──
         InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: AppRadius.rMd,
           onTap: () async {
             final changed = await Navigator.push<bool>(context,
                 MaterialPageRoute(builder: (_) => TaskDetailPage(task: widget.task)));
@@ -444,10 +444,10 @@ class _TaskCardState extends State<_TaskCard> {
             // Title row
             Row(children: [
               leadIcon,
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(widget.task['task_name'] ?? '-',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary),
@@ -456,28 +456,28 @@ class _TaskCardState extends State<_TaskCard> {
               _PriorityBadge(priority: priority),
               const SizedBox(width: 8),
               Text('${progress.toStringAsFixed(0)}%',
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textSecondary)),
             ]),
             if (widget.task['project_name'] != null ||
                 (widget.task['project'] != null)) ...[
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Padding(
-                padding: const EdgeInsets.only(left: 28),
+                padding: const EdgeInsets.only(left: 24),
                 child: Text(
                     widget.task['project_name'] ??
                         widget.task['project']?['project_name'] ??
                         '',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 13, color: AppColors.textMuted)),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             // Progress bar
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.rMd,
               child: LinearProgressIndicator(
                 value: progress / 100,
                 minHeight: 6,
@@ -487,19 +487,19 @@ class _TaskCardState extends State<_TaskCard> {
             ),
             // Trade badge
             if (widget.task['trade'] != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Padding(
-                padding: const EdgeInsets.only(left: 28),
+                padding: const EdgeInsets.only(left: 24),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: AppRadius.rMd,
                   ),
                   child: Text(
                     (widget.task['trade'] as String)[0].toUpperCase() +
                         (widget.task['trade'] as String).substring(1),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: AppColors.accent),
@@ -507,18 +507,18 @@ class _TaskCardState extends State<_TaskCard> {
                 ),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             // Worker + due date row
             Row(children: [
               if (workers.isNotEmpty) ...[
                 initialsAvatar(workers.first['name'] ?? '?', radius: 11),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     workers.length > 1
                         ? '${workers.first['name'] ?? ''} +${workers.length - 1} more'
                         : (workers.first['name'] ?? ''),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 14,
                         color: AppColors.accent,
                         fontWeight: FontWeight.w600),
@@ -528,7 +528,7 @@ class _TaskCardState extends State<_TaskCard> {
               ] else
                 Text(AppStrings.t('tasks.unassigned'),
                     style:
-                        GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                        GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
               const Spacer(),
               // Tap due date to quickly edit
               GestureDetector(
@@ -542,13 +542,13 @@ class _TaskCardState extends State<_TaskCard> {
             ]),
           ]),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         // ── Status quick-toggle (does not navigate) ──
         Row(children: [
           _statusBtn(AppStrings.t('tasks.pending'), 'pending'),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _statusBtn(AppStrings.t('tasks.inProgress'), 'in_progress'),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           _statusBtn(AppStrings.t('tasks.completed'), 'completed'),
         ]),
       ]),
@@ -564,17 +564,17 @@ class _TaskCardState extends State<_TaskCard> {
         bg = active
             ? AppColors.green
             : AppColors.greenLight.withValues(alpha: 0.4);
-        fg = active ? Colors.white : AppColors.green;
+        fg = active ? AppColors.onAccent : AppColors.green;
         break;
       case 'in_progress':
         bg = active
             ? AppColors.blue
             : AppColors.blueLight.withValues(alpha: 0.4);
-        fg = active ? Colors.white : AppColors.blue;
+        fg = active ? AppColors.onAccent : AppColors.blue;
         break;
       default:
         bg = active ? AppColors.textMuted : AppColors.border;
-        fg = active ? Colors.white : AppColors.textMuted;
+        fg = active ? AppColors.onAccent : AppColors.textMuted;
     }
     return Expanded(
       child: SizedBox(
@@ -587,10 +587,10 @@ class _TaskCardState extends State<_TaskCard> {
             padding: EdgeInsets.zero,
             elevation: 0,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
+                borderRadius: AppRadius.rMd),
           ),
           child: Text(label,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 13, fontWeight: FontWeight.w700)),
         ),
       ),
@@ -616,10 +616,10 @@ class _PriorityBadge extends StatelessWidget {
         label = AppStrings.t('tasks.low'); bg = AppColors.blueLight; fg = AppColors.blue;
     }
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: bg, borderRadius: AppRadius.rMd),
       child: Text(label,
-          style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 }
@@ -852,7 +852,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           '$reason\n\nEdit the task to select a Required Trade, or make the '
           'name/description more specific — Auto Assign will then match workers '
           'by trade and will never randomly assign.',
-          style: GoogleFonts.outfit(fontSize: 14),
+          style: GoogleFonts.inter(fontSize: 14),
         ),
         actions: [
           TextButton(
@@ -875,7 +875,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (_) => StatefulBuilder(builder: (ctx, setS) {
         return DraggableScrollableSheet(
           initialChildSize: 0.75,
@@ -884,7 +884,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           builder: (_, sc) => Container(
             decoration: BoxDecoration(
               color: AppColors.bgCard,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: AppRadius.bSheet,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -894,7 +894,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 12),
                     width: 36, height: 4,
-                    decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                    decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.rHair),
                   ),
                 ),
                 Expanded(
@@ -903,16 +903,16 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     padding: const EdgeInsets.only(bottom: 16),
                     children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(AppStrings.t('tasks.assignWorkersTitle'), style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800)),
-                    Text(_task['task_name'] ?? '', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(AppStrings.t('tasks.assignWorkersTitle'), style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800)),
+                    Text(_task['task_name'] ?? '', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ]),
                 ),
                 // All workers
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Text(AppStrings.t('tasks.allWorkers'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Text(AppStrings.t('tasks.allWorkers'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
                 ),
                 ..._projectWorkers.map((w) => _WorkerTile(
                     worker: w,
@@ -930,7 +930,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 ),
                 // Save bar (replaces the entire assignment)
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   decoration: BoxDecoration(
                     color: AppColors.bgCard,
                     border: Border(top: BorderSide(color: AppColors.border)),
@@ -941,11 +941,11 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       onPressed: () => _saveAssignments(selectedIds),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        foregroundColor: AppColors.onAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                       ),
-                      child: Text('Save Assignment (${selectedIds.length})', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
+                      child: Text('Save Assignment (${selectedIds.length})', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800)),
                     ),
                   ),
                 ),
@@ -966,12 +966,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppStrings.t('tasks.taskDetails'), style: GoogleFonts.outfit(fontWeight: FontWeight.w800)),
+        title: Text(AppStrings.t('tasks.taskDetails'), style: GoogleFonts.inter(fontWeight: FontWeight.w800)),
         actions: [
           if (_assignedWorkers.isNotEmpty)
             TextButton(
               onPressed: _unassign,
-              child: Text(AppStrings.t('tasks.unassign'), style: GoogleFonts.outfit(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
+              child: Text(AppStrings.t('tasks.unassign'), style: GoogleFonts.inter(color: AppColors.red, fontWeight: FontWeight.w700, fontSize: 13)),
             ),
           IconButton(
             onPressed: _deleteTask,
@@ -991,24 +991,24 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
 
         // Task name
         Text(t['task_name'] ?? '-',
-            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         if ((t['description'] as String? ?? '').isNotEmpty) ...[
           const SizedBox(height: 8),
-          Text(t['description'], style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13.5, height: 1.5)),
+          Text(t['description'], style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13.5, height: 1.5)),
         ],
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
 
         // Progress card
         sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Icon(Icons.trending_up_rounded, size: 16, color: AppColors.blue),
             const SizedBox(width: 8),
-            Text(AppStrings.t('tasks.progress'), style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(AppStrings.t('tasks.progress'), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
             const Spacer(),
-            Text('${progress.toStringAsFixed(0)}%', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, color: AppColors.blue, fontSize: 15)),
+            Text('${progress.toStringAsFixed(0)}%', style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: AppColors.blue, fontSize: 15)),
           ]),
-          const SizedBox(height: 10),
-          ClipRRect(borderRadius: BorderRadius.circular(6), child: LinearProgressIndicator(
+          const SizedBox(height: 12),
+          ClipRRect(borderRadius: AppRadius.rMd, child: LinearProgressIndicator(
             value: progress / 100, minHeight: 10, backgroundColor: AppColors.blueLight,
             valueColor: AlwaysStoppedAnimation(AppColors.blue),
           )),
@@ -1018,17 +1018,17 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         if (t['due_date'] != null)
           sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Row(children: [
             Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(color: AppColors.yellowLight, borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: AppColors.yellowLight, borderRadius: AppRadius.rMd),
               child: Icon(Icons.event_outlined, size: 16, color: AppColors.yellow),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                Text(AppStrings.t('tasks.dueDate'), style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 Text(DateHelper.tryFormatShort(t['due_date']),
                     maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14)),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14)),
               ]),
             ),
           ])),
@@ -1037,24 +1037,24 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Icon(Icons.person_outline_rounded, size: 16, color: AppColors.textMuted),
-            const SizedBox(width: 6),
-            Text(AppStrings.t('tasks.assignedWorker'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            const SizedBox(width: 8),
+            Text(AppStrings.t('tasks.assignedWorker'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
           ]),
           const SizedBox(height: 12),
           if (_assignedWorkers.isNotEmpty) ...[
             ..._assignedWorkers.map((w) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Row(children: [
                 initialsAvatar(w['name'] ?? '?', radius: 22),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(w['name'] ?? '-', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15)),
-                  Text(w['trade'] ?? 'General Worker', style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
+                  Text(w['name'] ?? '-', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15)),
+                  Text(w['trade'] ?? 'General Worker', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
                 ])),
                 Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
               ]),
             )),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
           ] else
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -1065,7 +1065,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   child: Icon(Icons.person_add_outlined, color: AppColors.textMuted, size: 20),
                 ),
                 const SizedBox(width: 12),
-                Text(AppStrings.t('tasks.noWorkerAssigned'), style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13)),
+                Text(AppStrings.t('tasks.noWorkerAssigned'), style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
               ]),
             ),
           // Auto Assign (AI suggestion) button
@@ -1080,9 +1080,9 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
               ),
             ),
@@ -1090,7 +1090,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             Row(children: [
               Expanded(
                 child: Text(AppStrings.t('tasks.autoAssignSameProject'),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 12, color: AppColors.textSecondary)),
               ),
               SizedBox(
@@ -1114,15 +1114,15 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 onPressed: null,
                 icon: SizedBox(
                   width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onAccent),
                 ),
                 label: const Text('Assigning…',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
               ),
             ),
@@ -1139,13 +1139,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
               ),
               label: Text(
                 _assignedWorkers.isNotEmpty ? AppStrings.t('tasks.changeAssignment') : AppStrings.t('tasks.assignWorker'),
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.accent,
                 side: BorderSide(color: AppColors.accent),
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
               ),
             ),
           ),
@@ -1168,34 +1168,34 @@ class _WorkerTile extends StatelessWidget {
     final trade = worker['trade'] as String? ?? AppStrings.t('tasks.generalWorker');
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgMain,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(children: [
         Row(children: [
           initialsAvatar(name, radius: 20),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              Expanded(child: Text(name, style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 14), overflow: TextOverflow.ellipsis)),
+              Expanded(child: Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 14), overflow: TextOverflow.ellipsis)),
             ]),
-            Text(trade, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+            Text(trade, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
           ])),
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: onToggle,
             style: ElevatedButton.styleFrom(
               backgroundColor: selected ? AppColors.green : AppColors.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              foregroundColor: AppColors.onAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
               minimumSize: const Size(70, 36),
             ),
-            child: Text(selected ? '✓' : AppStrings.t('common.add'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+            child: Text(selected ? '✓' : AppStrings.t('common.add'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ]),
       ]),

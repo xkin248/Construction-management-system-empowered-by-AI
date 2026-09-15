@@ -21,14 +21,14 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+    backgroundColor: AppColors.transparent,
     builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
       final pad = MediaQuery.of(ctx).viewInsets.bottom;
       return Container(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+        padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + pad),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          borderRadius: AppRadius.bSheet,
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -39,11 +39,11 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
                 child: Container(
                   margin: const EdgeInsets.symmetric(vertical: 12),
                   width: 36, height: 4,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.rHair),
                 ),
               ),
               Text(AppStrings.t('workers.addWorker'),
-                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               const SizedBox(height: 16),
               TextField(controller: name,
                   decoration: InputDecoration(labelText: AppStrings.t('workers.fullName'), hintText: AppStrings.t('workers.fullNameHint'))),
@@ -59,7 +59,7 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
               const SizedBox(height: 12),
               TextField(controller: password, obscureText: true,
                   decoration: InputDecoration(labelText: AppStrings.t('workers.password'), hintText: AppStrings.t('workers.passwordHint'))),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () async {
                   if (name.text.trim().isEmpty) {
@@ -91,12 +91,12 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  foregroundColor: AppColors.onAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
                 child: Text(AppStrings.t('workers.addWorker'),
-                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
               ),
             ],
           ),

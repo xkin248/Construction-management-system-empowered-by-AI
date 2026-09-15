@@ -121,7 +121,7 @@ class _TaskFormState extends State<TaskForm> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -137,7 +137,7 @@ class _TaskFormState extends State<TaskForm> {
                   Row(children: [
                     Expanded(
                       child: Text(_isEdit ? 'Edit Task' : 'New Task',
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textPrimary)),
@@ -148,32 +148,32 @@ class _TaskFormState extends State<TaskForm> {
                       onPressed: () => Navigator.pop(context),
                     ),
                   ]),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   // ── Title ──
                   _fieldLabel('Task Title'),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _title,
                     validator: (v) =>
                         (v?.trim().isEmpty ?? true) ? 'Required' : null,
                     decoration: _inputDeco('e.g. Foundation Pile Driving'),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // ── Description ──
                   _fieldLabel('Description'),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _desc,
                     maxLines: 2,
                     decoration: _inputDeco('Optional description...'),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // ── Project ──
                   _fieldLabel('Project'),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   _loadingProjects
                       ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
+                          padding: EdgeInsets.symmetric(vertical: 16),
                           child: SizedBox(
                               height: 16,
                               width: 16,
@@ -188,16 +188,16 @@ class _TaskFormState extends State<TaskForm> {
                                   DropdownMenuItem(
                                       value: p['project_id'],
                                       child: Text(p['project_name'] ?? '',
-                                          style: GoogleFonts.outfit(
+                                          style: GoogleFonts.inter(
                                               fontSize: 13))))
                               .toList(),
                           onChanged: (v) =>
                               setState(() => _projectId = v),
                         ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // ── Required Trade ──
                   _fieldLabel('Required Trade'),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: _trade ?? '',
                     isExpanded: true,
@@ -206,7 +206,7 @@ class _TaskFormState extends State<TaskForm> {
                       DropdownMenuItem(
                         value: '',
                         child: Text('None / Not sure',
-                            style: GoogleFonts.outfit(
+                            style: GoogleFonts.inter(
                                 fontSize: 13,
                                 color: AppColors.textMuted)),
                       ),
@@ -214,20 +214,20 @@ class _TaskFormState extends State<TaskForm> {
                             value: t.$1,
                             child: Text(t.$2,
                                 style:
-                                    GoogleFonts.outfit(fontSize: 13)),
+                                    GoogleFonts.inter(fontSize: 13)),
                           )),
                     ],
                     onChanged: (v) => setState(
                         () => _trade = (v == null || v.isEmpty) ? null : v),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     'Tip: selecting a trade lets AI Auto-Assign match workers by '
                     'trade instead of guessing from the task title.',
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 11, color: AppColors.textMuted),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // ── Priority + Due Date row ──
                   Row(children: [
                     Expanded(
@@ -235,7 +235,7 @@ class _TaskFormState extends State<TaskForm> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           _fieldLabel('Priority'),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
                             initialValue: _priority,
                             decoration: _inputDeco(null),
@@ -244,7 +244,7 @@ class _TaskFormState extends State<TaskForm> {
                                     value: p,
                                     child: Text(
                                         p[0].toUpperCase() + p.substring(1),
-                                        style: GoogleFonts.outfit(
+                                        style: GoogleFonts.inter(
                                             fontSize: 13))))
                                 .toList(),
                             onChanged: (v) =>
@@ -257,7 +257,7 @@ class _TaskFormState extends State<TaskForm> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           _fieldLabel('Due Date'),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           SizedBox(
                             height: 48,
                             child: OutlinedButton.icon(
@@ -269,25 +269,25 @@ class _TaskFormState extends State<TaskForm> {
                                 _due == null
                                     ? 'Select'
                                     : DateHelper.formatShort(_due!),
-                                style: GoogleFonts.outfit(fontSize: 13),
+                                style: GoogleFonts.inter(fontSize: 13),
                               ),
                               style: OutlinedButton.styleFrom(
                                 side:
                                     BorderSide(color: AppColors.border),
                                 shape: RoundedRectangleBorder(
                                     borderRadius:
-                                        BorderRadius.circular(10)),
+                                        AppRadius.rMd),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 10),
+                                    horizontal: 12),
                               ),
                             ),
                           ),
                         ])),
                   ]),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   // ── Estimated Days ──
                   _fieldLabel('Estimated Days'),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   TextFormField(
                     controller: _hours,
                     keyboardType: TextInputType.number,
@@ -301,19 +301,19 @@ class _TaskFormState extends State<TaskForm> {
                       onPressed: _submitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        foregroundColor: Colors.white,
+                        foregroundColor: AppColors.onAccent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: AppRadius.rMd),
                       ),
                       child: _submitting
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
+                                  strokeWidth: 2, color: AppColors.onAccent))
                           : Text(
                               _isEdit ? 'Save Changes' : 'Create Task',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700)),
                     ),
@@ -328,7 +328,7 @@ class _TaskFormState extends State<TaskForm> {
   }
 
   Widget _fieldLabel(String text) => Text(text,
-      style: GoogleFonts.outfit(
+      style: GoogleFonts.inter(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           color: AppColors.textSecondary));
@@ -336,22 +336,22 @@ class _TaskFormState extends State<TaskForm> {
   InputDecoration _inputDeco(String? hint) => InputDecoration(
         hintText: hint,
         hintStyle:
-            GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+            GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
         filled: true,
         fillColor: AppColors.bgMain,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.rMd,
             borderSide: BorderSide(color: AppColors.border)),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.rMd,
             borderSide: BorderSide(color: AppColors.border)),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.rMd,
             borderSide: BorderSide(color: AppColors.accent)),
         errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.rMd,
             borderSide: BorderSide(color: AppColors.red)),
       );
 

@@ -298,20 +298,20 @@ class _DashboardPageState extends State<DashboardPage> {
                     _loadError!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.red),
+                    style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.red),
                   ),
                 ),
                 TextButton(
                   onPressed: () => _load(forceRefresh: true),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.red,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
                   child: const Text('Retry'),
                 ),
               ]),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
           ],
           // ── Supervisor Quick Check-in ──
           if (_isSupervisor) ...[
@@ -396,15 +396,15 @@ class _DashboardPageState extends State<DashboardPage> {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(_supCheckedIn ? AppStrings.t('dash.onSite') : AppStrings.t('dash.quickCheckin'),
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const SizedBox(height: 2),
+                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            const SizedBox(height: 4),
             Text(_supMsg,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
+                style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary)),
           ]),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         _supLoading
             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
             : ElevatedButton.icon(
@@ -413,8 +413,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 label: Text(_supCheckedIn ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  foregroundColor: AppColors.onAccent,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
       ]),
@@ -468,7 +468,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ];
 
       if (isWide) {
-        return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 14)]).toList()..removeLast());
+        return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 16)]).toList()..removeLast());
       }
       // Mobile: full-width hero card + compact metric rows.
       // Single-column layout is kept on purpose — the previous 2x2 grid left
@@ -491,7 +491,7 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.assignment_rounded,
           iconColor: AppColors.blue,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _compactMetricCard(
           label: 'Overall Productivity',
           value: '$productivity%',
@@ -500,7 +500,7 @@ class _DashboardPageState extends State<DashboardPage> {
           iconColor: AppColors.green,
           valueColor: AppColors.green,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _compactMetricCard(
           label: 'Alerts',
           value: '$alerts',
@@ -525,7 +525,7 @@ class _DashboardPageState extends State<DashboardPage> {
     required int absent,
   }) {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: AppRadius.rLg,
@@ -549,16 +549,16 @@ class _DashboardPageState extends State<DashboardPage> {
               AppStrings.t('dash.todayAttendanceRate'),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Text('$rate%',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.accent)),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         ClipRRect(
           borderRadius: AppRadius.rXs,
           child: LinearProgressIndicator(
@@ -568,7 +568,7 @@ class _DashboardPageState extends State<DashboardPage> {
             valueColor: AlwaysStoppedAnimation(AppColors.accent),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Wrap(spacing: 8, runSpacing: 8, children: [
           _metricChip('$onSite/$totalWorkers on site', AppColors.accent),
           _metricChip('$present present', AppColors.green),
@@ -580,13 +580,13 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _metricChip(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
           borderRadius: AppRadius.rLg,
         ),
         child: Text(text,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 11.5, fontWeight: FontWeight.w600, color: color)),
       );
 
@@ -600,7 +600,7 @@ class _DashboardPageState extends State<DashboardPage> {
     Color? valueColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: AppRadius.rLg,
@@ -617,26 +617,26 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           child: Icon(icon, size: 18, color: iconColor),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
             if (sub != null) ...[
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(sub,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
             ],
           ]),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Text(value,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: valueColor ?? AppColors.textPrimary)),
@@ -659,28 +659,28 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Text(label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), borderRadius: AppRadius.rSm),
             child: Icon(icon, size: 16, color: iconColor),
           ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.centerLeft,
           child: Text(value,
-              style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
+              style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
         ),
         if (sub != null) ...[
           const SizedBox(height: 4),
           Text(sub,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
         ],
       ]),
     );
@@ -703,18 +703,18 @@ class _DashboardPageState extends State<DashboardPage> {
               Text(AppStrings.t('dash.weeklyAttendance'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               Text(AppStrings.t('dash.allProjectsCombined'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
             ]),
           ),
           TextButton(
             onPressed: () {},
             style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
             child: Text('${AppStrings.t('dash.viewAll')} →',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 16),
@@ -735,7 +735,7 @@ class _DashboardPageState extends State<DashboardPage> {
               border: Border.all(color: AppColors.border),
             ),
             child: Text(AppStrings.t('dash.noAttendanceData'),
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
           ),
       ]),
     );
@@ -760,18 +760,18 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(AppStrings.t('dash.taskDistribution'),
-            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        const SizedBox(height: 2),
+            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        const SizedBox(height: 4),
         Text(AppStrings.t('dash.allActiveProjects'),
-            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 18),
+            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+        const SizedBox(height: 16),
         Center(
           child: SimpleDonutChart(
             size: 118,
             slices: slices,
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 16),
         if (hasTasks) ...[
           _legendRow('Completed', '$completedPct%', AppColors.green),
           const SizedBox(height: 8),
@@ -781,7 +781,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ] else
           Center(
             child: Text(AppStrings.t('dash.noTaskData'),
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
           ),
       ]),
     );
@@ -790,8 +790,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget _legendRow(String label, String pct, Color color) => Row(children: [
         Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Expanded(child: Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary))),
-        Text(pct, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary))),
+        Text(pct, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ]);
 
   Widget _sectionHeader(String title, {String? sub}) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -805,12 +805,12 @@ class _DashboardPageState extends State<DashboardPage> {
             Text(title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             if (sub != null)
               Text(sub,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
           ]),
         ),
       ]);
@@ -818,7 +818,7 @@ class _DashboardPageState extends State<DashboardPage> {
   /// Compact empty-state block used across dashboard list sections.
   Widget _emptyBox(String message, {IconData icon = Icons.inbox_outlined}) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius: AppRadius.rMd,
@@ -829,7 +829,7 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 8),
           Text(message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
         ]),
       );
 
@@ -847,11 +847,11 @@ class _DashboardPageState extends State<DashboardPage> {
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Expanded(
             child: Text(p['project_name'] ?? '-',
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
+                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
                 overflow: TextOverflow.ellipsis),
           ),
           Text('${progress.toStringAsFixed(0)}%',
-              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
         ]),
         const SizedBox(height: 8),
         ClipRRect(
@@ -917,16 +917,16 @@ class _DashboardPageState extends State<DashboardPage> {
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(p['project_name'] ?? '-', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 2),
-            Text('Due: ${_fmtDate((p['end_date'] as String?) ?? '')}', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+            Text(p['project_name'] ?? '-', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text('Due: ${_fmtDate((p['end_date'] as String?) ?? '')}', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
           ]),
         ),
         const SizedBox(width: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
-          child: Text(label, style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
+          child: Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
         ),
       ]),
     );
@@ -1024,20 +1024,20 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Icon(Icons.auto_awesome_rounded,
                 size: 18, color: AppColors.purple),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('AI Progress Prediction',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary)),
               Text('Manual — calls the AI only when you tap Update (auto-refresh disabled, saves tokens)',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
             ]),
           ),
         ]),
@@ -1052,11 +1052,11 @@ class _DashboardPageState extends State<DashboardPage> {
               isDense: true,
               hintText: 'Select project',
               hintStyle:
-                  GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+                  GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
               filled: true,
               fillColor: AppColors.bgMain,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
                   borderRadius: AppRadius.rSm,
                   borderSide: BorderSide(color: AppColors.border)),
@@ -1076,7 +1076,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       p['project_name']?.toString() ?? 'Project',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 13),
+                      style: GoogleFonts.inter(fontSize: 13),
                     ),
                   ),
             ],
@@ -1093,19 +1093,19 @@ class _DashboardPageState extends State<DashboardPage> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
+                          strokeWidth: 2, color: AppColors.onAccent))
                   : const Icon(Icons.auto_awesome_rounded, size: 18),
               label: Text(
                 _predLoading ? 'Predicting…' : 'Update',
                 style:
-                    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+                    GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _predLoading ? AppColors.accent.withValues(alpha: 0.6) : AppColors.accent,
-                foregroundColor: Colors.white,
+                foregroundColor: AppColors.onAccent,
                 shape: RoundedRectangleBorder(
                     borderRadius: AppRadius.rSm),
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
           );
@@ -1118,7 +1118,7 @@ class _DashboardPageState extends State<DashboardPage> {
           }
           return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             picker,
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             updateBtn,
           ]);
         }),
@@ -1128,7 +1128,7 @@ class _DashboardPageState extends State<DashboardPage> {
         else
           Text(
             'Select a project and tap Update to see AI completion estimates.',
-            style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.textMuted),
+            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted),
           ),
       ]),
     );
@@ -1166,14 +1166,14 @@ class _DashboardPageState extends State<DashboardPage> {
       // ── AI narrative insight ──
       if (insights != null && insights.trim().isNotEmpty) ...[
         Text(insights.trim(),
-            style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.textSecondary)),
+            style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary)),
         const SizedBox(height: 12),
       ],
 
       // ── Current vs Scheduled progress bars ──
       _predBarRow('Current Progress', current, AppColors.accent),
       if (scheduled != null) ...[
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         _predBarRow('Scheduled Progress', scheduled.clamp(0, 100).toDouble(), AppColors.blue.withValues(alpha: 0.6)),
       ],
 
@@ -1201,7 +1201,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 gap >= 0
                     ? '+${gap.toStringAsFixed(1)}% ahead of schedule'
                     : '${gap.toStringAsFixed(1)}% behind schedule',
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: gap >= 0 ? AppColors.green : AppColors.yellow),
@@ -1211,22 +1211,22 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ],
 
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
 
       // ── Trend badge + predicted completion date ──
       Wrap(spacing: 8, runSpacing: 8, children: [
         // Trend badge
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: tc.withValues(alpha: 0.12),
             borderRadius: AppRadius.rLg,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(_trendIcon(trend), size: 13, color: tc),
-            const SizedBox(width: 5),
+            const SizedBox(width: 4),
             Text(trend.replaceAll('_', ' ').toUpperCase(),
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 11, fontWeight: FontWeight.w800, color: tc)),
           ]),
         ),
@@ -1256,18 +1256,18 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!aiUsed) ...[
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: AppColors.yellowLight,
             borderRadius: AppRadius.rXs,
           ),
           child: Row(children: [
             Icon(Icons.info_outline_rounded, size: 14, color: AppColors.yellow),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'Rule-based estimate — Gemini AI not enabled for this project.',
-                style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.yellow),
+                style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.yellow),
               ),
             ),
           ]),
@@ -1276,15 +1276,15 @@ class _DashboardPageState extends State<DashboardPage> {
 
       // ── Milestones mini progress bars ──
       if (milestones.isNotEmpty) ...[
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
         Text('Milestones',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         for (final ms in milestones)
           if (ms is Map)
             Padding(
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.only(bottom: 8),
               child: _predBarRow(
                 ms['label']?.toString() ?? ms['name']?.toString() ?? '',
                 (_predNum(ms, 'predicted_progress') ?? _predNum(ms, 'progress') ?? 0)
@@ -1298,12 +1298,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
       // ── Risk factors (top 3) ──
       if (risk.isNotEmpty) ...[
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(children: [
           Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.red),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text('Risk Factors',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.red)),
         ]),
         const SizedBox(height: 4),
@@ -1315,9 +1315,9 @@ class _DashboardPageState extends State<DashboardPage> {
         const SizedBox(height: 8),
         Row(children: [
           Icon(Icons.lightbulb_outline_rounded, size: 14, color: AppColors.green),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text('Recommendations',
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.green)),
         ]),
         const SizedBox(height: 4),
@@ -1327,13 +1327,13 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _predChip(String text, Color bg, Color fg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+            BoxDecoration(color: bg, borderRadius: AppRadius.rMd),
         child: Text(text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+            style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
       );
 
   Widget _predBarRow(String label, double v, Color color, {bool compact = false}) {
@@ -1344,12 +1344,12 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: compact ? 11.5 : 12.5,
                     color: AppColors.textSecondary))),
         const SizedBox(width: 8),
         Text('${value.toStringAsFixed(0)}%',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: compact ? 11.5 : 12.5,
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary)),
@@ -1375,7 +1375,7 @@ class _DashboardPageState extends State<DashboardPage> {
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Padding(
-                  padding: const EdgeInsets.only(top: 5),
+                  padding: const EdgeInsets.only(top: 4),
                   child: Container(
                     width: 6,
                     height: 6,
@@ -1386,7 +1386,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(item?.toString() ?? '',
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                           fontSize: 12, color: AppColors.textSecondary)),
                 ),
               ]),

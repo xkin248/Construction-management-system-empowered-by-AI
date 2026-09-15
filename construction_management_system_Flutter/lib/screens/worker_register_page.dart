@@ -104,13 +104,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0D1117),
+        backgroundColor: AppColors.darkBg,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF0D1117), Color(0xFF10141C), Color(0xFF1A2035)],
+              colors: [AppColors.authBgTop, AppColors.authBgMid, AppColors.authBgBottom],
             ),
           ),
           child: SafeArea(
@@ -122,7 +122,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
               final cardPad = isNarrow ? 20.0 : 28.0;
 
               return SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 20),
+                padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
                 child: FadeTransition(
                   opacity: _fade,
                   child: SlideTransition(
@@ -138,7 +138,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                               width: 60, height: 60,
                               decoration: BoxDecoration(
                                 color: AppColors.green,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: AppRadius.rMd,
                                 boxShadow: [
                                   BoxShadow(
                                     color: AppColors.green.withValues(alpha: 0.35),
@@ -147,29 +147,29 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                 ],
                               ),
                               child: const Center(
-                                child: Icon(Icons.badge_rounded, color: Colors.white, size: 30),
+                                child: Icon(Icons.badge_rounded, color: AppColors.onAccent, size: 30),
                               ),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                             Text(AppStrings.t('worker.register.title'),
-                                style: GoogleFonts.outfit(
-                                    fontSize: 24, fontWeight: FontWeight.w800, color: Colors.white)),
+                                style: GoogleFonts.inter(
+                                    fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.onAccent)),
                             const SizedBox(height: 4),
                             Text(AppStrings.t('worker.register.subtitle'),
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF757E90))),
-                            const SizedBox(height: 20),
+                                style: GoogleFonts.inter(fontSize: 13, color: AppColors.darkTextMuted)),
+                            const SizedBox(height: 24),
 
                             // ── Card ──
                             Container(
                               padding: EdgeInsets.all(cardPad),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF1A1F2E),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFF2A3045)),
+                                color: AppColors.darkSurface,
+                                borderRadius: AppRadius.rMd,
+                                border: Border.all(color: AppColors.darkBorder),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
+                                    color: AppColors.scrim,
                                     blurRadius: 32, offset: const Offset(0, 8),
                                   ),
                                 ],
@@ -182,33 +182,33 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                     // Role badge
                                     Center(
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: AppColors.green.withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(20),
+                                          borderRadius: AppRadius.rMd,
                                           border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
                                         ),
                                         child: Text(AppStrings.t('worker.register.roleBadge'),
-                                            style: GoogleFonts.outfit(
+                                            style: GoogleFonts.inter(
                                                 fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
                                       ),
                                     ),
-                                    const SizedBox(height: 22),
+                                    const SizedBox(height: 24),
 
                                     // ── Full Name ──
                                     _label(AppStrings.t('worker.register.fullName')),
-                                    const SizedBox(height: 7),
+                                    const SizedBox(height: 8),
                                     _field(
                                       controller: _name,
                                       hint: 'e.g. Ahmad Bin Osman',
                                       textInputAction: TextInputAction.next,
                                       onSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 16),
 
                                     // ── Email ──
                                     _label(AppStrings.t('login.email')),
-                                    const SizedBox(height: 7),
+                                    const SizedBox(height: 8),
                                     _field(
                                       controller: _email,
                                       focusNode: _emailFocus,
@@ -217,13 +217,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                       textInputAction: TextInputAction.next,
                                       onSubmitted: (_) => FocusScope.of(context).requestFocus(_pwdFocus),
                                     ),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 16),
 
                                     // ── Password + Confirm (stacked on narrow, side-by-side on wide) ──
                                     isNarrow
                                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             _label(AppStrings.t('login.password')),
-                                            const SizedBox(height: 7),
+                                            const SizedBox(height: 8),
                                             _pwdField(
                                               controller: _pwd,
                                               focusNode: _pwdFocus,
@@ -232,9 +232,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               onToggle: () => setState(() => obscure = !obscure),
                                               nextFocus: _pwd2Focus,
                                             ),
-                                            const SizedBox(height: 14),
+                                            const SizedBox(height: 16),
                                             _label(AppStrings.t('worker.register.confirmPassword')),
-                                            const SizedBox(height: 7),
+                                            const SizedBox(height: 8),
                                             _pwdField(
                                               controller: _pwd2,
                                               focusNode: _pwd2Focus,
@@ -247,7 +247,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                               _label(AppStrings.t('login.password')),
-                                              const SizedBox(height: 7),
+                                              const SizedBox(height: 8),
                                               _pwdField(
                                                 controller: _pwd,
                                                 focusNode: _pwdFocus,
@@ -260,7 +260,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             const SizedBox(width: 12),
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                               _label(AppStrings.t('worker.register.confirm')),
-                                              const SizedBox(height: 7),
+                                              const SizedBox(height: 8),
                                               _pwdField(
                                                 controller: _pwd2,
                                                 focusNode: _pwd2Focus,
@@ -271,13 +271,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               ),
                                             ])),
                                           ]),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 16),
 
                                     // ── Phone + IC (stacked on narrow) ──
                                     isNarrow
                                         ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             _label(AppStrings.t('worker.register.phone')),
-                                            const SizedBox(height: 7),
+                                            const SizedBox(height: 8),
                                             _field(
                                               controller: _phone,
                                               focusNode: _phoneFocus,
@@ -286,9 +286,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               textInputAction: TextInputAction.next,
                                               onSubmitted: (_) => FocusScope.of(context).requestFocus(_icFocus),
                                             ),
-                                            const SizedBox(height: 14),
+                                            const SizedBox(height: 16),
                                             _label(AppStrings.t('worker.register.ic')),
-                                            const SizedBox(height: 7),
+                                            const SizedBox(height: 8),
                                             _field(
                                               controller: _ic,
                                               focusNode: _icFocus,
@@ -300,7 +300,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                         : Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                               _label(AppStrings.t('worker.register.phone')),
-                                              const SizedBox(height: 7),
+                                              const SizedBox(height: 8),
                                               _field(
                                                 controller: _phone,
                                                 focusNode: _phoneFocus,
@@ -313,7 +313,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             const SizedBox(width: 12),
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                               _label(AppStrings.t('worker.register.ic')),
-                                              const SizedBox(height: 7),
+                                              const SizedBox(height: 8),
                                               _field(
                                                 controller: _ic,
                                                 focusNode: _icFocus,
@@ -323,13 +323,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                               ),
                                             ])),
                                           ]),
-                                    const SizedBox(height: 14),
+                                    const SizedBox(height: 16),
 
                                     // ── Trade/Skill ──
                                     _label(AppStrings.t('worker.register.trade')),
-                                    const SizedBox(height: 7),
+                                    const SizedBox(height: 8),
                                     _dropdownField(),
-                                    const SizedBox(height: 26),
+                                    const SizedBox(height: 24),
 
                                     // ── Submit button ──
                                     SizedBox(
@@ -338,17 +338,17 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                         onPressed: ld ? null : _register,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.green,
-                                          foregroundColor: Colors.white,
+                                          foregroundColor: AppColors.onAccent,
                                           disabledBackgroundColor: AppColors.green.withValues(alpha: 0.5),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                          shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                                           elevation: 0,
                                         ),
                                         child: ld
                                             ? const SizedBox(
                                                 height: 20, width: 20,
-                                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.2))
+                                                child: CircularProgressIndicator(color: AppColors.onAccent, strokeWidth: 2.2))
                                             : Text(AppStrings.t('worker.register.submit'),
-                                                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+                                                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
                                       ),
                                     ),
                                   ],
@@ -364,7 +364,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                               child: RichText(
                                 textAlign: TextAlign.center,
                                 text: TextSpan(
-                                  style: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF757E90)),
+                                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextMuted),
                                   children: [
                                     TextSpan(text: AppStrings.t('worker.register.haveAccount')),
                                     TextSpan(
@@ -378,7 +378,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                             const SizedBox(height: 8),
                             Text('CIDB Construction 4.0',
                                 textAlign: TextAlign.center,
-                                style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF3D4A5C))),
+                                style: GoogleFonts.inter(fontSize: 12, color: AppColors.darkTextMuted)),
                             const SizedBox(height: 8),
                           ],
                         ),
@@ -411,7 +411,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       onSubmitted: onSubmitted,
-      style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+      style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent),
       decoration: _inputDecoration(hint),
     );
   }
@@ -433,13 +433,13 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
       onSubmitted: nextFocus != null
           ? (_) => FocusScope.of(context).requestFocus(nextFocus)
           : null,
-      style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+      style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent),
       decoration: _inputDecoration(hint).copyWith(
         suffixIcon: IconButton(
           icon: Icon(
             obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
             size: 18,
-            color: const Color(0xFF4A5568),
+            color: AppColors.darkTextMuted,
           ),
           onPressed: onToggle,
         ),
@@ -452,14 +452,14 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
     return DropdownButtonFormField<String>(
       initialValue: _selectedSkill,
       isExpanded: true,
-      dropdownColor: const Color(0xFF1A1F2E),
+      dropdownColor: AppColors.darkSurface,
       decoration: _inputDecoration('Select your trade'),
-      style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w600),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF4A5568)),
+      style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent, fontWeight: FontWeight.w600),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.darkTextMuted),
       items: _skillOptions
           .map((t) => DropdownMenuItem(
                 value: t,
-                child: Text(t, style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+                child: Text(t, style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent)),
               ))
           .toList(),
       onChanged: (v) => setState(() => _selectedSkill = v),
@@ -469,16 +469,16 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.outfit(fontSize: 14, color: const Color(0xFF4A5568)),
+      hintStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextMuted),
       filled: true,
-      fillColor: const Color(0xFF0D1117),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border:        OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A3045))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2A3045))),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.green, width: 1.5)),
+      fillColor: AppColors.darkBg,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border:        OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: const BorderSide(color: AppColors.darkBorder)),
+      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: const BorderSide(color: AppColors.darkBorder)),
+      focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.green, width: 1.5)),
     );
   }
 
   Widget _label(String s) => Text(s,
-      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFFC8CDD8)));
+      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSidebar));
 }

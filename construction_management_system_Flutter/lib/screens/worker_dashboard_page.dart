@@ -425,14 +425,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             ? AppStrings.t('common.goodAfternoon')
             : AppStrings.t('common.goodEvening');
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.green, AppColors.green.withValues(alpha: 0.75)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadius.rMd,
         boxShadow: [BoxShadow(color: AppColors.green.withValues(alpha: 0.18), blurRadius: 18, offset: Offset(0, 6))],
       ),
       child: Row(
@@ -440,29 +440,29 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor: Colors.white.withValues(alpha: 0.25),
+            backgroundColor: AppColors.onAccentVeryFaint,
             child: initialsAvatar(name, radius: 24, seed: 'worker-$name'),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('$greeting, ${name.split(' ').first}!',
-                  style: GoogleFonts.outfit(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                  style: GoogleFonts.inter(color: AppColors.onAccent, fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
               Text(AppStrings.t('worker.portal'),
-                  style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 14)),
-              const SizedBox(height: 10),
+                  style: GoogleFonts.inter(color: AppColors.onAccentSoft, fontSize: 14)),
+              const SizedBox(height: 12),
               Wrap(spacing: 6, runSpacing: 4, children: [
                 _welcomeChip(Icons.badge_rounded, AppStrings.t('worker.portal')),
-                if (_checkedIn) _welcomeChip(Icons.gps_fixed, AppStrings.t('dash.onSite'), bg: Colors.white.withValues(alpha: 0.9), fg: AppColors.green),
+                if (_checkedIn) _welcomeChip(Icons.gps_fixed, AppStrings.t('dash.onSite'), bg: AppColors.onAccentStrong, fg: AppColors.green),
               ]),
             ]),
           ),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(_fmtNow(),
-                style: GoogleFonts.outfit(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                style: GoogleFonts.inter(color: AppColors.onAccent, fontSize: 24, fontWeight: FontWeight.w800)),
             Text(DateHelper.formatShort(DateTime.now()),
-                style: GoogleFonts.outfit(color: Colors.white.withValues(alpha: 0.85), fontSize: 13)),
+                style: GoogleFonts.inter(color: AppColors.onAccentSoft, fontSize: 13)),
           ]),
         ],
       ),
@@ -471,12 +471,12 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
   Widget _welcomeChip(IconData icon, String label, {Color? bg, Color? fg}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(color: bg ?? Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: bg ?? AppColors.onAccentWash, borderRadius: AppRadius.rMd),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 11, color: fg ?? Colors.white),
+        Icon(icon, size: 11, color: fg ?? AppColors.onAccent),
         const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.outfit(color: fg ?? Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+        Text(label, style: GoogleFonts.inter(color: fg ?? AppColors.onAccent, fontSize: 14, fontWeight: FontWeight.w700)),
       ]),
     );
   }
@@ -484,11 +484,11 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   Widget _buildCheckInCard() {
     final showCheckOut = _checkedIn && !_checkedOut;
     return sectionCard(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('📍 Daily Attendance Check-In',
-              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           if (!_loadingAtt)
             statusPill(_checkedOut ? 'checked_out' : _checkedIn ? 'checked_in' : 'absent',
                 label: _checkedOut ? 'DONE' : _checkedIn ? 'ON SITE' : 'NOT IN'),
@@ -514,7 +514,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 : (v) => setState(() => _selectedProjectId = v),
           ),
         if (_projects.isNotEmpty) ...[  
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           // Show fence radius for selected project
           if (_selectedProjectId != null) Builder(builder: (ctx) {
             final sel = _projects.firstWhere(
@@ -524,13 +524,13 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             final r = (sel['fence_radius'] as num?)?.toInt() ?? 0;
             if (r == 0) return const SizedBox.shrink();
             return Padding(
-              padding: const EdgeInsets.only(bottom: 2),
+              padding: const EdgeInsets.only(bottom: 4),
               child: Row(children: [
                 Icon(Icons.radar_rounded, size: 13, color: AppColors.green),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 Text(
                   'You must be within ${r}m of the site to check in',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w600),
                 ),
               ]),
             );
@@ -562,13 +562,13 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 color: _checkedOut ? AppColors.blue : _checkedIn ? AppColors.green : AppColors.accent,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             SizedBox(
               width: 260,
               child: Text(
                 _statusMsg,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                   fontSize: 13,
                   color: _checkInError ? AppColors.red : AppColors.textSecondary,
                   fontWeight: _checkInError ? FontWeight.w600 : FontWeight.normal,
@@ -578,27 +578,27 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             ),
           ]),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         if (_hoursToday > 0)
           Text('${AppStrings.t('worker.hoursToday')}: ${_hoursToday.toStringAsFixed(1)}h',
-              style: GoogleFonts.outfit(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 18),
+              style: GoogleFonts.inter(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 16),
 
         Row(children: [
           const SizedBox(width: 4),
           Text(_windowEnforced ? 'Check-in: $_checkInWindow' : 'Check-in: Anytime',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
           const Spacer(),
           Text(_windowEnforced ? 'Check-out: $_checkOutWindow' : 'Check-out: Anytime',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
           const SizedBox(width: 4),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: AppRadius.rMd,
             border: Border.all(color: AppColors.border),
           ),
           child: Row(
@@ -606,18 +606,18 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             children: [
               Column(children: [
                 Text(AppStrings.t('worker.workHours'),
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(_windowEnforced ? _workHours : AppStrings.t('worker.anytime'),
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
               ]),
               Container(width: 1, height: 30, color: AppColors.border),
               Column(children: [
                 Text(AppStrings.t('worker.breakNoCheckin'),
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
                 Text(_breakWindow,
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w800)),
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w800)),
               ]),
             ],
           ),
@@ -634,7 +634,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                     ? null
                     : (showCheckOut ? _doCheckOut : _doCheckIn)),
             icon: _checkInLoading
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(color: AppColors.onAccent, strokeWidth: 2))
                 : Icon(showCheckOut ? Icons.logout_rounded : Icons.fingerprint_rounded, size: 22),
             label: Text(
               _checkedOut
@@ -642,7 +642,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                   : showCheckOut
                       ? 'Tap to Check Out'
                       : '🎯 Tap to Check In (GPS)',
-              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800),
+              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
             ),
             style: ElevatedButton.styleFrom(
               backgroundColor: _checkedOut
@@ -650,15 +650,15 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                   : showCheckOut
                       ? AppColors.red
                       : AppColors.green,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
               elevation: 0,
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Text(
           'Device: $_deviceType • $_deviceInfo',
-          style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
         ),
       ]),
     );
@@ -669,11 +669,11 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       return sectionCard(
         padding: const EdgeInsets.all(24),
         child: Column(children: [
-          SizedBox(height: 18),
+          SizedBox(height: 16),
           Center(child: CircularProgressIndicator()),
           SizedBox(height: 12),
           Center(child: Text(AppStrings.t('worker.loadingTaskBoard'), style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
-          SizedBox(height: 18),
+          SizedBox(height: 16),
         ]),
       );
     }
@@ -682,14 +682,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       padding: const EdgeInsets.all(4),
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
           child: Row(children: [
             Text('🎯 My Assigned Work Sections',
-                style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             const Spacer(),
             if (_lastUpdated.isNotEmpty)
               Text(_lastUpdated.substring(11, 16),
-                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
             IconButton(
               icon: Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
               tooltip: 'Refresh tasks',
@@ -703,16 +703,16 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             child: Column(children: [
               Container(
                 width: 56, height: 56,
-                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rMd),
                 child: Icon(Icons.assignment_outlined, size: 26, color: AppColors.accent),
               ),
               const SizedBox(height: 12),
               Text(AppStrings.t('worker.noTasks'),
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
               Text(AppStrings.t('worker.noTasksHint'),
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
             ]),
           )
         else
@@ -765,20 +765,20 @@ class _TaskTile extends StatelessWidget {
     final projectName = task['project_name']?.toString() ?? '';
 
     return Container(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rMd),
                 child: Row(children: [
                   Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
                   const SizedBox(width: 4),
@@ -786,7 +786,7 @@ class _TaskTile extends StatelessWidget {
                     child: Text(part,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
+                        style: GoogleFonts.inter(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
                   ),
                 ]),
               ),
@@ -795,13 +795,13 @@ class _TaskTile extends StatelessWidget {
             statusPill(status),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: _priorityColor(priority).withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.rMd,
               ),
               child: Text(priority.toUpperCase(),
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                     color: _priorityColor(priority),
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
@@ -813,11 +813,11 @@ class _TaskTile extends StatelessWidget {
           Text(task['task_name']?.toString() ?? 'Unnamed Task',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           if (task['description']?.toString().isNotEmpty ?? false) ...[
             const SizedBox(height: 4),
             Text(task['description'].toString(),
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
+                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
           ],
           const SizedBox(height: 8),
           Wrap(
@@ -831,13 +831,13 @@ class _TaskTile extends StatelessWidget {
             ],
           ),
           if (instructions.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.blueLight,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: AppRadius.rMd,
                 border: Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
               ),
               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -845,7 +845,7 @@ class _TaskTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(instructions,
-                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.blue, height: 1.4, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.blue, height: 1.4, fontWeight: FontWeight.w600)),
                 ),
               ]),
             ),
@@ -856,13 +856,13 @@ class _TaskTile extends StatelessWidget {
   }
 
   Widget _miniTag(IconData icon, String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3.5),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, size: 10.5, color: color),
           const SizedBox(width: 3.5),
           Text(label,
-              style: GoogleFonts.outfit(color: color, fontSize: 14, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.inter(color: color, fontSize: 14, fontWeight: FontWeight.w700)),
         ]),
       );
 }

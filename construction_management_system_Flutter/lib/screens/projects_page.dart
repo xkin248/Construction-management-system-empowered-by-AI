@@ -38,7 +38,7 @@ class _FenceMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final center = LatLng(lat, lng);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: AppRadius.rMd,
       child: SizedBox(
         height: height,
         child: FlutterMap(
@@ -161,7 +161,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (_) => _ProjectFormSheet(
         existing: existing,
         onSaved: () {
@@ -198,7 +198,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     child: projects.isEmpty
                         ? ListView(children: [
                             Padding(
-                              padding: const EdgeInsets.all(40),
+                              padding: const EdgeInsets.all(24),
                               child: Center(
                                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                                   Container(
@@ -211,7 +211,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(AppStrings.t('proj.noProjects'),
-                                      style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textMuted)),
+                                      style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
                                   const SizedBox(height: 16),
                                   OutlinedButton.icon(
                                     onPressed: () => _openProjectForm(),
@@ -226,13 +226,13 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             builder: (ctx, constraints) {
                               if (constraints.maxWidth < AppBreakpoints.phone) {
                                 return ListView.builder(
-                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                                   itemCount: projects.length,
                                   itemBuilder: (ctx, i) => _projectCard(projects[i]),
                                 );
                               }
                               return GridView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+                                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   mainAxisSpacing: AppSpacing.md,
@@ -271,7 +271,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.zero,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: AppRadius.rMd,
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: p['project_id']))),
         child: Padding(
@@ -280,27 +280,27 @@ class _ProjectsPageState extends State<ProjectsPage> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Expanded(
                 child: Text(p['project_name'] ?? '-',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 15),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15),
                     overflow: TextOverflow.ellipsis),
               ),
               Row(mainAxisSize: MainAxisSize.min, children: [
                 statusPill(p['status'] ?? 'planning'),
                 if ((p['status'] ?? 'planning') != 'completed' && progress >= 100) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _markProjectComplete(p),
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: AppRadius.rMd,
                       ),
                       child: Icon(Icons.check_circle_rounded,
                           size: 14, color: AppColors.green),
                     ),
                   ),
                 ],
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 // Edit button
                 GestureDetector(
                   onTap: () => _openProjectForm(existing: Map<String, dynamic>.from(p)),
@@ -308,7 +308,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: AppColors.bgMain,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: AppRadius.rMd,
                     ),
                     child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
                   ),
@@ -318,33 +318,33 @@ class _ProjectsPageState extends State<ProjectsPage> {
             const SizedBox(height: 4),
             Row(children: [
               Icon(Icons.place_outlined, size: 13, color: AppColors.textMuted),
-              const SizedBox(width: 3),
+              const SizedBox(width: 4),
               Expanded(child: Text(p['location_address'] ?? '-',
-                  style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14),
+                  style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14),
                   overflow: TextOverflow.ellipsis)),
             ]),
             const SizedBox(height: 12),
             // Geofence badge
             Row(children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: AppRadius.rMd),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
                   const SizedBox(width: 4),
                   Text('Geofence: ${radius}m radius',
-                      style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
+                      style: GoogleFonts.inter(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
                 ]),
               ),
               if (workerCount > 0) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Text('$workerCount workers tracked',
-                    style: GoogleFonts.outfit(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w600)),
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w600)),
               ],
             ]),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.rMd,
               child: LinearProgressIndicator(
                 value: progress / 100,
                 minHeight: 7, backgroundColor: AppColors.border,
@@ -354,10 +354,10 @@ class _ProjectsPageState extends State<ProjectsPage> {
             const SizedBox(height: 8),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text('${progress.toStringAsFixed(0)}% complete',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
               if (p['end_date'] != null)
                 Text('Due ${DateHelper.tryFormatShort(p['end_date'])}',
-                    style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
             ]),
           ]),
         ),
@@ -498,10 +498,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
   Widget build(BuildContext context) {
     final pad = MediaQuery.of(context).viewInsets.bottom;
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+      padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + pad),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: AppRadius.bSheet,
       ),
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -510,70 +510,70 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
             child: Container(
               margin: const EdgeInsets.symmetric(vertical: 12),
               width: 36, height: 4,
-              decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.rHair),
             ),
           ),
           Row(children: [
             Expanded(
               child: Text(_isEdit ? t('Edit Project', 'Sunting Projek') : t('New Project', 'Projek Baharu'),
-                  style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             ),
             // ── Language switch button ──
             TextButton.icon(
               onPressed: () => setState(() => _lang = _lang == 'en' ? 'bm' : 'en'),
               icon: Icon(_lang == 'en' ? Icons.translate_rounded : Icons.language_rounded, size: 16),
               label: Text(_lang == 'en' ? 'BM' : 'EN',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 minimumSize: const Size(0, 36),
               ),
             ),
           ]),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // ── Project Name ──────────────────────────────
-          Text(t('Project Name', 'Nama Projek'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
+          Text(t('Project Name', 'Nama Projek'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
           TextField(
             controller: _name,
             decoration: InputDecoration(
               hintText: t('e.g. Penang Tower Block C', 'cth. Menara Pulau Pinang Blok C'),
-              hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+              hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           // ── Location Address ──────────────────────────
-          Text(t('Site Address', 'Alamat Tapak'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-          const SizedBox(height: 6),
+          Text(t('Site Address', 'Alamat Tapak'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+          const SizedBox(height: 8),
           TextField(
             controller: _loc,
             decoration: InputDecoration(
               hintText: t('Full address of the construction site', 'Alamat penuh tapak pembinaan'),
-              hintStyle: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+              hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
               filled: true, fillColor: AppColors.bgMain,
               prefixIcon: Icon(Icons.place_outlined, color: AppColors.textMuted, size: 18),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           // ── GPS GEOFENCE SECTION ──────────────────────
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: _hasGps
                   ? AppColors.greenLight
                   : (_gpsFailed ? AppColors.red.withValues(alpha: 0.06) : AppColors.bgMain),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: AppRadius.rMd,
               border: Border.all(
                   color: _hasGps
                       ? AppColors.green
@@ -585,28 +585,28 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(t('Site Geofence', 'Geopagar Tapak'),
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700,
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700,
                           color: _hasGps ? AppColors.green : AppColors.textPrimary)),
                 ),
                 if (_hasGps)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: AppColors.green, borderRadius: BorderRadius.circular(8)),
-                    child: Text(t('Set', 'Tetap'), style: GoogleFonts.outfit(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: AppColors.green, borderRadius: AppRadius.rMd),
+                    child: Text(t('Set', 'Tetap'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent, fontWeight: FontWeight.w700)),
                   ),
               ]),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
               // GPS coordinates display
               if (_hasGps)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(children: [
                     Icon(Icons.location_on, size: 12, color: AppColors.green),
                     const SizedBox(width: 4),
                     Text(
                       'Lat: ${_lat.toStringAsFixed(5)},  Lng: ${_lng.toStringAsFixed(5)}',
-                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary),
                     ),
                   ]),
                 ),
@@ -627,10 +627,10 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               const SizedBox(height: 8),
               Row(children: [
                 Icon(Icons.touch_app_outlined, size: 13, color: AppColors.textMuted),
-                const SizedBox(width: 5),
+                const SizedBox(width: 4),
                 Expanded(
                   child: Text(t('Tap on the map to move the fence center', 'Ketik peta untuk menggerakkan pusat pagar'),
-                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                 ),
               ]),
               const SizedBox(height: 12),
@@ -638,12 +638,12 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
               // GPS failure hint
               if (_gpsFailed) ...[
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: Row(children: [
                     Icon(Icons.error_outline, size: 14, color: AppColors.red),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.'),
-                        style: GoogleFonts.outfit(
+                        style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: AppColors.red)),
@@ -657,27 +657,27 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 child: OutlinedButton.icon(
                   onPressed: _gpsLoading ? null : _getGps,
                   icon: _gpsLoading
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(width: 16, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.my_location_rounded, size: 16),
                   label: Text(_hasGps ? t('Re-capture Site Location', 'Tangkap Semula Lokasi Tapak') : t('Capture Site Location (Go to site first)', 'Tangkap Lokasi Tapak (Pergi ke tapak dahulu)'),
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: _hasGps ? AppColors.green : AppColors.accent,
                     side: BorderSide(color: _hasGps ? AppColors.green : AppColors.accent),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
 
               // Radius slider
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(t('Check-in Radius', 'Jejari Daftar Masuk'), style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                Text(t('Check-in Radius', 'Jejari Daftar Masuk'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
                   child: Text('${_radius.toInt()} m',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
                 ),
               ]),
               Slider(
@@ -689,14 +689,14 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 onChanged: (v) => setState(() => _radius = v),
               ),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(t('50m (tight)', '50m (ketat)'), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                Text(t('50m (tight)', '50m (ketat)'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
                 Text(t('Workers must be within this distance to check in', 'Pekerja mesti berada dalam jarak ini untuk daftar masuk'),
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-                Text('5000m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+                Text('5000m', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
               ]),
             ]),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           // ── Dates ─────────────────────────────────────
           Row(children: [
@@ -707,7 +707,7 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
                 onTap: () => _pickDate(true),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: _DateButton(
                 label: t('End Date', 'Tarikh Tamat'),
@@ -723,14 +723,14 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              foregroundColor: AppColors.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
             ),
             child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onAccent))
                 : Text(_isEdit ? t('Save Changes', 'Simpan Perubahan') : t('Create Project', 'Cipta Projek'),
-                    style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w700)),
+                    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
         ]),
       ),
@@ -750,12 +750,12 @@ class _DateButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         side: BorderSide(color: AppColors.border),
         padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
-        const SizedBox(height: 2),
-        Text(value, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        Text(label, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       ]),
     );
   }
@@ -908,16 +908,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         title: Text(p['project_name'] ?? 'Project',
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
         actions: [
           TextButton.icon(
             onPressed: () {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
-                backgroundColor: Colors.transparent,
+                backgroundColor: AppColors.transparent,
                 builder: (_) => _ProjectFormSheet(
                   existing: Map<String, dynamic>.from(p),
                   onSaved: _load,
@@ -933,12 +933,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       body: ListView(padding: const EdgeInsets.all(16), children: [
         // Header card
         Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(color: AppColors.sidebarBg, borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: AppColors.sidebarBg, borderRadius: AppRadius.rMd),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Expanded(child: Text(p['project_name'] ?? '-',
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800))),
+                  style: const TextStyle(color: AppColors.onAccent, fontSize: 18, fontWeight: FontWeight.w800))),
               if ((p['status'] ?? 'planning') != 'completed' &&
                   ((p['progress'] ?? 0) as num).toDouble() >= 100) ...[
                 const SizedBox(width: 8),
@@ -946,19 +946,19 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   onTap: _markProjectComplete,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(color: AppColors.onAccentFaint, borderRadius: AppRadius.rMd),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Icon(Icons.check_circle_rounded, size: 14, color: AppColors.green),
                       const SizedBox(width: 4),
                       Text('Complete',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          style: const TextStyle(color: AppColors.onAccent, fontSize: 12, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                 ),
               ],
               statusPill(p['status'] ?? 'planning'),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(children: [
               Icon(Icons.place_outlined, size: 13, color: AppColors.textSidebarMuted),
               const SizedBox(width: 4),
@@ -969,11 +969,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               Text(AppStrings.t('proj.overallCompletion'), style: TextStyle(color: AppColors.textSidebarMuted, fontSize: 13)),
               Text('${p['progress']?.toStringAsFixed(0) ?? 0}%',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                  style: const TextStyle(color: AppColors.onAccent, fontWeight: FontWeight.w800)),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: AppRadius.rMd,
               child: LinearProgressIndicator(
                 value: ((p['progress'] ?? 0) as num) / 100,
                 minHeight: 8, backgroundColor: AppColors.sidebarHover,
@@ -993,13 +993,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
                 child: Icon(Icons.gps_fixed_rounded, size: 16, color: AppColors.green),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(AppStrings.t('proj.siteGeofence'),
-                      style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
                   Text(AppStrings.t('proj.geofenceHint').replaceAll('{radius}', '$radius'),
-                      style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                 ]),
               ),
               statusPill('active'),
@@ -1011,7 +1011,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             const SizedBox(height: 8),
             _infoRow(Icons.my_location_rounded, 'Center GPS',
                 'Lat ${lat.toStringAsFixed(5)},  Lng ${lng.toStringAsFixed(5)}'),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             if (lat != 0.0 || lng != 0.0)
               _FenceMap(lat: lat, lng: lng, radiusMeters: radius.toDouble(), height: 200),
           ]),
@@ -1021,20 +1021,20 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         // Dates
         Row(children: [
           Expanded(child: statCard(label: 'Start', value: DateHelper.tryFormatShort(p['start_date'], fallback: '—'))),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: statCard(label: 'Due', value: DateHelper.tryFormatShort(p['end_date'], fallback: '—'))),
         ]),
         const SizedBox(height: 16),
 
         // Tasks
         Text(AppStrings.t('proj.taskSummary'),
-            style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
-        const SizedBox(height: 10),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(child: statCard(label: 'Total', value: '${tasks.length}')),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: statCard(label: 'Done', value: '$completed', iconColor: AppColors.green)),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: statCard(label: 'Left', value: '${tasks.length - completed}', iconColor: AppColors.accent)),
         ]),
         const SizedBox(height: 16),
@@ -1048,10 +1048,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
                 child: Icon(Icons.schedule_rounded, size: 16, color: AppColors.green),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text('Attendance Time Window',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
               ),
               if (!_settingsLd)
                 TextButton.icon(
@@ -1061,33 +1061,33 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   style: TextButton.styleFrom(foregroundColor: AppColors.accent),
                 ),
             ]),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text('Work start / late threshold / check-out window',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
-            const SizedBox(height: 14),
+                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+            const SizedBox(height: 16),
             if (_settingsLd)
               const Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
+                  padding: EdgeInsets.symmetric(vertical: 24),
                   child: CircularProgressIndicator(strokeWidth: 2.5),
                 ),
               )
             else ...[
               Row(children: [
                 _timeField(_checkInStart, 'Check-in start'),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 _timeField(_checkInEnd, 'Late threshold'),
               ]),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(children: [
                 _timeField(_checkOutStart, 'Check-out start'),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 _timeField(_checkOutEnd, 'Check-out end'),
               ]),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               Row(children: [
                 _timeField(_breakStart, 'Break start'),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 _timeField(_breakEnd, 'Break end'),
               ]),
             ],
@@ -1099,7 +1099,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         Row(children: [
           Expanded(
             child: Text(AppStrings.t('proj.taskSummary'),
-                style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textPrimary)),
           ),
           OutlinedButton.icon(
             onPressed: () async {
@@ -1118,14 +1118,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
           ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         if (tasks.isEmpty)
           sectionCard(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: Text('No tasks yet — tap Add New Task to create one.',
-                    style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
               ),
             ),
           )
@@ -1135,9 +1135,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             final status = t['status'] ?? 'todo';
             final priority = t['priority'] ?? 'medium';
             return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 12),
               child: InkWell(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: AppRadius.rMd,
                 onTap: () async {
                   await Navigator.push(
                     context,
@@ -1146,10 +1146,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   if (mounted) _load();
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: AppRadius.rMd,
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1166,26 +1166,26 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                       Expanded(
                         child: Text(name,
                             maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                       ),
                       const SizedBox(width: 8),
                       _priorityChip(priority),
                       const SizedBox(width: 8),
                       statusPill(status),
-                      const SizedBox(width: 2),
+                      const SizedBox(width: 4),
                       Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
                     ]),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     // Second row: due date · assigned worker (single line, never wraps vertically)
                     Padding(
-                      padding: const EdgeInsets.only(left: 46),
+                      padding: const EdgeInsets.only(left: 24),
                       child: Row(children: [
                         Expanded(
                           child: Text(
                             '${DateHelper.tryFormatShort(t['due_date'], fallback: 'No due date')}  ·  ${t['assigned_workers'] is List && (t['assigned_workers'] as List).isNotEmpty ? '${(t['assigned_workers'] as List).length} worker(s)' : 'Unassigned'}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted),
+                            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -1236,17 +1236,17 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ? AppColors.blue
             : AppColors.accentOrange;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
       child: Text(priority,
-          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
     );
   }
 
   Widget _infoRow(IconData icon, String label, String value) => Row(children: [
         Icon(icon, size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 8),
-        Text('$label: ', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-        Expanded(child: Text(value, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary))),
+        Text('$label: ', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        Expanded(child: Text(value, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary))),
       ]);
 }

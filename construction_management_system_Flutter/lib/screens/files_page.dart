@@ -93,12 +93,12 @@ class _FilesPageState extends State<FilesPage> {
       builder: (ctx) => AlertDialog(
         title: Text(
           AppStrings.t('files.deleteTitle'),
-          style: GoogleFonts.outfit(
+          style: GoogleFonts.inter(
               fontWeight: FontWeight.w700, color: AppColors.textPrimary),
         ),
         content: Text(
             'Delete "${file.originalName}"?\nThis moves the file to recycle bin.',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 13.5, color: AppColors.textSecondary)),
         actions: [
           TextButton(
@@ -150,15 +150,15 @@ class _FilesPageState extends State<FilesPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
         final pad = MediaQuery.of(ctx).viewInsets.bottom;
         return Container(
-          padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + pad),
+          padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + pad),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
             borderRadius:
-                BorderRadius.vertical(top: Radius.circular(24)),
+                AppRadius.bSheet,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -172,11 +172,11 @@ class _FilesPageState extends State<FilesPage> {
                     height: 4,
                     decoration: BoxDecoration(
                         color: AppColors.border,
-                        borderRadius: BorderRadius.circular(2)),
+                        borderRadius: AppRadius.rHair),
                   ),
                 ),
                 Text(AppStrings.t('files.uploadTitle'),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textPrimary)),
@@ -206,7 +206,7 @@ class _FilesPageState extends State<FilesPage> {
                   label: Text(
                     pickedName ?? 'Pick a file...',
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 14,
                         color: pickedName != null
                             ? AppColors.textPrimary
@@ -215,10 +215,10 @@ class _FilesPageState extends State<FilesPage> {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.accent,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 16),
+                        horizontal: 16, vertical: 16),
                     side: BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: AppRadius.rMd),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -255,7 +255,7 @@ class _FilesPageState extends State<FilesPage> {
                       .toList(),
                   onChanged: (v) => setD(() => cat = v!),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () async {
                     // Mandatory: file + project + category.
@@ -283,10 +283,10 @@ class _FilesPageState extends State<FilesPage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    foregroundColor: AppColors.onAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                        borderRadius: AppRadius.rMd),
                     minimumSize: const Size(0, 48),
                   ),
                   child: Text(AppStrings.t('files.upload')),
@@ -303,13 +303,13 @@ class _FilesPageState extends State<FilesPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
           borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24)),
+              AppRadius.bSheet,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -322,18 +322,18 @@ class _FilesPageState extends State<FilesPage> {
                 height: 4,
                 decoration: BoxDecoration(
                     color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
+                    borderRadius: AppRadius.rHair),
               ),
             ),
             Text(file.originalName,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             if (file.isImage) ...[
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.rMd,
                 child: Image.network(
                   ApiService().downloadUrl(file.fileId),
                   height: 220,
@@ -375,9 +375,9 @@ class _FilesPageState extends State<FilesPage> {
                 label: Text(AppStrings.t('files.downloadOpen')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
+                  foregroundColor: AppColors.onAccent,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: AppRadius.rMd),
                 ),
               ),
             ),
@@ -388,19 +388,19 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Widget _detailRow(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(children: [
           SizedBox(
             width: 90,
             child: Text(label,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 14,
                     color: AppColors.textMuted,
                     fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Text(value,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 13, color: AppColors.textPrimary)),
           ),
         ]),
@@ -439,20 +439,20 @@ class _FilesPageState extends State<FilesPage> {
           heroTag: const ValueKey('fab_files'),
           onPressed: _openUpload,
           backgroundColor: AppColors.accent,
-          child: const Icon(Icons.upload_file_rounded, color: Colors.white),
+          child: const Icon(Icons.upload_file_rounded, color: AppColors.onAccent),
         ),
       ),
       body: Column(children: [
         // ── Project dropdown ──
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(children: [
             Expanded(
               child: Container(
                 constraints: const BoxConstraints(minHeight: 48),
                 decoration: BoxDecoration(
                   color: AppColors.bgCard,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.rMd,
                   border: Border.all(color: AppColors.border),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -465,14 +465,14 @@ class _FilesPageState extends State<FilesPage> {
                       child: Icon(Icons.expand_more_rounded,
                           color: AppColors.textSecondary),
                     ),
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontSize: 13.5,
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w600),
                     hint: Padding(
                       padding: const EdgeInsets.only(left: 12),
                       child: Text(AppStrings.t('files.allProjects'),
-                          style: GoogleFonts.outfit(
+                          style: GoogleFonts.inter(
                               fontSize: 13.5,
                               color: AppColors.textMuted)),
                     ),
@@ -498,16 +498,16 @@ class _FilesPageState extends State<FilesPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             // ── Grid/List toggle ──
             SizedBox(
               width: 48,
               height: 48,
               child: Material(
                 color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: AppRadius.rMd,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: AppRadius.rMd,
                   onTap: () => setState(() => _gridMode = !_gridMode),
                   child: Icon(
                     _gridMode
@@ -540,10 +540,10 @@ class _FilesPageState extends State<FilesPage> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: selected ? AppColors.accent : AppColors.bgCard,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: AppRadius.rMd,
                     border: Border.all(
                         color: selected
                             ? AppColors.accent
@@ -554,18 +554,18 @@ class _FilesPageState extends State<FilesPage> {
                       _catIcons[cat['value']] ?? Icons.folder_rounded,
                       size: 17,
                       color: selected
-                          ? Colors.white
+                          ? AppColors.onAccent
                           : AppColors.textSecondary,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Text(
                       cat['label']!,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                         fontSize: 14,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600,
                         color: selected
-                            ? Colors.white
+                            ? AppColors.onAccent
                             : AppColors.textSecondary,
                       ),
                     ),
@@ -593,7 +593,7 @@ class _FilesPageState extends State<FilesPage> {
 
   Widget _emptyState() => Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -602,22 +602,22 @@ class _FilesPageState extends State<FilesPage> {
                 height: 72,
                 decoration: BoxDecoration(
                   color: AppColors.accentLight,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: AppRadius.rMd,
                 ),
                 child: Icon(Icons.folder_open_rounded,
                     size: 34, color: AppColors.accent),
               ),
               const SizedBox(height: 16),
               Text(AppStrings.t('files.noFiles'),
-                  style: GoogleFonts.outfit(
+                  style: GoogleFonts.inter(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary)),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 'Tap + to upload construction files,\ndrawings, photos, or reports.',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(
+                style: GoogleFonts.inter(
                     fontSize: 13, color: AppColors.textMuted),
               ),
             ],
@@ -631,7 +631,7 @@ class _FilesPageState extends State<FilesPage> {
             (constraints.maxWidth - 32 - (crossAxisCount - 1) * 10) /
                 crossAxisCount;
         return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 10,
@@ -644,10 +644,10 @@ class _FilesPageState extends State<FilesPage> {
       });
 
   Widget _buildList() => ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 90),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         itemCount: _files.length,
         itemBuilder: (ctx, i) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 12),
           child: _fileListTile(_files[i]),
         ),
       );
@@ -658,7 +658,7 @@ class _FilesPageState extends State<FilesPage> {
       onTap: () => _openPreview(file),
       onLongPress: () => _deleteFile(file),
       child: sectionCard(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -666,12 +666,12 @@ class _FilesPageState extends State<FilesPage> {
               child: Container(
                 decoration: BoxDecoration(
                   color: _catBgColor(file.fileCategory),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.rMd,
                 ),
                 child: Center(
                   child: file.isImage && file.thumbnailPath != null
                       ? ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: AppRadius.rMd,
                           child: Image.network(
                             ApiService().downloadUrl(file.fileId),
                             fit: BoxFit.cover,
@@ -690,15 +690,15 @@ class _FilesPageState extends State<FilesPage> {
               file.originalName,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               '${file.sizeFormatted}  ${file.dateFormatted}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.outfit(
+              style: GoogleFonts.inter(
                   fontSize: 14, color: AppColors.textMuted),
             ),
           ],
@@ -720,7 +720,7 @@ class _FilesPageState extends State<FilesPage> {
             height: 48,
             decoration: BoxDecoration(
               color: _catBgColor(file.fileCategory),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: AppRadius.rMd,
             ),
             child: Center(child: _fileIcon(file, size: 24)),
           ),
@@ -732,21 +732,21 @@ class _FilesPageState extends State<FilesPage> {
                 Text(file.originalName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
+                    style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: 13.5,
                         color: AppColors.textPrimary)),
-                const SizedBox(height: 3),
+                const SizedBox(height: 4),
                 Row(children: [
                   _infoChip(file.categoryLabel),
                   const SizedBox(width: 8),
                   Text(file.sizeFormatted,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                           fontSize: 13,
                           color: AppColors.textMuted)),
                   const SizedBox(width: 8),
                   Text(file.dateFormatted,
-                      style: GoogleFonts.outfit(
+                      style: GoogleFonts.inter(
                           fontSize: 13,
                           color: AppColors.textMuted)),
                 ]),
@@ -789,13 +789,13 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Widget _infoChip(String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: AppColors.bgMain,
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: AppRadius.rMd,
         ),
         child: Text(label,
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
                 fontSize: 14, fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary)),
       );

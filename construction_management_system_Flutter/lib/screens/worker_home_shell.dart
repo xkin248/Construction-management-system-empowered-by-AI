@@ -108,7 +108,7 @@ class _NarrowLayout extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         title: Text(_navT(_workerTitles[idx]),
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
@@ -132,7 +132,7 @@ class _NarrowLayout extends StatelessWidget {
       // SafeArea inside the bar, and the outer padding keeps a 10px gap from
       // the screen edge. Navigation behaviour itself is untouched.
       bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.bgCard,
@@ -147,7 +147,7 @@ class _NarrowLayout extends StatelessWidget {
               child: BottomNavigationBar(
                 currentIndex: idx.clamp(0, _workerPages.length - 1),
                 onTap: onNav,
-                backgroundColor: Colors.transparent,
+                backgroundColor: AppColors.transparent,
                 selectedItemColor: AppColors.accent,
                 unselectedItemColor: AppColors.textMuted,
                 type: BottomNavigationBarType.fixed,
@@ -244,7 +244,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
           sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Today\'s Attendance Record',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 12),
               if (attRec == null)
                 Text('No attendance record for today yet. Check in from the Dashboard.',
@@ -274,18 +274,18 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
           sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('⏰ Check-in Windows',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 8),
               if (!windowEnabled) ...[
                 _row('Check In', 'Anytime', AppColors.green),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 _row('Check Out', 'Anytime', AppColors.blue),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text('Clock-in is allowed at any time (time window restrictions removed)',
                     style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               ] else ...[
                 _row('Check In', att?['check_in_window'] ?? '08:00 - 10:30', AppColors.green),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 _row('Check Out', att?['check_out_window'] ?? '15:00 - 17:00', AppColors.blue),
               ],
             ]),

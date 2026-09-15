@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Wraps flutter_secure_storage for sensitive values (JWT token)
 /// and keeps SharedPreferences for non-sensitive cached role data.
+///
+/// On web there is no Keystore/Keychain, so the JWT falls back to
+/// SharedPreferences (browser localStorage). Android / iOS / desktop keep the
+/// encrypted [FlutterSecureStorage] implementation unchanged.
 ///
 /// Use [TokenStorage] everywhere instead of reading/writing the token
 /// directly via SharedPreferences.
@@ -21,14 +26,28 @@ class TokenStorage {
   static const _kSupervisor = 'supervisor_id';
   static const _kProject    = 'project_id';
 
-  // ── JWT token (secure) ────────────────────────────────────────────────────
+  // ── JWT token (secure on mobile/desktop, SharedPreferences on web) ─────────
 
-  static Future<String?> getToken() => _store.read(key: _kToken);
+  static Future<String?> getToken() async {
+    if (kIsWeb) return (await _sp).getString(_kToken);
+    return _store.read(key: _kToken);
+  }
 
-  static Future<void> saveToken(String token) =>
-      _store.write(key: _kToken, value: token);
+  static Future<void> saveToken(String token) async {
+    if (kIsWeb) {
+      await (await _sp).setString(_kToken, token);
+      return;
+    }
+    await _store.write(key: _kToken, value: token);
+  }
 
-  static Future<void> deleteToken() => _store.delete(key: _kToken);
+  static Future<void> deleteToken() async {
+    if (kIsWeb) {
+      await (await _sp).remove(_kToken);
+      return;
+    }
+    await _store.delete(key: _kToken);
+  }
 
   // ── Non-sensitive role data (SharedPreferences — fast sync read) ──────────
 
@@ -67,8 +86,13 @@ class TokenStorage {
 
   /// Clears everything — call on logout or 401.
   static Future<void> clearAll() async {
-    await _store.deleteAll();
+    // Secure storage is not available on web (and may throw there), so only
+    // touch it on platforms that actually back it with a Keystore/Keychain.
+    if (!kIsWeb) {
+      await _store.deleteAll();
+    }
     final sp = await _sp;
+    // Also removes the web fallback copy of the token.
     await sp.clear();
   }
 }

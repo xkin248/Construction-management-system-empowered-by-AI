@@ -37,18 +37,18 @@ class ErrorApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: const Color(0xFF10141C),
+        backgroundColor: AppColors.darkBg,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, color: Color(0xFFEF4444), size: 56),
+                Icon(Icons.error_outline, color: AppColors.red, size: 56),
                 const SizedBox(height: 16),
                 const Text(
                   'BuildSmart — Startup Error',
-                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: AppColors.onAccent, fontSize: 18, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -56,18 +56,18 @@ class ErrorApp extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1F2634),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.darkSurface,
+                    borderRadius: AppRadius.rMd,
                   ),
                   child: SelectableText(
                     error,
-                    style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontFamily: 'monospace'),
+                    style: TextStyle(color: AppColors.red, fontSize: 12, fontFamily: 'monospace'),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Please screenshot this and send to the developer.',
-                  style: TextStyle(color: Color(0xFF757E90), fontSize: 12),
+                  style: TextStyle(color: AppColors.darkTextMuted, fontSize: 12),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -79,9 +79,9 @@ class ErrorApp extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () => runApp(const MyApp()),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F6EF7),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: AppColors.onAccent,
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                     ),
                     child: const Text(
                       'Try Again',
@@ -89,10 +89,10 @@ class ErrorApp extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => runApp(const MyApp()),
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF757E90)),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.darkTextMuted),
                   child: const Text('Retry',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 ),
@@ -200,10 +200,35 @@ class _SplashGateState extends State<SplashGate> {
   }
 
   Future<void> _boot() async {
+    // ── 1. Read persisted auth state ────────────────────────────────────────
+    // Each read is guarded on its own: storage can be unavailable on some
+    // platforms (e.g. web), and one failing read must never abort the startup
+    // sequence nor leave a stale/partial value behind.
+    String? token;
+    String? userType;
+    String? userRole;
+
     try {
-      final token    = await TokenStorage.getToken();
-      final userType = await TokenStorage.getUserType();
-      final userRole = await TokenStorage.getUserRole();
+      token = await TokenStorage.getToken();
+    } catch (e, st) {
+      debugPrint('[Boot] getToken failed: $e\n$st');
+    }
+    try {
+      userType = await TokenStorage.getUserType();
+    } catch (e, st) {
+      debugPrint('[Boot] getUserType failed: $e\n$st');
+    }
+    try {
+      userRole = await TokenStorage.getUserRole();
+    } catch (e, st) {
+      debugPrint('[Boot] getUserRole failed: $e\n$st');
+    }
+
+    // ── 2. Initialise the API client — UNCONDITIONAL ────────────────────────
+    // ApiService is a singleton used by every screen; it must be initialised
+    // even when the stored token could not be read (null token = anonymous),
+    // otherwise later calls run against an unconfigured client and crash.
+    try {
       ApiService().init(
         token: token,
         onUnauthorized: () async {
@@ -212,34 +237,31 @@ class _SplashGateState extends State<SplashGate> {
               MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
         },
       );
-      // FCM push setup: Firebase init + notification permission + token
-      // registration. Never blocks startup (failures are swallowed inside).
-      await FcmService.setup();
-      if (!mounted) return;
-
-      Widget home;
-      final hasToken = token != null && token.isNotEmpty;
-      final isWorker = userType == 'worker' || userRole == 'worker';
-      if (hasToken) {
-        home = isWorker ? const WorkerHomeShell() : const HomeShell();
-      } else {
-        home = const LoginPage();
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => home),
-      );
     } catch (e, st) {
-      debugPrint('[Boot Error] $e\n$st');
-      // Always fallback to login — never crash
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginPage()),
-        );
-      }
+      debugPrint('[Boot] ApiService.init failed: $e\n$st');
     }
+
+    // ── 3. FCM push setup ───────────────────────────────────────────────────
+    // Firebase init + notification permission + token registration. Never
+    // blocks startup (failures are swallowed inside, and re-guarded here).
+    try {
+      await FcmService.setup();
+    } catch (e, st) {
+      debugPrint('[Boot] FcmService.setup failed: $e\n$st');
+    }
+
+    if (!mounted) return;
+
+    // ── 4. Route to the correct shell ───────────────────────────────────────
+    final hasToken = token != null && token.isNotEmpty;
+    final isWorker = userType == 'worker' || userRole == 'worker';
+    final Widget home =
+        hasToken ? (isWorker ? const WorkerHomeShell() : const HomeShell()) : const LoginPage();
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => home),
+    );
   }
 
   @override
@@ -249,15 +271,15 @@ class _SplashGateState extends State<SplashGate> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(
               width: 64, height: 64,
-              decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(16)),
-              child: const Center(child: Text('B', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800))),
+              decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rMd),
+              child: const Center(child: Text('B', style: TextStyle(color: AppColors.onAccent, fontSize: 28, fontWeight: FontWeight.w800))),
             ),
             const SizedBox(height: 16),
-            const Text('BuildSmart', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
+            const Text('BuildSmart', style: TextStyle(color: AppColors.onAccent, fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
             const Text('AI Construction System',
-                style: TextStyle(color: Color(0xFF757E90), fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
-            const SizedBox(height: 22),
+                style: TextStyle(color: AppColors.darkTextMuted, fontSize: 12.5, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+            const SizedBox(height: 24),
             SizedBox(
                 width: 22,
                 height: 22,

@@ -20,7 +20,7 @@ class SimpleBarChart extends StatelessWidget {
           final h = maxV <= 0 ? 4.0 : (v / maxV) * (height - 4);
           return Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Container(
                 height: h < 4 ? 4 : h,
                 decoration: BoxDecoration(color: color ?? AppColors.accent, borderRadius: AppRadius.topXs),
@@ -66,7 +66,7 @@ class LabeledBarChart extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: ySteps.reversed.map((y) => Text('$y',
                 maxLines: 1,
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted))).toList(),
+                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted))).toList(),
           ),
           const SizedBox(width: 8),
           // Bars
@@ -78,7 +78,7 @@ class LabeledBarChart extends StatelessWidget {
                 final h = yMax <= 0 ? 4.0 : (e.value / yMax) * height;
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Container(
                       height: h < 4 ? 4 : h,
                       decoration: BoxDecoration(
@@ -93,17 +93,17 @@ class LabeledBarChart extends StatelessWidget {
           ),
         ]),
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
       // X-axis labels
       Row(children: [
-        const SizedBox(width: 28), // y-axis offset
+        const SizedBox(width: 24), // y-axis offset
         Expanded(
           child: Row(
             children: labels.map((l) => Expanded(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(l, textAlign: TextAlign.center, maxLines: 1,
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
               ),
             )).toList(),
           ),
@@ -148,7 +148,7 @@ class DualBarChart extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: ySteps.reversed.map((y) => Text('$y',
                 maxLines: 1,
-                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted))).toList(),
+                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted))).toList(),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -159,7 +159,7 @@ class DualBarChart extends StatelessWidget {
                 final hB = yMax <= 0 ? 4.0 : (seriesB[i] / yMax) * height;
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -173,7 +173,7 @@ class DualBarChart extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 2),
+                          const SizedBox(width: 4),
                           Expanded(
                             child: Container(
                               height: hB < 4 ? 4 : hB,
@@ -193,16 +193,16 @@ class DualBarChart extends StatelessWidget {
           ),
         ]),
       ),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
       Row(children: [
-        const SizedBox(width: 28),
+        const SizedBox(width: 24),
         Expanded(
           child: Row(
             children: labels.map((l) => Expanded(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(l, textAlign: TextAlign.center, maxLines: 1,
-                    style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
               ),
             )).toList(),
           ),
@@ -223,7 +223,7 @@ class StackedProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = present + late + absent;
-    if (total == 0) return const SizedBox(height: 10);
+    if (total == 0) return const SizedBox(height: 12);
     return ClipRRect(
       borderRadius: AppRadius.rXs,
       child: SizedBox(

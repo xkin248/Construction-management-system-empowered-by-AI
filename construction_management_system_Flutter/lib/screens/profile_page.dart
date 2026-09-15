@@ -61,31 +61,31 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         title: Text(AppStrings.t('profile.title'),
-            style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
       ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
           : ListView(padding: const EdgeInsets.all(16), children: [
               sectionCard(
-                padding: const EdgeInsets.fromLTRB(16, 26, 16, 22),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                 child: Column(children: [
                   Container(
                     width: 46, height: 3.5,
                     decoration: BoxDecoration(
                       color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(99),
+                      borderRadius: AppRadius.rPill,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
                   initialsAvatar(user?['full_name'] ?? '?', radius: 38),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   Text(user?['full_name'] ?? '-',
-                      style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
                   const SizedBox(height: 4),
                   Text(user?['email'] ?? '',
-                      style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 14)),
+                      style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
                   const SizedBox(height: 12),
                   statusPill(user?['role'] ?? 'site_supervisor', label: (user?['role'] ?? '').toString().replaceAll('_', ' ')),
                 ]),
@@ -115,7 +115,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ]),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
               OutlinedButton.icon(
                 onPressed: _logout,
                 icon: Icon(Icons.logout, color: AppColors.red, size: 18),

@@ -77,18 +77,18 @@ class _WorkersPageState extends State<WorkersPage> {
             child: Column(children: [
               // Search bar
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: TextField(
                   onChanged: (v) => setState(() => _searchQuery = v),
                   decoration: InputDecoration(
                     hintText: AppStrings.t('workers.searchHint'),
-                    hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+                    hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
                     prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
                     filled: true, fillColor: AppColors.bgCard,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
                   ),
                 ),
               ),
@@ -113,14 +113,14 @@ class _WorkersPageState extends State<WorkersPage> {
                         child: LayoutBuilder(builder: (ctx, constraints) {
                           if (constraints.maxWidth < AppBreakpoints.phone) {
                             return ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                               itemCount: _filtered.length,
                               itemBuilder: (ctx, i) => _workerCard(_filtered[i]),
                             );
                           }
                           // Tablet / desktop: two-column grid
                           return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 2,
                               mainAxisSpacing: AppSpacing.sm,
@@ -143,7 +143,7 @@ class _WorkersPageState extends State<WorkersPage> {
   Widget _emptyState({required IconData icon, required String label, Widget? action}) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 76, height: 76,
@@ -155,7 +155,7 @@ class _WorkersPageState extends State<WorkersPage> {
           ),
           const SizedBox(height: 16),
           Text(label, textAlign: TextAlign.center,
-              style: GoogleFonts.outfit(fontSize: 15, color: AppColors.textMuted)),
+              style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
           if (action != null) ...[
             const SizedBox(height: 16),
             action,
@@ -167,7 +167,7 @@ class _WorkersPageState extends State<WorkersPage> {
 
   Widget _workerCard(Map w, {bool inGrid = false}) {
     return sectionCard(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       child: Row(children: [
         initialsAvatar(w['name'] ?? '?', radius: 22),
         const SizedBox(width: 12),
@@ -175,16 +175,16 @@ class _WorkersPageState extends State<WorkersPage> {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(child: Text(w['name'] ?? '-',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 14.5),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14.5),
                   overflow: TextOverflow.ellipsis)),
               statusPill(w['today_status'] ?? 'absent'),
             ]),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             Row(children: [
               Icon(Icons.handyman_outlined, size: 13, color: AppColors.textMuted),
               const SizedBox(width: 4),
               Expanded(child: Text(w['trade'] ?? 'General Worker',
-                  style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13.5),
+                  style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13.5),
                   overflow: TextOverflow.ellipsis)),
             ]),
             if (w['project'] != null) ...[
@@ -193,12 +193,12 @@ class _WorkersPageState extends State<WorkersPage> {
                 Icon(Icons.location_on_outlined, size: 13, color: AppColors.textMuted),
                 const SizedBox(width: 4),
                 Expanded(child: Text(w['project']['project_name'] ?? '',
-                    style: GoogleFonts.outfit(color: AppColors.textMuted, fontSize: 13),
+                    style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
                     overflow: TextOverflow.ellipsis)),
               ]),
             ],
             if (w['check_in_time'] != null || w['hours_today'] != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Row(children: [
                 Icon(Icons.schedule_rounded, size: 13, color: AppColors.textSecondary),
                 const SizedBox(width: 4),
@@ -208,7 +208,7 @@ class _WorkersPageState extends State<WorkersPage> {
                     if (w['check_out_time'] != null) 'Out ${_fmtTime(w['check_out_time'])}',
                     if (w['hours_today'] != null) '${w['hours_today']}h',
                   ].join(' · '),
-                  style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
+                  style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
                   overflow: TextOverflow.ellipsis,
                 )),
               ]),

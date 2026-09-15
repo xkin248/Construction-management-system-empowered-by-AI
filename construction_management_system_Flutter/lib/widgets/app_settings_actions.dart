@@ -65,7 +65,7 @@ class _AppSettingsActionsState extends State<AppSettingsActions> {
           ),
           child: Text(
             lang == 'en' ? 'EN' : 'BM',
-            style: GoogleFonts.outfit(
+            style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w800,
               color: AppColors.textPrimary,

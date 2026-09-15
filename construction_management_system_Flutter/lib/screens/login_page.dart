@@ -108,13 +108,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.sidebarBg,
+      // Always-dark auth backdrop: fixed tokens so it never flips with the theme.
+      backgroundColor: AppColors.authBgTop,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0D1117), Color(0xFF10141C), Color(0xFF1A2035)],
+            colors: [AppColors.authBgTop, AppColors.authBgMid, AppColors.authBgBottom],
           ),
         ),
         child: SafeArea(
@@ -129,8 +130,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         radius: 0.9,
                         colors: [
                           AppColors.accent.withValues(alpha: 0.10),
-                          Colors.transparent,
-                          Colors.transparent,
+                          AppColors.transparent,
+                          AppColors.transparent,
                         ],
                         stops: const [0.0, 0.45, 1.0],
                       ),
@@ -144,7 +145,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             final cardPad = isNarrow ? 20.0 : 28.0;
 
             return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 20),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 24),
               child: FadeTransition(
                 opacity: _fade,
                 child: SlideTransition(
@@ -165,17 +166,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   AppShadows.accent(AppColors.accent, alpha: 0.32, blur: 26, dy: 10),
                             ),
                             child: const Center(
-                              child: Icon(Icons.construction_rounded, color: Colors.white, size: 34),
+                              child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 34),
                             ),
                           ),
                           const SizedBox(height: 16),
                           Text('BuildSmart',
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                   fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.darkTextPrimary)),
                           const SizedBox(height: 4),
                           Text('AI Construction Management System',
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                   fontSize: 12, color: AppColors.darkTextSecondary, letterSpacing: 0.3)),
                           const SizedBox(height: 24),
                           // ── Login Card ──
@@ -206,26 +207,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 20),
+                                const SizedBox(height: 24),
                                 // Role badge
                                 Center(
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: AppColors.accent.withValues(alpha: 0.15),
                                       borderRadius: AppRadius.rPill,
                                       border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                                     ),
                                     child: Text(AppStrings.t('login.roleBadge'),
-                                        style: GoogleFonts.outfit(
+                                        style: GoogleFonts.inter(
                                             fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
                                   ),
                                 ),
-                                const SizedBox(height: 22),
+                                const SizedBox(height: 24),
 
                                 // Email field
                                 Text(AppStrings.t('login.email'),
-                                    style: GoogleFonts.outfit(
+                                    style: GoogleFonts.inter(
                                         fontSize: 13, fontWeight: FontWeight.w600,
                                         color: AppColors.darkTextSecondary)),
                                 const SizedBox(height: 8),
@@ -233,14 +234,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   controller: _email,
                                   keyboardType: TextInputType.emailAddress,
                                   textInputAction: TextInputAction.next,
-                                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextPrimary),
+                                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextPrimary),
                                   decoration: _fieldDeco('you@buildsmart.my'),
                                 ),
                                 const SizedBox(height: 16),
 
                                 // Password field
                                 Text(AppStrings.t('login.password'),
-                                    style: GoogleFonts.outfit(
+                                    style: GoogleFonts.inter(
                                         fontSize: 13, fontWeight: FontWeight.w600,
                                         color: AppColors.darkTextSecondary)),
                                 const SizedBox(height: 8),
@@ -249,7 +250,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   obscureText: obscure,
                                   onSubmitted: (_) => _login(),
                                   textInputAction: TextInputAction.done,
-                                  style: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextPrimary),
+                                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextPrimary),
                                   decoration: _fieldDeco('••••••••').copyWith(
                                     suffixIcon: IconButton(
                                       icon: Icon(
@@ -274,11 +275,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     child: ElevatedButton(
                                       onPressed: ld ? null : _login,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.transparent,
-                                        foregroundColor: Colors.white,
-                                        disabledBackgroundColor: Colors.transparent,
-                                        disabledForegroundColor: Colors.white70,
-                                        shadowColor: Colors.transparent,
+                                        backgroundColor: AppColors.transparent,
+                                        foregroundColor: AppColors.onAccent,
+                                        disabledBackgroundColor: AppColors.transparent,
+                                        disabledForegroundColor: AppColors.onAccentMuted,
+                                        shadowColor: AppColors.transparent,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(
                                             borderRadius: AppRadius.rBtn),
@@ -287,9 +288,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                           ? const SizedBox(
                                               height: 20, width: 20,
                                               child: CircularProgressIndicator(
-                                                  color: Colors.white, strokeWidth: 2.2))
+                                                  color: AppColors.onAccent, strokeWidth: 2.2))
                                           : Text(AppStrings.t('login.signIn'),
-                                              style: GoogleFonts.outfit(
+                                              style: GoogleFonts.inter(
                                                   fontSize: 15.5, fontWeight: FontWeight.w700)),
                                     ),
                                   ),
@@ -306,7 +307,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             child: RichText(
                               textAlign: TextAlign.center,
                               text: TextSpan(
-                                style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted),
+                                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
                                 children: [
                                   TextSpan(text: AppStrings.t('login.noWorkerAccount')),
                                   TextSpan(
@@ -321,7 +322,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           const SizedBox(height: 8),
                           Text('CIDB Construction 4.0',
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.outfit(
+                              style: GoogleFonts.inter(
                                   fontSize: 12, color: AppColors.darkTextMuted)),
                           const SizedBox(height: 8),
                         ],
@@ -341,10 +342,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   InputDecoration _fieldDeco(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: GoogleFonts.outfit(fontSize: 14, color: AppColors.darkTextMuted),
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextMuted),
         filled: true,
         fillColor: AppColors.darkBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
             borderRadius: AppRadius.rMd,
             borderSide: const BorderSide(color: AppColors.darkBorder)),

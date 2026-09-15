@@ -110,12 +110,12 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     onPressed: () => showAddWorkerSheet(context, onAdded: _load),
                     icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
                     label: Text(AppStrings.t('workers.addWorker'),
-                        style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      foregroundColor: AppColors.onAccent,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                     ),
                   ),
                 ),
@@ -135,7 +135,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: AppColors.warning.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: AppRadius.rMd,
                       border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
                     ),
                     child: Row(children: [
@@ -144,7 +144,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                       Expanded(
                         child: Text(
                           'Check-in window is enforced — workers must check in within the configured time window',
-                          style: GoogleFonts.outfit(fontSize: 13, color: AppColors.warning, fontWeight: FontWeight.w600),
+                          style: GoogleFonts.inter(fontSize: 13, color: AppColors.warning, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ]),
@@ -155,7 +155,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                 // ── Project Geofence Cards ──
                 if (projects.isNotEmpty) ...[
                   _sectionLabel("Project Check-in Zones"),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   SizedBox(
                     height: 130,
                     child: ListView.separated(
@@ -170,7 +170,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
                 // ── Search + Filter ──
                 _buildFilterRow(),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
 
                 // ── Worker Table ──
                 _buildWorkerTable(filtered),
@@ -216,17 +216,17 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   Widget _statMini(String label, String value, {String? sub, Color? valueColor}) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+        Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
-        if (sub != null) Text(sub, style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+        Text(value, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
+        if (sub != null) Text(sub, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -241,15 +241,15 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text("Today's Attendance Rate — All Projects",
-            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         const SizedBox(height: 12),
         StackedProgressBar(present: present > 0 ? present : 80, late: late, absent: absent > 0 ? absent : 20),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(children: [
           _legend(AppColors.green, 'Present $presentPct%'),
           const SizedBox(width: 16),
@@ -263,15 +263,15 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   Widget _legend(Color color, String label) => Row(mainAxisSize: MainAxisSize.min, children: [
         Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 5),
-        Text(label, style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        const SizedBox(width: 4),
+        Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
       ]);
 
   Widget _sectionLabel(String s) => Row(children: [
-        Container(width: 3.5, height: 15, decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(2))),
+        Container(width: 3.5, height: 15, decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rHair)),
         const SizedBox(width: 8),
         Text(s,
-            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ]);
 
   Widget _buildFilterRow() {
@@ -283,13 +283,13 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           onChanged: (v) => setState(() => _searchQuery = v),
           decoration: InputDecoration(
             hintText: AppStrings.t('att.searchWorker'),
-            hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted),
+            hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
             prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
             filled: true, fillColor: AppColors.bgCard,
-            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+            border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
           ),
         ),
       ),
@@ -304,16 +304,16 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   Widget _filterDropdown(List<String> items, String value, ValueChanged<String?> onChanged) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: DropdownButton<String>(
         value: value,
         underline: const SizedBox(),
-        style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
         onChanged: onChanged,
       ),
@@ -325,11 +325,11 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     if (filtered.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 40),
+        padding: const EdgeInsets.symmetric(vertical: 24),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: AppRadius.rMd,
           border: Border.all(color: AppColors.border),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -341,8 +341,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             ),
             child: Icon(Icons.person_search_rounded, size: 28, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 14),
-          Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+          const SizedBox(height: 16),
+          Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
         ]),
       );
     }
@@ -393,25 +393,25 @@ class _WorkerAttCard extends StatelessWidget {
     final hours = worker['hours_today'];
 
     return Container(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Row 1: avatar + name + status pill
         Row(children: [
           initialsAvatar(name, radius: 19),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name,
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   overflow: TextOverflow.ellipsis),
               Text(trade,
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textMuted)),
+                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
             ]),
           ),
           statusPill(status),
@@ -422,7 +422,7 @@ class _WorkerAttCard extends StatelessWidget {
           Icon(Icons.place_outlined, size: 12, color: AppColors.textMuted),
           const SizedBox(width: 4),
           Expanded(child: Text(project,
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary),
+              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary),
               overflow: TextOverflow.ellipsis)),
         ]),
         const SizedBox(height: 8),
@@ -437,16 +437,16 @@ class _WorkerAttCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.accentLight,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: AppRadius.rMd,
               ),
               child: Text('${hours}h',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
             ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
-            const SizedBox(width: 3),
-            Text('GPS', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+            const SizedBox(width: 4),
+            Text('GPS', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
           ]),
         ]),
       ]),
@@ -456,9 +456,9 @@ class _WorkerAttCard extends StatelessWidget {
   Widget _timeChip(IconData icon, String label, String time, Color color) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(icon, size: 12, color: color),
-      const SizedBox(width: 3),
+      const SizedBox(width: 4),
       Text('$label $time',
-          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600,
+          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600,
               color: time == '—' ? AppColors.textMuted : color)),
     ]);
   }
@@ -477,28 +477,28 @@ class _ProjectGeofenceCard extends StatelessWidget {
 
     return Container(
       width: 200,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: AppRadius.rMd,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(Icons.gps_fixed_rounded, size: 13, color: AppColors.green),
-          const SizedBox(width: 5),
+          const SizedBox(width: 4),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(8)),
-            child: Text(AppStrings.t('att.active'), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: AppRadius.rMd),
+            child: Text(AppStrings.t('att.active'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 8),
-        Text(name, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
-        Text(_shortLoc(location), style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 6),
-        Text('$workerCount workers tracked', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
-        Text('Radius: ${radius}m', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textMuted)),
+        Text(name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
+        Text(_shortLoc(location), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 8),
+        Text('$workerCount workers tracked', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
+        Text('Radius: ${radius}m', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
       ]),
     );
   }
