@@ -5,6 +5,7 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
+import '../services/task_status_notifier.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
@@ -29,6 +30,7 @@ class _TasksPageState extends State<TasksPage> {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
+    TaskStatusNotifier.addListener(_onExternalTaskChange);
     _load();
   }
 
@@ -40,7 +42,16 @@ class _TasksPageState extends State<TasksPage> {
   void dispose() {
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
+    TaskStatusNotifier.removeListener(_onExternalTaskChange);
     super.dispose();
+  }
+
+  /// Reloads when a task changed on another page (e.g. ProjectDetail quick
+  /// status buttons). Pages live in an IndexedStack inside HomeShell, so
+  /// initState does not run again when the user switches back to Tasks —
+  /// without this signal the main list keeps showing the stale status.
+  void _onExternalTaskChange() {
+    _load();
   }
 
   Future<void> _load() async {
@@ -306,6 +317,17 @@ class _TaskCardState extends State<_TaskCard> {
   @override
   void initState() {
     super.initState();
+    _status = widget.task['status'] as String? ?? 'pending';
+    _dueDate = widget.task['due_date'] as String?;
+  }
+
+  @override
+  void didUpdateWidget(covariant _TaskCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The parent reloads the task list after any status change (locally or
+    // from another page via TaskStatusNotifier). The card State object is
+    // reused by ListView/GridView, so sync our copies from the new task map;
+    // otherwise the quick buttons keep showing the stale status.
     _status = widget.task['status'] as String? ?? 'pending';
     _dueDate = widget.task['due_date'] as String?;
   }

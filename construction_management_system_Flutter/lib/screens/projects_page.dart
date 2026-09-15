@@ -10,6 +10,7 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
+import '../services/task_status_notifier.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
@@ -1210,6 +1211,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       await ApiService().updateTask(taskId, {'status': newStatus});
       t['status'] = newStatus;
       toast('Task marked $newStatus');
+      TaskStatusNotifier.notify();
       if (mounted) _load();
     } catch (e) {
       toast('Failed to update task: $e');
