@@ -16,12 +16,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    name: Build Flutter Web & Deploy
+  # ── Build ──────────────────────────────────────────────────────────────
+  # This job must NOT declare `environment: github-pages`: the github-pages
+  # environment has a deployment branch policy that only allows `main`, so a
+  # job-level environment reference makes tag-triggered runs fail instantly
+  # at startup (no runner assigned, 0 steps) instead of building the bundle.
+  build:
+    name: Build Flutter Web
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       # ── Checkout ──────────────────────────────────────────────
@@ -47,7 +49,7 @@ jobs:
         working-directory: construction_management_system_Flutter
         run: flutter build web --release --base-href=/${{ github.event.repository.name }}/
 
-      # ── Deploy to GitHub Pages ────────────────────────────────
+      # ── Stage Pages artifact ──────────────────────────────────
       # Deploy only from the main branch. Tag-triggered runs still build
       # the web bundle (compile verification) but skip publishing, because
       # the github-pages environment protection rules reject tag refs.
@@ -61,7 +63,19 @@ jobs:
         with:
           path: construction_management_system_Flutter/build/web
 
+  # ── Deploy ─────────────────────────────────────────────────────────────
+  # Runs on main only; the `github-pages` environment (which enforces the
+  # main-only deployment branch policy) is scoped to this job alone.
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
       - name: 🚀 Deploy to GitHub Pages
-        if: github.ref == 'refs/heads/main'
         id: deployment
         uses: actions/deploy-pages@v4
