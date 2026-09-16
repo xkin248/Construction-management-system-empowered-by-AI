@@ -6,9 +6,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Project, Task, TaskWorker, Worker
+from app.models import Project, Task, TaskProgressLog, TaskWorker, Worker
 from app.schemas import (
-    AIMatchResult, TaskOut,
+    AIMatchResult, TaskOut, TaskProgressLogOut,
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
 )
 from app.routers.auth import require_worker, require_any_authorized
@@ -231,7 +231,13 @@ def _task_load_options():
 def _serialize_task(task: Task) -> Dict[str, Any]:
     data = TaskOut.model_validate(task).model_dump(mode="json")
     data["ok"] = True
-    data["progress"] = STATUS_TO_PROGRESS.get(task.status or "pending", 0)
+    # Supervisor-set progress wins; fall back to the status-derived value so
+    # tasks without an explicit progress still display a sensible percentage.
+    data["progress"] = (
+        task.progress
+        if task.progress is not None
+        else STATUS_TO_PROGRESS.get(task.status or "pending", 0)
+    )
     data["project_name"] = task.project.project_name if task.project else None
     return data
 
@@ -302,18 +308,67 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
         task.priority = str(payload["priority"]).strip().lower()
 
     if "status" in payload or "progress" in payload:
+        # Supervisor-set progress: validate type and 0-100 range BEFORE deriving
+        # the status, so malformed values fail with 400 instead of a 500.
+        raw_progress = payload.get("progress")
+        parsed_progress = None
+        if "progress" in payload and raw_progress is not None:
+            try:
+                parsed_progress = int(float(raw_progress))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "progress must be an integer between 0 and 100")
+            if parsed_progress < 0 or parsed_progress > 100:
+                raise HTTPException(400, "progress must be between 0 and 100")
+
         old_status = task.status or "pending"
-        new_status = _normalize_status(payload.get("status"), payload.get("progress"))
-        if new_status != old_status:
+        new_status = _normalize_status(payload.get("status"), parsed_progress)
+        status_changed = new_status != old_status
+        if status_changed:
             _validate_status_transition(old_status, new_status)
+
+        # Persist the validated progress value only when it actually changes.
+        progress_changed = False
+        if parsed_progress is not None and parsed_progress != task.progress:
+            task.progress = parsed_progress
+            progress_changed = True
+
+        # Completing a task requires a non-empty completion note (anti-bypass:
+        # the note must accompany every route into the completed state).
+        completion_note = str(payload.get("completion_note") or "").strip() or None
+        if new_status == "completed":
+            if not completion_note:
+                raise HTTPException(
+                    400, "completion_note is required when completing a task"
+                )
+            task.completion_note = completion_note
+
+        # Record lifecycle timestamps: first time entering in_progress, and
+        # the moment the task is completed. started_at is kept on later
+        # re-entries (pending -> in_progress) so it reflects first start.
+        if status_changed:
             task.status = new_status
-            # Record lifecycle timestamps: first time entering in_progress, and
-            # the moment the task is completed. started_at is kept on later
-            # re-entries (pending -> in_progress) so it reflects first start.
             if new_status == "in_progress" and task.started_at is None:
                 task.started_at = datetime.utcnow()
             elif new_status == "completed":
                 task.completed_at = datetime.utcnow()
+
+        # Leave a trace on any status or progress change (timeline entry).
+        # from_status == to_status for pure progress updates; the note
+        # explains what changed. Completion writes the mandatory note.
+        if status_changed or progress_changed:
+            log_note = (
+                completion_note
+                if new_status == "completed"
+                else str(payload.get("note") or "").strip() or None
+            )
+            db.add(TaskProgressLog(
+                task_id=task.task_id,
+                from_status=old_status,
+                to_status=task.status or new_status,
+                note=log_note,
+            ))
+
+        if status_changed:
             db.flush()  # persist in-memory change so the recalc query sees it
             _recalc_project_progress(db, task.project_id)
             _recalc_project_status(db, task.project_id)
@@ -355,6 +410,20 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     db.refresh(task)
     task = db.query(Task).options(*_task_load_options()).get(task.task_id)
     return _serialize_task(task)
+
+
+@router.get("/tasks/{task_id}/logs", response_model=List[TaskProgressLogOut])
+def task_logs(task_id: int, db: Session = Depends(get_db)):
+    """Return the task timeline (status/progress changes), newest first."""
+    task = db.query(Task).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+    return (
+        db.query(TaskProgressLog)
+        .filter(TaskProgressLog.task_id == task_id)
+        .order_by(TaskProgressLog.created_at.desc(), TaskProgressLog.log_id.desc())
+        .all()
+    )
 
 
 @router.delete("/tasks/{task_id}")

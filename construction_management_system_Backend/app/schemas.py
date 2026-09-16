@@ -156,10 +156,21 @@ class TaskBase(BaseModel):
     ai_confidence: Optional[float] = Field(None, ge=0, le=1)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    progress: Optional[int] = Field(None, ge=0, le=100)  # supervisor-set 0-100; None falls back to status-derived value
+    completion_note: Optional[str] = None  # mandatory note captured when the task is completed
 class TaskCreate(TaskBase): pass
 class TaskOut(TaskBase):
     task_id: int; assigned_worker: Optional[WorkerOut] = None; project: Optional[ProjectOut] = None
     assigned_workers: List[WorkerRef] = []      # full multi-worker list (worker_id/name/trade)
+    model_config = ConfigDict(from_attributes=True)
+class TaskProgressLogOut(BaseModel):
+    """One timeline entry of a task's status/progress history."""
+    log_id: int
+    task_id: int
+    from_status: Optional[str] = None
+    to_status: Optional[str] = None
+    note: Optional[str] = None
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 class AIMatchResult(BaseModel):
     worker_id: int; worker_name: str; trade: str; match_score: float; reason: str

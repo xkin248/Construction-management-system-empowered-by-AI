@@ -1208,27 +1208,70 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     final taskId = t['task_id'];
     if (taskId == null) { toast('Invalid task'); return; }
     // Completing a task is a forward-only transition (the backend rejects
-    // completed -> pending), so require an explicit confirmation first.
+    // completed -> pending), so require an explicit confirmation and a
+    // non-empty completion note (the backend enforces it too).
     if (newStatus == 'completed') {
+      final noteCtrl = TextEditingController();
       final ok = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
-          content: Text(AppStrings.t('tasks.confirmCompleteBody')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(AppStrings.t('common.cancel')),
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, _) => AlertDialog(
+            title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AppStrings.t('tasks.confirmCompleteBody'),
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteCtrl,
+                  autofocus: true,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.t('tasks.completionNoteLabel'),
+                    hintText: AppStrings.t('tasks.completionNoteHint'),
+                    border: OutlineInputBorder(borderRadius: AppRadius.rMd),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.green),
-              child: Text(AppStrings.t('common.confirm')),
-            ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(AppStrings.t('common.cancel')),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (noteCtrl.text.trim().isEmpty) {
+                    toast(AppStrings.t('tasks.completionNoteRequired'));
+                    return;
+                  }
+                  Navigator.pop(ctx, true);
+                },
+                style: TextButton.styleFrom(foregroundColor: AppColors.green),
+                child: Text(AppStrings.t('common.confirm')),
+              ),
+            ],
+          ),
         ),
       );
       if (ok != true || !mounted) return;
+      try {
+        await ApiService().updateTask(taskId, {
+          'status': newStatus,
+          'completion_note': noteCtrl.text.trim(),
+        });
+        t['status'] = newStatus;
+        t['completion_note'] = noteCtrl.text.trim();
+        toast('Task marked $newStatus');
+        TaskStatusNotifier.notify();
+        if (mounted) _load();
+      } catch (e) {
+        toast('Failed to update task: $e');
+      }
+      return;
     }
     try {
       await ApiService().updateTask(taskId, {'status': newStatus});

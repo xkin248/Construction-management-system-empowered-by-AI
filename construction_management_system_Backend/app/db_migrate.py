@@ -190,3 +190,45 @@ def ensure_task_timestamp_columns(engine) -> list:
             )
             added.append(f"tasks.{col}")
     return added
+
+
+# SQLite accepts INTEGER / TEXT (affinity); PostgreSQL uses the same names.
+_TASK_PROGRESS_COLUMNS = {
+    "progress": "INTEGER",
+    "completion_note": "TEXT",
+}
+
+_POSTGRES_TASK_PROGRESS_DDL = {
+    "progress": "INTEGER",
+    "completion_note": "TEXT",
+}
+
+
+def ensure_task_progress_columns(engine) -> list:
+    """Add progress / completion_note columns to the tasks table on old databases.
+
+    Mirrors the Task model change (C batch): both columns are nullable, so
+    existing rows need no default and the ALTER is idempotent per column.
+    The DDL type is identical for SQLite and PostgreSQL here; the dialect split
+    is kept for symmetry with ensure_task_timestamp_columns and future-proofing.
+    """
+    added = []
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "tasks" not in tables:
+        return added
+
+    is_postgres = engine.dialect.name == "postgresql"
+    ddl_map = _POSTGRES_TASK_PROGRESS_DDL if is_postgres else _TASK_PROGRESS_COLUMNS
+    existing = {c["name"] for c in inspector.get_columns("tasks")}
+    missing = {c: ddl for c, ddl in ddl_map.items() if c not in existing}
+    if not missing:
+        return added
+
+    with engine.begin() as conn:
+        for col, ddl in missing.items():
+            conn.execute(
+                text("ALTER TABLE tasks ADD COLUMN %s %s" % (col, ddl))
+            )
+            added.append(f"tasks.{col}")
+    return added

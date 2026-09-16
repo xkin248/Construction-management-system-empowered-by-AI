@@ -401,27 +401,69 @@ class _TaskCardState extends State<_TaskCard> {
   Future<void> _setStatus(String newStatus) async {
     if (newStatus == _status) return;
     // Completing a task is a forward-only transition (the backend rejects
-    // completed -> pending), so require an explicit confirmation first.
+    // completed -> pending), so require an explicit confirmation first, and
+    // the completion note is mandatory (the backend enforces it too).
     if (newStatus == 'completed') {
+      final noteCtrl = TextEditingController();
       final ok = await showDialog<bool>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
-          content: Text(AppStrings.t('tasks.confirmCompleteBody')),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(AppStrings.t('common.cancel')),
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, _) => AlertDialog(
+            title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AppStrings.t('tasks.confirmCompleteBody'),
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteCtrl,
+                  autofocus: true,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: AppStrings.t('tasks.completionNoteLabel'),
+                    hintText: AppStrings.t('tasks.completionNoteHint'),
+                    border: OutlineInputBorder(borderRadius: AppRadius.rMd),
+                  ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.green),
-              child: Text(AppStrings.t('common.confirm')),
-            ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(AppStrings.t('common.cancel')),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (noteCtrl.text.trim().isEmpty) {
+                    toast(AppStrings.t('tasks.completionNoteRequired'));
+                    return;
+                  }
+                  Navigator.pop(ctx, true);
+                },
+                style: TextButton.styleFrom(foregroundColor: AppColors.green),
+                child: Text(AppStrings.t('common.confirm')),
+              ),
+            ],
+          ),
         ),
       );
       if (ok != true || !mounted) return;
+      try {
+        await ApiService().updateTask(widget.task['task_id'], {
+          'status': newStatus,
+          'completion_note': noteCtrl.text.trim(),
+        });
+        setState(() => _status = newStatus);
+        widget.task['status'] = newStatus;
+        widget.onChanged?.call();
+        toast(AppStrings.t('tasks.statusUpdated'));
+      } catch (e) {
+        toast(AppStrings.t('tasks.statusFailed'));
+      }
+      return;
     }
     try {
       await ApiService()
@@ -721,6 +763,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   late Map _task;
   bool _autoAssigning = false;   // auto-assign request in flight
   bool _autoAssignSameProject = false; // restrict auto-assign to this project
+  List _logs = [];               // task timeline entries (newest first)
+  bool _logsLoading = true;      // timeline fetch in flight
+  double _progressInput = 50;    // progress slider draft
+  final _progressNoteCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -733,13 +779,59 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       final single = _task['assigned_worker'] as Map?;
       if (single != null) _assignedWorkers = [single];
     }
+    final p = (_task['progress'] as num?)?.toDouble();
+    if (p != null) _progressInput = p.clamp(0, 100).toDouble();
     _loadWorkers();
+    _loadLogs();
+  }
+
+  @override
+  void dispose() {
+    _progressNoteCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadWorkers() async {
     try {
       _projectWorkers = await ApiService().getWorkers();
     } catch (_) {}
+  }
+
+  /// Fetch the task timeline (status/progress history), newest first.
+  Future<void> _loadLogs() async {
+    final tid = _task['task_id'];
+    if (tid == null) return;
+    try {
+      final logs = await ApiService().getTaskLogs(tid);
+      if (!mounted) return;
+      setState(() {
+        _logs = logs;
+        _logsLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _logsLoading = false);
+    }
+  }
+
+  /// Push the draft progress (+optional note) to the backend and refresh.
+  Future<void> _saveProgress() async {
+    final tid = _task['task_id'];
+    if (tid == null) return;
+    final p = _progressInput.round().clamp(0, 100);
+    final note = _progressNoteCtrl.text.trim();
+    try {
+      await ApiService().updateTask(tid, {
+        'progress': p,
+        if (note.isNotEmpty) 'note': note,
+      });
+      _progressNoteCtrl.clear();
+      toast(AppStrings.t('tasks.progressSaved'));
+      await _refreshTaskFromServer();
+      await _loadLogs();
+    } catch (e) {
+      toast(AppStrings.t('tasks.progressSaveFailed'));
+    }
   }
 
   Future<void> _saveAssignments(Set<int> workerIds) async {
@@ -1059,6 +1151,68 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           )),
         ])),
 
+        // Progress update entry (only while the task is in progress)
+        if (status == 'in_progress')
+          sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(Icons.tune_rounded, size: 16, color: AppColors.blue),
+              const SizedBox(width: 8),
+              Text(AppStrings.t('tasks.updateProgress'), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
+            ]),
+            const SizedBox(height: 4),
+            Row(children: [
+              Expanded(child: Slider(
+                value: _progressInput,
+                min: 0, max: 100, divisions: 20,
+                label: '${_progressInput.round()}%',
+                onChanged: (v) => setState(() => _progressInput = v),
+              )),
+              Text('${_progressInput.round()}%',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: AppColors.blue, fontSize: 14)),
+            ]),
+            TextField(
+              controller: _progressNoteCtrl,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: AppStrings.t('tasks.progressNoteHint'),
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: AppRadius.rMd),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(width: double.infinity, child: ElevatedButton(
+              onPressed: _saveProgress,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.blue, foregroundColor: AppColors.onAccent,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: Text(AppStrings.t('tasks.saveProgress'),
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13)),
+            )),
+          ])),
+
+        // Timeline: automatic status/progress history
+        sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(Icons.history_rounded, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            Text(AppStrings.t('tasks.timeline'), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
+          ]),
+          const SizedBox(height: 12),
+          if (_logsLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+            ),
+          if (!_logsLoading && _logs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(AppStrings.t('tasks.noTimeline'),
+                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+            ),
+          ..._logs.asMap().entries.map((e) => _TimelineTile(entry: e.value, isFirst: e.key == 0)),
+        ])),
+
         // Due date
         if (t['due_date'] != null)
           sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Row(children: [
@@ -1243,6 +1397,93 @@ class _WorkerTile extends StatelessWidget {
             child: Text(selected ? '✓' : AppStrings.t('common.add'), style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
           ),
         ]),
+      ]),
+    );
+  }
+}
+
+// ── Timeline helpers ────────────────────────────────────────────────────────
+
+String _fmtLogTime(String? iso) {
+  if (iso == null || iso.isEmpty) return '';
+  final dt = DateTime.tryParse(iso)?.toLocal();
+  if (dt == null) return iso;
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${dt.year}-${two(dt.month)}-${two(dt.day)} '
+      '${two(dt.hour)}:${two(dt.minute)}';
+}
+
+String _statusLabel(String? s) {
+  switch (s) {
+    case 'completed':
+      return AppStrings.t('tasks.completed');
+    case 'in_progress':
+      return AppStrings.t('tasks.inProgress');
+    default:
+      return AppStrings.t('tasks.pending');
+  }
+}
+
+/// One row of the task timeline: from -> to status, optional note, timestamp.
+class _TimelineTile extends StatelessWidget {
+  const _TimelineTile({required this.entry, required this.isFirst});
+
+  final Map entry;
+  final bool isFirst;
+
+  @override
+  Widget build(BuildContext context) {
+    final from = entry['from_status'] as String?;
+    final to = entry['to_status'] as String?;
+    final note = entry['note'] as String?;
+    final time = _fmtLogTime(entry['created_at'] as String?);
+    final unchanged = from != null && from == to;
+
+    return IntrinsicHeight(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // Dot + connector line
+        SizedBox(
+          width: 24,
+          child: Column(children: [
+            Container(
+              width: 10, height: 10,
+              margin: const EdgeInsets.only(top: 5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: to == 'completed' ? AppColors.green : AppColors.blue,
+              ),
+            ),
+            if (!isFirst)
+              Expanded(child: Container(width: 2, color: AppColors.border)),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isFirst ? 0 : 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(
+                  child: Text(
+                    unchanged
+                        ? AppStrings.t('tasks.noChange')
+                        : '${_statusLabel(from)} → ${_statusLabel(to)}',
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Spacer(),
+                Text(time,
+                    style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+              ]),
+              if (note != null && note.trim().isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(note,
+                    style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary)),
+              ],
+            ]),
+          ),
+        ),
       ]),
     );
   }

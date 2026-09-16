@@ -148,6 +148,17 @@ class AppStrings {
     'tasks.assignFailed': ['Failed to assign', 'Gagal menugaskan'],
     'tasks.unassignAll': ['All workers unassigned', 'Semua pekerja dinyah-tugaskan'],
     'tasks.assignedCount': ['worker(s) assigned', 'pekerja ditugaskan'],
+    'tasks.timeline': ['Timeline', 'Garis Masa'],
+    'tasks.noTimeline': ['No status changes recorded yet', 'Tiada perubahan status direkodkan lagi'],
+    'tasks.updateProgress': ['Update Progress', 'Kemas Kini Kemajuan'],
+    'tasks.progressNoteHint': ['Note (optional)', 'Nota (pilihan)'],
+    'tasks.saveProgress': ['Save Progress', 'Simpan Kemajuan'],
+    'tasks.progressSaved': ['Progress updated', 'Kemajuan dikemas kini'],
+    'tasks.progressSaveFailed': ['Failed to update progress', 'Gagal mengemas kini kemajuan'],
+    'tasks.completionNoteLabel': ['Completion note', 'Nota penyiapan'],
+    'tasks.completionNoteHint': ['Describe what was completed...', 'Terangkan apa yang telah disiapkan...'],
+    'tasks.completionNoteRequired': ['Completion note is required', 'Nota penyiapan diperlukan'],
+    'tasks.noChange': ['No change', 'Tiada perubahan'],
 
     // ============ Attendance ============
     'att.title': ['Attendance', 'Kehadiran'],

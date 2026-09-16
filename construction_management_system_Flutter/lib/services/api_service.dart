@@ -311,6 +311,8 @@ class ApiService {
       Map.from((await dio.put('/tasks/$taskId', data: d)).data);
   Future<Map> deleteTask(int taskId) async =>
       Map.from((await dio.delete('/tasks/$taskId')).data);
+  Future<List> getTaskLogs(int taskId) async =>
+      (await dio.get('/tasks/$taskId/logs')).data as List;
 
   Future<Map> aiAutoAssign(int? projectId,
           {List<int>? taskIds, bool dryRun = false, bool sameProjectOnly = false}) async =>

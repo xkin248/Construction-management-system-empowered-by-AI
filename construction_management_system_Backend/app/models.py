@@ -95,9 +95,12 @@ class Task(Base):
     ai_confidence = Column(Float, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=True)  # first time the task entered in_progress
     completed_at = Column(DateTime(timezone=True), nullable=True)  # time the task was marked completed
+    progress = Column(Integer, nullable=True)  # supervisor-set 0-100 progress; None falls back to status-derived value
+    completion_note = Column(Text, nullable=True)  # mandatory note captured when the task is completed
     assigned_worker = relationship("Worker", back_populates="tasks")
     task_workers = relationship("TaskWorker", back_populates="task", cascade="all, delete-orphan")
     project = relationship("Project", back_populates="tasks")
+    progress_logs = relationship("TaskProgressLog", back_populates="task", cascade="all, delete-orphan", order_by="TaskProgressLog.log_id")
 
     @property
     def assigned_workers(self) -> list:
@@ -255,6 +258,24 @@ class TaskWorker(Base):
     assigned_at = Column(DateTime(timezone=True), server_default=func.now())
     task = relationship("Task", back_populates="task_workers")
     worker = relationship("Worker", back_populates="task_links")
+
+
+class TaskProgressLog(Base):
+    """One row per task status/progress change, forming the task timeline.
+
+    Written automatically by the update_task endpoint whenever a task's status
+    or progress changes. ``from_status`` equals ``to_status`` for pure progress
+    updates (the note explains what changed); both are set for status
+    transitions.
+    """
+    __tablename__ = "task_progress_logs"
+    log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=False, index=True)
+    from_status = Column(String(50), nullable=True)
+    to_status = Column(String(50), nullable=True)
+    note = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    task = relationship("Task", back_populates="progress_logs")
 
 
 class PredictionHistory(Base):
