@@ -93,6 +93,8 @@ class Task(Base):
     trade = Column(String(100), nullable=True)  # canonical trade selected by the user (optional, beats semantic guessing)
     due_date = Column(Date, nullable=True)
     ai_confidence = Column(Float, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)  # first time the task entered in_progress
+    completed_at = Column(DateTime(timezone=True), nullable=True)  # time the task was marked completed
     assigned_worker = relationship("Worker", back_populates="tasks")
     task_workers = relationship("TaskWorker", back_populates="task", cascade="all, delete-orphan")
     project = relationship("Project", back_populates="tasks")

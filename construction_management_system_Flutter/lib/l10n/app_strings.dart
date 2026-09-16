@@ -143,6 +143,8 @@ class AppStrings {
     'tasks.dueFailed': ['Failed to update due date', 'Gagal mengemas kini tarikh akhir'],
     'tasks.statusUpdated': ['Status updated', 'Status dikemas kini'],
     'tasks.statusFailed': ['Failed to update status', 'Gagal mengemas kini status'],
+    'tasks.confirmCompleteTitle': ['Mark task as completed?', 'Tandakan tugasan sebagai selesai?'],
+    'tasks.confirmCompleteBody': ['This will move the task to completed. Continue?', 'Ini akan menandakan tugasan sebagai selesai. Teruskan?'],
     'tasks.assignFailed': ['Failed to assign', 'Gagal menugaskan'],
     'tasks.unassignAll': ['All workers unassigned', 'Semua pekerja dinyah-tugaskan'],
     'tasks.assignedCount': ['worker(s) assigned', 'pekerja ditugaskan'],

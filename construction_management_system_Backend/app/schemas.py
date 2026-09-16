@@ -154,6 +154,8 @@ class TaskBase(BaseModel):
     trade: Optional[str] = None  # canonical trade selected by the user (optional)
     due_date: Optional[date] = None
     ai_confidence: Optional[float] = Field(None, ge=0, le=1)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 class TaskCreate(TaskBase): pass
 class TaskOut(TaskBase):
     task_id: int; assigned_worker: Optional[WorkerOut] = None; project: Optional[ProjectOut] = None

@@ -21,6 +21,27 @@ STATUS_TO_PROGRESS = {
     "completed": 100,
 }
 
+# Allowed task status transitions (state machine whitelist). Only adjacent
+# moves are permitted; jumping pending->completed or reverting
+# completed->pending is rejected with a 400 so task history stays honest.
+TASK_STATUS_TRANSITIONS = {
+    "pending": {"in_progress"},
+    "in_progress": {"completed", "pending"},
+    "completed": set(),
+}
+
+
+def _validate_status_transition(old_status: str, new_status: str) -> None:
+    """Raise 400 when new_status is not a legal move from old_status."""
+    allowed = TASK_STATUS_TRANSITIONS.get(old_status, set())
+    if new_status not in allowed:
+        raise HTTPException(
+            400,
+            f"Invalid task status transition: {old_status} -> {new_status}. "
+            "Allowed transitions: pending -> in_progress, in_progress -> completed, "
+            "in_progress -> pending.",
+        )
+
 
 def _recalc_project_progress(db: Session, project_id: int) -> None:
     """Recompute project.progress = completed tasks / total tasks * 100.
@@ -281,9 +302,18 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
         task.priority = str(payload["priority"]).strip().lower()
 
     if "status" in payload or "progress" in payload:
-        old_status = task.status
-        task.status = _normalize_status(payload.get("status"), payload.get("progress"))
-        if task.status != old_status:
+        old_status = task.status or "pending"
+        new_status = _normalize_status(payload.get("status"), payload.get("progress"))
+        if new_status != old_status:
+            _validate_status_transition(old_status, new_status)
+            task.status = new_status
+            # Record lifecycle timestamps: first time entering in_progress, and
+            # the moment the task is completed. started_at is kept on later
+            # re-entries (pending -> in_progress) so it reflects first start.
+            if new_status == "in_progress" and task.started_at is None:
+                task.started_at = datetime.utcnow()
+            elif new_status == "completed":
+                task.completed_at = datetime.utcnow()
             db.flush()  # persist in-memory change so the recalc query sees it
             _recalc_project_progress(db, task.project_id)
             _recalc_project_status(db, task.project_id)

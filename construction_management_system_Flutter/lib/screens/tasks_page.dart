@@ -400,6 +400,29 @@ class _TaskCardState extends State<_TaskCard> {
 
   Future<void> _setStatus(String newStatus) async {
     if (newStatus == _status) return;
+    // Completing a task is a forward-only transition (the backend rejects
+    // completed -> pending), so require an explicit confirmation first.
+    if (newStatus == 'completed') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
+          content: Text(AppStrings.t('tasks.confirmCompleteBody')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(AppStrings.t('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.green),
+              child: Text(AppStrings.t('common.confirm')),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     try {
       await ApiService()
           .updateTask(widget.task['task_id'], {'status': newStatus});

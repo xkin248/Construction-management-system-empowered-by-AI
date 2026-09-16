@@ -47,6 +47,19 @@ _ATTENDANCE_COLUMN_ADDITIONS = {
     },
 }
 
+# Task lifecycle timestamp columns added to the tasks table over time.
+# SQLite accepts DATETIME (affinity); PostgreSQL needs TIMESTAMP WITH TIME ZONE
+# to match models.Column(DateTime(timezone=True)).
+_TASK_TIMESTAMP_COLUMNS = {
+    "started_at": "DATETIME",
+    "completed_at": "DATETIME",
+}
+
+_POSTGRES_TASK_TIMESTAMP_DDL = {
+    "started_at": "TIMESTAMP WITH TIME ZONE",
+    "completed_at": "TIMESTAMP WITH TIME ZONE",
+}
+
 
 def ensure_settings_columns(engine) -> list:
     """Add missing attendance-window columns to the settings table.
@@ -146,4 +159,34 @@ def ensure_attendance_columns(engine) -> list:
             conn.execute(
                 text("ALTER TABLE attendance_logs ALTER COLUMN worker_id DROP NOT NULL")
             )
+    return added
+
+
+def ensure_task_timestamp_columns(engine) -> list:
+    """Add started_at / completed_at columns to the tasks table on old databases.
+
+    Mirrors the Task model change: both columns are nullable timestamps, so
+    existing rows need no default. The DDL type follows the dialect (DATETIME
+    for SQLite, TIMESTAMP WITH TIME ZONE for PostgreSQL); the function is
+    intentionally generic so the same code can run against both engines.
+    """
+    added = []
+    inspector = inspect(engine)
+    tables = set(inspector.get_table_names())
+    if "tasks" not in tables:
+        return added
+
+    is_postgres = engine.dialect.name == "postgresql"
+    ddl_map = _POSTGRES_TASK_TIMESTAMP_DDL if is_postgres else _TASK_TIMESTAMP_COLUMNS
+    existing = {c["name"] for c in inspector.get_columns("tasks")}
+    missing = {c: ddl for c, ddl in ddl_map.items() if c not in existing}
+    if not missing:
+        return added
+
+    with engine.begin() as conn:
+        for col, ddl in missing.items():
+            conn.execute(
+                text("ALTER TABLE tasks ADD COLUMN %s %s" % (col, ddl))
+            )
+            added.append(f"tasks.{col}")
     return added

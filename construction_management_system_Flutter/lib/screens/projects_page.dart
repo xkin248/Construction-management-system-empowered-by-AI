@@ -1207,6 +1207,29 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   Future<void> _setTaskStatus(Map t, String newStatus) async {
     final taskId = t['task_id'];
     if (taskId == null) { toast('Invalid task'); return; }
+    // Completing a task is a forward-only transition (the backend rejects
+    // completed -> pending), so require an explicit confirmation first.
+    if (newStatus == 'completed') {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
+          content: Text(AppStrings.t('tasks.confirmCompleteBody')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(AppStrings.t('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.green),
+              child: Text(AppStrings.t('common.confirm')),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     try {
       await ApiService().updateTask(taskId, {'status': newStatus});
       t['status'] = newStatus;
