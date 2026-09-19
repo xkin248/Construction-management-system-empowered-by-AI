@@ -17,7 +17,7 @@ except Exception:
     pwd_context = _F()
 
 from app.database import get_db, settings
-from app.models import Supervisor, Worker
+from app.models import Project, Supervisor, Worker
 from app.schemas import (
     SupervisorCreate, SupervisorOut,
     WorkerAuthCreate, WorkerAuthOut,

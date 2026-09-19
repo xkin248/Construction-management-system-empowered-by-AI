@@ -392,6 +392,7 @@ class _TaskCardState extends State<_TaskCard> {
           .updateTask(widget.task['task_id'], {'due_date': newDate});
       setState(() => _dueDate = newDate);
       widget.task['due_date'] = newDate;
+      TaskStatusNotifier.notify();
       toast(AppStrings.t('tasks.dueUpdated'));
     } catch (e) {
       toast(AppStrings.t('tasks.dueFailed'));
@@ -459,6 +460,7 @@ class _TaskCardState extends State<_TaskCard> {
         setState(() => _status = newStatus);
         widget.task['status'] = newStatus;
         widget.onChanged?.call();
+        TaskStatusNotifier.notify();
         toast(AppStrings.t('tasks.statusUpdated'));
       } catch (e) {
         toast(AppStrings.t('tasks.statusFailed'));
@@ -471,6 +473,7 @@ class _TaskCardState extends State<_TaskCard> {
       setState(() => _status = newStatus);
       widget.task['status'] = newStatus;
       widget.onChanged?.call();
+      TaskStatusNotifier.notify();
       toast(AppStrings.t('tasks.statusUpdated'));
     } catch (e) {
       toast(AppStrings.t('tasks.statusFailed'));
@@ -827,6 +830,10 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       });
       _progressNoteCtrl.clear();
       toast(AppStrings.t('tasks.progressSaved'));
+      // Signal the main list so it refreshes instead of showing stale
+      // progress (the list lives in an IndexedStack inside HomeShell and
+      // does not re-run initState when this detail page is popped).
+      TaskStatusNotifier.notify();
       await _refreshTaskFromServer();
       await _loadLogs();
     } catch (e) {
@@ -851,6 +858,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
         }
       }
       setState(() => _assignedWorkers = selected);
+      TaskStatusNotifier.notify();
       toast('${selected.length} ${AppStrings.t('tasks.assignedCount')}');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -862,6 +870,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     try {
       await ApiService().updateTask(_task['task_id'], {'worker_ids': []});
       setState(() => _assignedWorkers = []);
+      TaskStatusNotifier.notify();
       toast(AppStrings.t('tasks.unassignAll'));
     } catch (e) {
       toast('${AppStrings.t('tasks.assignFailed')}: $e');
