@@ -787,7 +787,9 @@ def compute_project_progress(db, project_id: int) -> Dict[str, Any]:
     model = get_gemini_model()
     ai_insights = ""
     recommendations = []
-    risk_level = "low"
+    # Empty (not "low") so the fallback band below is reached when Gemini is
+    # unavailable; otherwise every project would be reported as low risk.
+    risk_level = ""
     health_score = 0
 
     # Rule-based base score (used as fallback and AI anchor)

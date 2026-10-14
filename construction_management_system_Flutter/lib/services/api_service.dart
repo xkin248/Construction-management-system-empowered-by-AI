@@ -327,6 +327,9 @@ class ApiService {
   Future<Map> progressPrediction(int projectId) async =>
       Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
 
+  Future<Map> projectHealth(int projectId) async =>
+      Map.from((await dio.get('/ai/projects/$projectId/health')).data);
+
   Future<List> getWorkers({int? pid}) async =>
       (await dio.get('/workers',
               queryParameters: pid != null ? {'project_id': pid} : null))
