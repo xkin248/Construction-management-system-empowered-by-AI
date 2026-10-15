@@ -1,23 +1,54 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import logging
 import os
 
 from app.database import engine, Base, SessionLocal, settings
 from app import models
 from app.db_migrate import ensure_settings_columns, ensure_fcm_columns, ensure_attendance_columns, ensure_task_timestamp_columns, ensure_task_progress_columns
-Base.metadata.create_all(bind=engine)
-# Existing SQLite databases don't get new columns via create_all — patch them.
-ensure_settings_columns(engine)
-ensure_fcm_columns(engine)
-ensure_attendance_columns(engine)
-ensure_task_timestamp_columns(engine)
-ensure_task_progress_columns(engine)
-# Ensure the single-row settings table exists with default values on startup.
-with SessionLocal() as db:
-    if db.query(models.Settings).count() == 0:
-        db.add(models.Settings(id=1))
-        db.commit()
+
+logger = logging.getLogger("buildsmart.startup")
+
+# Database bootstrap runs at import time, i.e. BEFORE uvicorn binds the port.
+# It must never abort the process: when the database is unreachable the raised
+# OperationalError would kill the import, uvicorn would exit with status 1 and
+# the platform (Render) would report "Deploy failed" / never pass the port
+# scan. Keep the API booting instead and surface the state on /health.
+DB_READY = False
+DB_BOOTSTRAP_ERROR = ""
+
+
+def _bootstrap_database() -> None:
+    """Create tables / run light migrations / seed settings, without crashing boot."""
+    global DB_READY, DB_BOOTSTRAP_ERROR
+    try:
+        Base.metadata.create_all(bind=engine)
+        # Existing SQLite databases don't get new columns via create_all — patch them.
+        ensure_settings_columns(engine)
+        ensure_fcm_columns(engine)
+        ensure_attendance_columns(engine)
+        ensure_task_timestamp_columns(engine)
+        ensure_task_progress_columns(engine)
+        # Ensure the single-row settings table exists with default values on startup.
+        with SessionLocal() as db:
+            if db.query(models.Settings).count() == 0:
+                db.add(models.Settings(id=1))
+                db.commit()
+        DB_READY = True
+        DB_BOOTSTRAP_ERROR = ""
+        logger.info("Database bootstrap completed.")
+    except Exception as exc:  # startup must not crash the whole service
+        DB_READY = False
+        DB_BOOTSTRAP_ERROR = f"{type(exc).__name__}: {exc}".splitlines()[0]
+        logger.error(
+            "Database bootstrap FAILED - the API will boot but data endpoints "
+            "cannot work. Check that DATABASE_URL points to a reachable, "
+            "existing database. Cause: %s", DB_BOOTSTRAP_ERROR,
+        )
+
+
+_bootstrap_database()
 
 app = FastAPI(title="Construction Management System API", version="1.0.0")
 app.add_middleware(
@@ -40,7 +71,11 @@ def root():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "database": "ok" if DB_READY else "unavailable",
+        "database_error": DB_BOOTSTRAP_ERROR or None,
+    }
 
 # ✅ Register routers
 from app.routers.auth import router as ar;       app.include_router(ar, prefix="/api")
