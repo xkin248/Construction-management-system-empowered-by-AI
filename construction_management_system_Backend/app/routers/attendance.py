@@ -456,12 +456,20 @@ def weekly_attendance_stats(
     Returns per-day distinct present workers and total check-in records.
     Optional project_id filters to one project.
     """
-    today_local = date.today()
+    def _naive_utc(dt):
+        """Normalise DB values to naive UTC so comparisons never mix
+        offset-aware and offset-naive datetimes (SQLite returns naive,
+        Postgres returns aware)."""
+        if dt is None:
+            return None
+        return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
+
+    today_local = datetime.now(KL_TZ).date()
     monday = today_local - timedelta(days=today_local.weekday())
-    # Use aware datetimes: Supabase/Postgres stores timestamptz (aware UTC),
-    # comparing with naive datetimes raises TypeError. KL_TZ keeps "week"
-    # aligned to the business timezone (UTC+8).
-    start = datetime(monday.year, monday.month, monday.day, tzinfo=KL_TZ)
+    # Week boundaries belong to the KL business day (UTC+8), but the column
+    # stores naive UTC (datetime.utcnow()), so convert the window back to UTC.
+    start = (datetime(monday.year, monday.month, monday.day, tzinfo=KL_TZ)
+             .astimezone(timezone.utc).replace(tzinfo=None))
     end = start + timedelta(days=7)
 
     q = db.query(AttendanceLog).filter(
@@ -478,7 +486,7 @@ def weekly_attendance_stats(
         day_end = day_start + timedelta(days=1)
         day_logs = [
             a for a in logs
-            if day_start <= a.check_in_time < day_end
+            if day_start <= _naive_utc(a.check_in_time) < day_end
             and a.status in ("checked_in", "checked_out")
         ]
         present_workers = len({a.worker_id for a in day_logs})
