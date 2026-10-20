@@ -10,11 +10,11 @@ from app.models import (
 from app.schemas import (
     AITaskAnalysisRequest, AITaskAnalysisResponse,
     AIAutoAssignRequest, AIAutoAssignResponse,
-    SiteProgressPrediction, ProjectHealthScore
+    SiteProgressPrediction
 )
 from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
-    analyze_task, auto_assign_tasks, compute_project_progress, predict_site_progress
+    analyze_task, auto_assign_tasks, predict_site_progress
 )
 
 router = APIRouter(tags=["🤖 AI Services"])
@@ -78,24 +78,6 @@ def get_progress_prediction(
     risk factors and recommendations.
     """
     result = predict_site_progress(db, pid)
-    if "error" in result:
-        raise HTTPException(status_code=404, detail=result["error"])
-    return result
-
-
-@router.get("/ai/projects/{pid}/health", response_model=ProjectHealthScore)
-def get_project_health(
-    pid: int,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    """
-    Real-time project health score (0-100) for a specific project.
-    Factors: task completion, attendance rate, overdue tasks, workload balance.
-    Uses Gemini to refine the score/insights when configured, otherwise falls
-    back to the deterministic rule-based score.
-    """
-    result = compute_project_progress(db, pid)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result

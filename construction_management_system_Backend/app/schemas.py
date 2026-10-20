@@ -438,16 +438,3 @@ class SiteProgressPrediction(BaseModel):
     recommendations: List[str] = []
     milestones: List[ProgressMilestone] = []
 
-
-class ProjectHealthScore(BaseModel):
-    """Output of compute_project_progress(): rule-based + optional Gemini health score."""
-    project_id: int
-    project_name: str
-    generated_at: str
-    health_score: int
-    risk_level: str  # low / medium / high / critical
-    ai_insights: str
-    recommendations: List[Any] = []
-    metrics: Dict[str, Any] = {}
-    tasks: List[Dict[str, Any]] = []
-    worker_metrics: List[Dict[str, Any]] = []
