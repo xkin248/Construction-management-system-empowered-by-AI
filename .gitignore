@@ -97,3 +97,10 @@ pip-delete-this-directory.txt
 construction_management_system_Backend/*.db
 construction_management_system_Backend/*.sqlite
 construction_management_system_Backend/.env
+
+# Dated data backups (model/state snapshots) - never commit
+*.bak-*
+
+# Local AI tooling state
+.claude/
+
