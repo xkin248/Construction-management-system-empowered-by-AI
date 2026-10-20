@@ -8,6 +8,7 @@ import 'worker_dashboard_page.dart';
 import 'profile_page.dart';
 import 'notifications_page.dart';
 import '../services/app_settings.dart';
+import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
 
 // ──────────────── Nav model ────────────────
@@ -38,9 +39,10 @@ const _workerMenu = [
 final _workerPages = <Widget>[
   const WorkerDashboardPage(),
   const _WorkerAttendanceTab(),
-  // Notifications opens as a full-screen page (push) to keep its own TabBar AppBar
-  // from double-stacking under this shell's AppBar.
-  const SizedBox.shrink(),
+  // Notifications lives inside this shell so the bottom navigation (and its
+  // tap targets) stay in place — no full-screen second-level page where a tap
+  // aimed at the nav bar would hit a list row instead.
+  const NotificationsPage(embedded: true),
   const ProfilePage(),
 ];
 
@@ -57,6 +59,27 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
   // Single IndexedStack instance keeps page state alive across navigation.
   final _pagesKey = GlobalKey();
 
+  @override
+  void initState() {
+    super.initState();
+    // The AppBar title and the bottom-navigation labels are resolved from the
+    // active language inside build(), so the shell must rebuild whenever the
+    // language (or theme) changes — otherwise they stay in the old language.
+    AppSettings.lang.addListener(_onSettingsChanged);
+    AppColors.darkMode.addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppSettings.lang.removeListener(_onSettingsChanged);
+    AppColors.darkMode.removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
   Future<void> _logout() async {
     final sp = await SharedPreferences.getInstance();
     await sp.clear();
@@ -67,12 +90,6 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
   }
 
   void _go(int i) {
-    if (i == 2) {
-      // Notifications has its own TabBar AppBar -> open as full screen page
-      // instead of nesting under this shell's AppBar (avoids double bar).
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
-      return;
-    }
     setState(() => idx = i);
   }
 
@@ -122,7 +139,7 @@ class _NarrowLayout extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red),
-            tooltip: 'Log out',
+            tooltip: AppStrings.t('profile.logout'),
             onPressed: onLogout,
           ),
         ],

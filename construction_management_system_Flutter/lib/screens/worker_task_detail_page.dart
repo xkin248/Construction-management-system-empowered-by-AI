@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../utils/date_helper.dart';
+import '../l10n/app_strings.dart';
 
 /// Worker-facing task detail page.
 ///
@@ -230,7 +231,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Task Detail'),
+        title: Text(AppStrings.t('tasks.taskDetails')),
         actions: [
           IconButton(
             tooltip: 'Refresh',

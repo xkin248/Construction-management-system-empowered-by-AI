@@ -22,7 +22,14 @@ const _severities = ['low', 'medium', 'high'];
 const _categories = ['safety', 'delay', 'equipment', 'quality', 'other'];
 
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key});
+  const NotificationsPage({super.key, this.embedded = false});
+
+  /// When true the page is rendered inside a shell that already owns the
+  /// AppBar and the bottom navigation (worker shell tab), so this page only
+  /// contributes its tab strip + content and never pushes a full-screen
+  /// second-level route.
+  final bool embedded;
+
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
 }
@@ -247,27 +254,26 @@ class _NotificationsPageState extends State<NotificationsPage>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Text(
-                      'Could not load your saved settings, showing defaults. '
-                      'Saving will overwrite them.',
+                      AppStrings.t('notif.settingsLoadFallback'),
                       style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
                     ),
                   ),
-                _switch('Attendance', settings.notifAttendance,
+                _switch(AppStrings.t('notif.settingsAttendance'), settings.notifAttendance,
                     (v) => setDialogState(() => settings.notifAttendance = v)),
-                _switch('Task Overdue', settings.notifTaskOverdue,
+                _switch(AppStrings.t('notif.settingsTaskOverdue'), settings.notifTaskOverdue,
                     (v) => setDialogState(() => settings.notifTaskOverdue = v)),
-                _switch('Task Assigned', settings.notifTaskAssigned,
+                _switch(AppStrings.t('notif.settingsTaskAssigned'), settings.notifTaskAssigned,
                     (v) => setDialogState(() => settings.notifTaskAssigned = v)),
-                _switch('Issues', settings.notifIssue,
+                _switch(AppStrings.t('notif.settingsIssues'), settings.notifIssue,
                     (v) => setDialogState(() => settings.notifIssue = v)),
-                _switch('Safety Alerts', settings.notifSafety,
+                _switch(AppStrings.t('notif.settingsSafety'), settings.notifSafety,
                     (v) => setDialogState(() => settings.notifSafety = v)),
-                _switch('Daily Reports', settings.notifDailyReport,
+                _switch(AppStrings.t('notif.settingsDailyReport'), settings.notifDailyReport,
                     (v) => setDialogState(() => settings.notifDailyReport = v)),
                 const Divider(height: 20),
-                _switch('Email', settings.notifEmail,
+                _switch(AppStrings.t('notif.settingsEmail'), settings.notifEmail,
                     (v) => setDialogState(() => settings.notifEmail = v)),
-                _switch('Push', settings.notifPush,
+                _switch(AppStrings.t('notif.settingsPush'), settings.notifPush,
                     (v) => setDialogState(() => settings.notifPush = v)),
               ]),
             ),
@@ -284,10 +290,10 @@ class _NotificationsPageState extends State<NotificationsPage>
                           await ApiService().updateNotificationSettings(settings.toJson());
                           _settings = settings;
                           if (ctx.mounted) Navigator.pop(ctx);
-                          toast('Notification settings saved');
+                          toast(AppStrings.t('notif.settingsSaved'));
                         } catch (e) {
                           if (ctx.mounted) setDialogState(() => saving = false);
-                          toast('Save failed: ${_settingsError(e)}');
+                          toast('${AppStrings.t('notif.settingsSaveFailed')}: ${_settingsError(e)}');
                         }
                       },
                 child: saving
@@ -335,6 +341,52 @@ class _NotificationsPageState extends State<NotificationsPage>
     }
   }
 
+  /// Unread counter chip shown next to the page title.
+  Widget _unreadBadge() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.red,
+          borderRadius: AppRadius.rMd,
+        ),
+        child: Text('$_unreadCount',
+            style: GoogleFonts.inter(
+                color: AppColors.onAccent, fontSize: 13, fontWeight: FontWeight.w800)),
+      );
+
+  Widget _titleRow() => Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(AppStrings.t('notif.title'),
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
+        if (_unreadCount > 0) ...[
+          const SizedBox(width: 8),
+          _unreadBadge(),
+        ],
+      ]);
+
+  List<Widget> _headerActions() => [
+        // Icon-only actions keep the header safe for long translated labels
+        // (e.g. "Tandakan semua dibaca") on narrow phones.
+        if (_items.any((e) => !e.isRead))
+          IconButton(
+            onPressed: _markAllRead,
+            icon: const Icon(Icons.done_all_rounded, size: 20),
+            color: AppColors.accent,
+            tooltip: AppStrings.t('notif.markAllRead'),
+          ),
+        IconButton(
+          icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+          tooltip: AppStrings.t('notif.settingsTooltip'),
+          onPressed: _openSettings,
+        ),
+      ];
+
+  TabBar _tabBar(List<Widget> tabs) => TabBar(
+        indicatorColor: AppColors.accent,
+        labelColor: AppColors.accent,
+        unselectedLabelColor: AppColors.textSecondary,
+        labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+        tabs: tabs,
+      );
+
   @override
   Widget build(BuildContext context) {
     // Build tab list once so DefaultTabController length never mismatches.
@@ -348,6 +400,16 @@ class _NotificationsPageState extends State<NotificationsPage>
       if (!_isWorker) _buildReportsTab(),
       _buildIssuesTab(),
     ];
+    final content = Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+        child: SizedBox(
+          width: double.infinity,
+          child: TabBarView(children: tabViews),
+        ),
+      ),
+    );
     return DefaultTabController(
       length: tabs.length,
       child: Builder(builder: (ctx) {
@@ -358,58 +420,42 @@ class _NotificationsPageState extends State<NotificationsPage>
           _tabController = controller;
           _tabController!.addListener(_onTabChanged);
         }
+        // Embedded mode: rendered as a tab inside a shell that already owns
+        // the AppBar and bottom navigation (so no second-level full-screen
+        // page and no accidental taps where the nav bar used to be).
+        if (widget.embedded) {
+          return ColoredBox(
+            color: AppColors.bgMain,
+            child: Column(children: [
+              Material(
+                color: AppColors.bgCard,
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  SizedBox(
+                    height: 48,
+                    child: Row(children: [
+                      if (_unreadCount > 0) ...[
+                        const SizedBox(width: 16),
+                        _unreadBadge(),
+                      ],
+                      const Spacer(),
+                      ..._headerActions(),
+                    ]),
+                  ),
+                  _tabBar(tabs),
+                ]),
+              ),
+              Expanded(child: content),
+            ]),
+          );
+        }
         return Scaffold(
           backgroundColor: AppColors.bgMain,
           appBar: AppBar(
-            title: Row(mainAxisSize: MainAxisSize.min, children: [
-              Text(AppStrings.t('notif.title'),
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
-              if (_unreadCount > 0) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.red,
-                    borderRadius: AppRadius.rMd,
-                  ),
-                  child: Text('$_unreadCount',
-                      style: GoogleFonts.inter(
-                          color: AppColors.onAccent, fontSize: 13, fontWeight: FontWeight.w800)),
-                ),
-              ],
-            ]),
-            actions: [
-              if (_items.any((e) => !e.isRead))
-                TextButton.icon(
-                  onPressed: _markAllRead,
-                  icon: const Icon(Icons.done_all_rounded, size: 18),
-                  label: Text(AppStrings.t('notif.markAllRead')),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.accent),
-                ),
-              IconButton(
-                icon: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-                tooltip: 'Notification settings',
-                onPressed: _openSettings,
-              ),
-            ],
-            bottom: TabBar(
-              indicatorColor: AppColors.accent,
-              labelColor: AppColors.accent,
-              unselectedLabelColor: AppColors.textSecondary,
-              labelStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
-              tabs: tabs,
-            ),
+            title: _titleRow(),
+            actions: _headerActions(),
+            bottom: _tabBar(tabs),
           ),
-          body: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
-              child: SizedBox(
-                width: double.infinity,
-                child: TabBarView(children: tabViews),
-              ),
-            ),
-          ),
+          body: content,
         );
       }),
     );
@@ -544,6 +590,10 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   Widget _buildIssuesTab() {
     if (_issLoading) return const Center(child: CircularProgressIndicator());
+    final activeIssues =
+        issues.where((i) => !_isResolvedIssue(i as Map)).toList();
+    final resolvedIssues =
+        issues.where((i) => _isResolvedIssue(i as Map)).toList();
     return RefreshIndicator(
       onRefresh: _loadIssues,
       child: ListView(
@@ -612,45 +662,67 @@ class _NotificationsPageState extends State<NotificationsPage>
           Text(AppStrings.t('notif.activeIssues'),
               style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
           const SizedBox(height: 12),
-          if (issues.isEmpty)
+          if (activeIssues.isEmpty)
             Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text(AppStrings.t('notif.noIssues'),
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: Text(AppStrings.t('notif.noActiveIssues'),
                   style: TextStyle(color: AppColors.textMuted))),
             )
           else
-            ...issues.map((iss) => _sectionCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Expanded(
-                        child: Text(iss['title']?.toString() ?? '-',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13.5, color: AppColors.textPrimary)),
-                      ),
-                      _statusPill(iss['priority']?.toString() ?? 'low'),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(iss['description']?.toString() ?? '',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      _statusPill(iss['incident_type']?.toString() ?? 'general'),
-                      const Spacer(),
-                      if ((iss['status']?.toString() ?? 'open').toLowerCase() == 'open')
-                        TextButton(
-                          onPressed: () => _resolveIssue(iss['issue_id'] as int),
-                          child: Text(AppStrings.t('notif.markResolved')),
-                        ),
-                      _issueStatusPill(iss['status']?.toString() ?? 'open'),
-                    ]),
-                  ]),
-                )),
+            ...activeIssues.map((iss) => _issueCard(iss as Map)),
+          if (resolvedIssues.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            Text(AppStrings.t('notif.resolvedIssues'),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+            const SizedBox(height: 12),
+            ...resolvedIssues.map((iss) => _issueCard(iss as Map)),
+          ],
         ],
       ),
+    );
+  }
+
+  /// An issue counts as resolved only when the backend says so (``resolved``
+  /// or ``closed``); anything else stays in the active list.
+  bool _isResolvedIssue(Map iss) {
+    final s = (iss['status']?.toString() ?? 'open').toLowerCase();
+    return s == 'resolved' || s == 'closed';
+  }
+
+  Widget _issueCard(Map iss) {
+    final resolved = _isResolvedIssue(iss);
+    return _sectionCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(
+            child: Text(iss['title']?.toString() ?? '-',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: resolved ? AppColors.textSecondary : AppColors.textPrimary)),
+          ),
+          _statusPill(iss['priority']?.toString() ?? 'low'),
+        ]),
+        const SizedBox(height: 4),
+        Text(iss['description']?.toString() ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+        const SizedBox(height: 8),
+        Row(children: [
+          _statusPill(iss['incident_type']?.toString() ?? 'general'),
+          const Spacer(),
+          if (!resolved)
+            TextButton(
+              onPressed: () => _resolveIssue(iss['issue_id'] as int),
+              child: Text(AppStrings.t('notif.markResolved')),
+            ),
+          _issueStatusPill(iss['status']?.toString() ?? 'open'),
+        ]),
+      ]),
     );
   }
 
@@ -678,7 +750,8 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _issueStatusPill(String status) {
-    final resolved = status.toLowerCase() == 'resolved';
+    final s = status.toLowerCase();
+    final resolved = s == 'resolved' || s == 'closed';
     final color = resolved ? AppColors.green : AppColors.red;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
