@@ -2,7 +2,22 @@ from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models import Notification, NotificationSetting, Supervisor
+from app.models import Notification, NotificationSetting, Supervisor, WorkerNotificationSetting
+
+
+def get_or_create_worker_settings(db: Session, worker_id: int) -> WorkerNotificationSetting:
+    """Worker-scoped counterpart of ``get_or_create_settings``."""
+    settings = db.query(WorkerNotificationSetting).filter(
+        WorkerNotificationSetting.worker_id == worker_id
+    ).first()
+
+    if not settings:
+        settings = WorkerNotificationSetting(worker_id=worker_id)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+
+    return settings
 
 
 def send_notification(

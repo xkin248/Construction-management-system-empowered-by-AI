@@ -10,7 +10,7 @@ from app.schemas import (
     NotificationSettingUpdate, UnreadCountResponse
 )
 from app.routers.auth import cu, require_any_authorized
-from app.notification_service import get_or_create_settings
+from app.notification_service import get_or_create_settings, get_or_create_worker_settings
 
 router = APIRouter(tags=["🔔 Notifications"])
 
@@ -139,6 +139,65 @@ def get_unread_count(
     return UnreadCountResponse(count=count)
 
 
+# NOTE: the static "/notifications/settings" routes MUST be declared before the
+# dynamic "/notifications/{notification_id}" route. FastAPI matches routes in
+# registration order, so declaring the dynamic one first makes
+# GET /notifications/settings resolve to get_notification(notification_id="settings")
+# and fail with 422 instead of returning the settings payload.
+@router.get("/notifications/settings")
+def get_notification_settings(
+    db: Session = Depends(get_db),
+    current_user=Depends(cu)
+):
+    """Notification preferences of the logged-in account.
+
+    Workers get their own row (``worker_notification_settings``); supervisors
+    keep the original site-level row. Returning the same field set for both
+    keeps the Flutter settings dialog role-agnostic.
+    """
+    return _settings_payload(db, current_user)
+
+
+@router.put("/notifications/settings")
+def update_notification_settings(
+    settings_update: NotificationSettingUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(cu)
+):
+    settings = (
+        get_or_create_worker_settings(db, current_user.worker_id)
+        if current_user.user_type == "worker"
+        else get_or_create_settings(db, current_user.supervisor_id)
+    )
+
+    for field, value in settings_update.model_dump().items():
+        if hasattr(settings, field):
+            setattr(settings, field, value)
+
+    db.commit()
+    db.refresh(settings)
+    return _settings_payload(db, current_user, settings=settings)
+
+
+def _settings_payload(db: Session, current_user, settings=None) -> Dict[str, Any]:
+    is_worker = current_user.user_type == "worker"
+    if settings is None:
+        settings = (
+            get_or_create_worker_settings(db, current_user.worker_id)
+            if is_worker
+            else get_or_create_settings(db, current_user.supervisor_id)
+        )
+    payload = {
+        field: bool(getattr(settings, field))
+        for field in NotificationSettingUpdate.model_fields.keys()
+    }
+    payload.update({
+        "setting_id": settings.setting_id,
+        "scope": "worker" if is_worker else "supervisor",
+    })
+    return payload
+
+
 @router.get("/notifications/{notification_id}", response_model=NotificationOut)
 def get_notification(
     notification_id: int,
@@ -190,31 +249,6 @@ def mark_all_read(
     })
     db.commit()
     return {"status": "ok", "message": "All notifications marked as read"}
-
-
-@router.get("/notifications/settings", response_model=NotificationSettingOut)
-def get_notification_settings(
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    return get_or_create_settings(db, current_user.supervisor_id)
-
-
-@router.put("/notifications/settings", response_model=NotificationSettingOut)
-def update_notification_settings(
-    settings_update: NotificationSettingUpdate,
-    db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
-):
-    settings = get_or_create_settings(db, current_user.supervisor_id)
-    
-    for field, value in settings_update.model_dump().items():
-        if hasattr(settings, field):
-            setattr(settings, field, value)
-    
-    db.commit()
-    db.refresh(settings)
-    return settings
 
 
 @router.websocket("/ws/notifications")

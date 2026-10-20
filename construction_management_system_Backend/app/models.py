@@ -241,6 +241,29 @@ class NotificationSetting(Base):
     supervisor = relationship("Supervisor")
 
 
+class WorkerNotificationSetting(Base):
+    """Per-worker notification preferences.
+
+    ``notification_settings`` is keyed on ``supervisor_id`` only, so a worker
+    account had no row to read or write (the endpoint raised 500 / 422 and the
+    app's Save button appeared dead). Worker preferences live in their own
+    table instead, which ``create_all`` adds to existing databases without a
+    column migration.
+    """
+    __tablename__ = "worker_notification_settings"
+    setting_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False, unique=True)
+    notif_attendance = Column(Boolean, nullable=False, server_default="1")
+    notif_task_overdue = Column(Boolean, nullable=False, server_default="1")
+    notif_task_assigned = Column(Boolean, nullable=False, server_default="1")
+    notif_issue = Column(Boolean, nullable=False, server_default="1")
+    notif_safety = Column(Boolean, nullable=False, server_default="1")
+    notif_daily_report = Column(Boolean, nullable=False, server_default="0")
+    notif_email = Column(Boolean, nullable=False, server_default="0")
+    notif_push = Column(Boolean, nullable=False, server_default="0")
+    worker = relationship("Worker")
+
+
 class TaskWorker(Base):
     """Many-to-many link between Task and Worker (multi-worker assignment).
 

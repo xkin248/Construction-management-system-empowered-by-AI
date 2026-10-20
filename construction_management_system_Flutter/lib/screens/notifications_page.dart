@@ -218,60 +218,98 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Future<void> _openSettings() async {
+    NotificationSettings settings;
+    String? loadError;
     try {
       final raw = await ApiService().getNotificationSettings();
-      _settings = NotificationSettings.fromJson(Map<String, dynamic>.from(raw));
-    } catch (_) {
-      _settings ??= NotificationSettings();
+      settings = NotificationSettings.fromJson(Map<String, dynamic>.from(raw));
+    } catch (e) {
+      // Fall back to the last known / default values but tell the user the
+      // dialog is not showing what the server currently has.
+      settings = _settings ?? NotificationSettings();
+      loadError = '$e';
     }
+    _settings = settings;
     if (!mounted) return;
-    showDialog(
+
+    await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(AppStrings.t('notif.settingsTitle'),
-              style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
-          shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
-          content: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              _switch('Attendance', _settings?.notifAttendance ?? true,
-                  (v) => setDialogState(() => _settings?.notifAttendance = v)),
-              _switch('Task Overdue', _settings?.notifTaskOverdue ?? true,
-                  (v) => setDialogState(() => _settings?.notifTaskOverdue = v)),
-              _switch('Task Assigned', _settings?.notifTaskAssigned ?? true,
-                  (v) => setDialogState(() => _settings?.notifTaskAssigned = v)),
-              _switch('Issues', _settings?.notifIssue ?? true,
-                  (v) => setDialogState(() => _settings?.notifIssue = v)),
-              _switch('Safety Alerts', _settings?.notifSafety ?? true,
-                  (v) => setDialogState(() => _settings?.notifSafety = v)),
-              _switch('Daily Reports', _settings?.notifDailyReport ?? true,
-                  (v) => setDialogState(() => _settings?.notifDailyReport = v)),
-              const Divider(height: 20),
-              _switch('Email', _settings?.notifEmail ?? false,
-                  (v) => setDialogState(() => _settings?.notifEmail = v)),
-              _switch('Push', _settings?.notifPush ?? true,
-                  (v) => setDialogState(() => _settings?.notifPush = v)),
-            ]),
+      builder: (ctx) {
+        var saving = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            title: Text(AppStrings.t('notif.settingsTitle'),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 17)),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+            content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                if (loadError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Could not load your saved settings, showing defaults. '
+                      'Saving will overwrite them.',
+                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ),
+                _switch('Attendance', settings.notifAttendance,
+                    (v) => setDialogState(() => settings.notifAttendance = v)),
+                _switch('Task Overdue', settings.notifTaskOverdue,
+                    (v) => setDialogState(() => settings.notifTaskOverdue = v)),
+                _switch('Task Assigned', settings.notifTaskAssigned,
+                    (v) => setDialogState(() => settings.notifTaskAssigned = v)),
+                _switch('Issues', settings.notifIssue,
+                    (v) => setDialogState(() => settings.notifIssue = v)),
+                _switch('Safety Alerts', settings.notifSafety,
+                    (v) => setDialogState(() => settings.notifSafety = v)),
+                _switch('Daily Reports', settings.notifDailyReport,
+                    (v) => setDialogState(() => settings.notifDailyReport = v)),
+                const Divider(height: 20),
+                _switch('Email', settings.notifEmail,
+                    (v) => setDialogState(() => settings.notifEmail = v)),
+                _switch('Push', settings.notifPush,
+                    (v) => setDialogState(() => settings.notifPush = v)),
+              ]),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: saving ? null : () => Navigator.pop(ctx),
+                  child: Text(AppStrings.t('common.cancel'))),
+              ElevatedButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        setDialogState(() => saving = true);
+                        try {
+                          await ApiService().updateNotificationSettings(settings.toJson());
+                          _settings = settings;
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          toast('Notification settings saved');
+                        } catch (e) {
+                          if (ctx.mounted) setDialogState(() => saving = false);
+                          toast('Save failed: ${_settingsError(e)}');
+                        }
+                      },
+                child: saving
+                    ? const SizedBox(
+                        width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(AppStrings.t('common.save')),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(AppStrings.t('common.cancel'))),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await ApiService().updateNotificationSettings(_settings!.toJson());
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  toast(AppStrings.t('common.success'));
-                } catch (e) {
-                  toast('${AppStrings.t('common.failed')}: $e');
-                }
-              },
-              child: Text(AppStrings.t('common.save'))),
-          ],
-        ),
-      ),
+        );
+      },
     );
+  }
+
+  /// Keep server errors readable in a toast instead of dumping a Dio stack.
+  String _settingsError(Object e) {
+    final s = e.toString();
+    if (s.contains('SocketException') || s.contains('Connection')) {
+      return 'cannot reach the server';
+    }
+    if (s.contains('timeout')) return 'request timed out';
+    return s.length > 120 ? '${s.substring(0, 120)}…' : s;
   }
 
   Widget _switch(String label, bool value, ValueChanged<bool> onChanged) {
