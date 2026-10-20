@@ -42,7 +42,6 @@ class _DashboardPageState extends State<DashboardPage> {
   int? _predictionPid; // project id that _prediction belongs to (avoid stale display)
 
   @override
-  @override
   void initState() {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
@@ -414,7 +413,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 label: Text(_supCheckedIn ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accent,
-                  foregroundColor: AppColors.onAccent,
+                  foregroundColor: AppColors.accentInk,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
@@ -1094,7 +1093,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: AppColors.onAccent))
+                          strokeWidth: 2, color: AppColors.accentInk))
                   : const Icon(Icons.auto_awesome_rounded, size: 18),
               label: Text(
                 _predLoading ? 'Predicting…' : 'Update',
@@ -1103,7 +1102,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: _predLoading ? AppColors.accent.withValues(alpha: 0.6) : AppColors.accent,
-                foregroundColor: AppColors.onAccent,
+                foregroundColor: AppColors.accentInk,
                 shape: RoundedRectangleBorder(
                     borderRadius: AppRadius.rSm),
                 padding: const EdgeInsets.symmetric(horizontal: 16),

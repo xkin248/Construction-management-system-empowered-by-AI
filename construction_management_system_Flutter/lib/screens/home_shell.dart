@@ -304,7 +304,7 @@ class _NarrowLayout extends StatelessWidget {
           Container(
             width: 28, height: 28,
             decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rXs),
-            child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 15)),
+            child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.accentInk, size: 15)),
           ),
           const SizedBox(width: 8),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -486,13 +486,13 @@ class _SidebarContent extends StatelessWidget {
               Container(
                 width: 38, height: 38,
                 decoration: BoxDecoration(color: AppColors.accent, borderRadius: AppRadius.rMd),
-                child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 20)),
+                child: const Center(child: Icon(Icons.construction_rounded, color: AppColors.accentInk, size: 20)),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('BuildSmart',
-                      style: GoogleFonts.inter(color: AppColors.onAccent, fontWeight: FontWeight.w800, fontSize: 15)),
+                      style: GoogleFonts.inter(color: AppColors.accentInk, fontWeight: FontWeight.w800, fontSize: 15)),
                   Text('AI Construction System',
                       style: GoogleFonts.inter(color: AppColors.textSidebarMuted, fontSize: 14)),
                 ]),

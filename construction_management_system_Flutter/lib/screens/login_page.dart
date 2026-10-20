@@ -166,7 +166,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   AppShadows.accent(AppColors.accent, alpha: 0.32, blur: 26, dy: 10),
                             ),
                             child: const Center(
-                              child: Icon(Icons.construction_rounded, color: AppColors.onAccent, size: 34),
+                              child: Icon(Icons.construction_rounded, color: AppColors.accentInk, size: 34),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -191,23 +191,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                // Accent divider line at the top of the card.
-                                Center(
-                                  child: Container(
-                                    width: 44, height: 3.5,
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          AppColors.accent.withValues(alpha: 0.25),
-                                          AppColors.accent,
-                                          AppColors.accent.withValues(alpha: 0.25),
-                                        ],
-                                      ),
-                                      borderRadius: AppRadius.rPill,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 4),
                                 // Role badge
                                 Center(
                                   child: Container(
@@ -276,7 +260,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                       onPressed: ld ? null : _login,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppColors.transparent,
-                                        foregroundColor: AppColors.onAccent,
+                                        foregroundColor: AppColors.accentInk,
                                         disabledBackgroundColor: AppColors.transparent,
                                         disabledForegroundColor: AppColors.onAccentMuted,
                                         shadowColor: AppColors.transparent,
@@ -288,7 +272,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                           ? const SizedBox(
                                               height: 20, width: 20,
                                               child: CircularProgressIndicator(
-                                                  color: AppColors.onAccent, strokeWidth: 2.2))
+                                                  color: AppColors.accentInk, strokeWidth: 2.2))
                                           : Text(AppStrings.t('login.signIn'),
                                               style: GoogleFonts.inter(
                                                   fontSize: 15.5, fontWeight: FontWeight.w700)),

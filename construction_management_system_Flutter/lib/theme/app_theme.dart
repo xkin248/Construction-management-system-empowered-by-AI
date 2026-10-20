@@ -7,11 +7,17 @@ import 'package:google_fonts/google_fonts.dart';
 class AppRadius {
   AppRadius._();
 
-  /// One unified surface radius for every card, panel, control and sheet.
-  static const double xs = 16;
-  static const double sm = 16;
-  static const double md = 16;
-  static const double lg = 16;
+  /// Graduated radius scale (a flat 16px read too soft for a data-dense
+  /// B-side console):
+  ///   xs 8  - chips, checkboxes, tiny tiles
+  ///   sm 10 - list rows, nested surfaces
+  ///   md 12 - panels, popup menus
+  ///   lg 12 - cards
+  ///   xl 16 - hero panels only
+  static const double xs = 8;
+  static const double sm = 10;
+  static const double md = 12;
+  static const double lg = 12;
   static const double xl = 16;
   static const double pill = 999;
 
@@ -31,7 +37,7 @@ class AppRadius {
   static const BorderRadius topXs = BorderRadius.vertical(top: Radius.circular(md));
 
   /// Control radius shared by buttons, inputs and snackbars.
-  static const double control = 16;
+  static const double control = 10;
   static const BorderRadius rBtn = BorderRadius.all(Radius.circular(control));
   static const BorderRadius bInput = BorderRadius.all(Radius.circular(control));
 
@@ -104,8 +110,16 @@ class AppColors {
   // action colour. Every value below is resolved per brightness at call time.
   //   light: bg #F8FAFC / card #FFFFFF / body #334155 / border #E2E8F0
   //   dark : bg #0F172A / card #1E293B / body #E2E8F0 / border #334155
+  // Brand fill stays the safety-orange #F97316, but white-on-orange is only
+  // 2.8:1. Anything drawn ON an accent fill must use [accentInk] (#431407,
+  // 5.6:1), and accent text on a light surface must use [accentText]
+  // (#C2410C, 4.9:1). Both hold in dark mode as well.
   static const Color accentSolid = Color(0xFFF97316);
   static const Color accentSolidDark = Color(0xFFEA580C);
+  /// Foreground for content placed on an accent fill.
+  static const Color accentInk = Color(0xFF431407);
+  /// Accent as text/icon on a normal surface.
+  static Color get accentText => isDark ? const Color(0xFFFB923C) : const Color(0xFFC2410C);
 
   static Color get sidebarBg => isDark ? const Color(0xFF0F172A) : const Color(0xFF334155);
   static Color get sidebarHover => isDark ? const Color(0xFF1E293B) : const Color(0xFF475569);
@@ -115,16 +129,20 @@ class AppColors {
   static Color get accentLight => isDark ? const Color(0x26F97316) : const Color(0xFFFFF1E6);
   static Color get bgMain => isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
   static Color get bgCard => isDark ? const Color(0xFF1E293B) : const Color(0xFFFFFFFF);
+  // Text ramp is contrast-audited against bgMain:
+  //   primary   #334155 on #F8FAFC = 10.3:1
+  //   secondary #475569 on #F8FAFC =  7.4:1 (body copy)
+  //   muted     #64748B on #F8FAFC =  4.8:1 (labels only, never body copy)
   static Color get textPrimary => isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155);
-  static Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-  static Color get textMuted => isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+  static Color get textSecondary => isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569);
+  static Color get textMuted => isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
   static Color get textSidebar => const Color(0xFFE2E8F0);
   static Color get textSidebarMuted => isDark ? const Color(0xFF94A3B8) : const Color(0xFFCBD5E1);
   static Color get border => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
   static Color get borderLight => isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
   // Semantic colors. The "Light" variants are solid tints in light mode and a
   // ~16% translucent wash in dark mode, so status chips never glare on dark.
-  static Color get green => const Color(0xFF16A34A);
+  static Color get green => const Color(0xFF15803D);
   static Color get greenLight => isDark ? const Color(0x2916A34A) : const Color(0xFFDCFCE7);
   static Color get yellow => const Color(0xFFF59E0B);
   static Color get yellowLight => isDark ? const Color(0x29F59E0B) : const Color(0xFFFEF3C7);
@@ -171,7 +189,7 @@ class AppColors {
   static Color get primaryDark => const Color(0xFF475569);
   static Color get accentOrange => accentSolid;
   static Color get accentOrangeLight => const Color(0xFFFB923C);
-  static Color get success => const Color(0xFF16A34A);
+  static Color get success => green;
   static Color get successLight => greenLight;
   static Color get warning => const Color(0xFFF59E0B);
   static Color get danger => const Color(0xFFEF4444);
@@ -198,7 +216,7 @@ class AppColors {
         end: Alignment.bottomRight,
       );
   static LinearGradient get successGradient => const LinearGradient(
-        colors: [Color(0xFF16A34A), Color(0xFF4ADE80)],
+        colors: [Color(0xFF15803D), Color(0xFF14532D)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
@@ -419,11 +437,11 @@ TextTheme _buildTextTheme(TextTheme base) {
     headlineMedium: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
     headlineSmall: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
     titleLarge: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, height: 1.3, color: AppColors.textPrimary),
-    titleMedium: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.35, color: AppColors.textPrimary),
-    bodyLarge: GoogleFonts.inter(fontSize: 15, height: 1.4, color: AppColors.textPrimary),
-    bodyMedium: GoogleFonts.inter(fontSize: 14, height: 1.4, color: AppColors.textSecondary),
-    bodySmall: GoogleFonts.inter(fontSize: 13, height: 1.4, color: AppColors.textMuted),
-    labelLarge: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3),
+    titleMedium: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w600, height: 1.35, color: AppColors.textPrimary, fontFeatures: const [FontFeature.tabularFigures()]),
+    bodyLarge: GoogleFonts.inter(fontSize: 15, height: 1.5, color: AppColors.textPrimary),
+    bodyMedium: GoogleFonts.inter(fontSize: 14, height: 1.5, color: AppColors.textSecondary, fontFeatures: const [FontFeature.tabularFigures()]),
+    bodySmall: GoogleFonts.inter(fontSize: 13, height: 1.45, color: AppColors.textSecondary),
+    labelLarge: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3, fontFeatures: const [FontFeature.tabularFigures()]),
     labelSmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.4, height: 1.3),
   );
 }
@@ -433,6 +451,9 @@ ThemeData buildAppTheme() => ThemeData(
       scaffoldBackgroundColor: AppColors.bgMain,
       colorScheme: ColorScheme.fromSeed(seedColor: AppColors.accent).copyWith(
         primary: AppColors.accent,
+        // White-on-orange is 2.8:1; M3 components that pair primary with
+        // onPrimary (FilledButton, badges, selected chips) get the ink token.
+        onPrimary: AppColors.accentInk,
         secondary: AppColors.accentDark,
         surface: AppColors.bgCard,
       ),
@@ -462,9 +483,9 @@ ThemeData buildAppTheme() => ThemeData(
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.onAccent,
+          foregroundColor: AppColors.accentInk,
           disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
-          disabledForegroundColor: AppColors.onAccent,
+          disabledForegroundColor: AppColors.accentInk,
           elevation: 0,
           minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -483,7 +504,7 @@ ThemeData buildAppTheme() => ThemeData(
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.accent,
+          foregroundColor: AppColors.accentText,
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
       ),
@@ -501,15 +522,15 @@ ThemeData buildAppTheme() => ThemeData(
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.bInput,
-          borderSide: BorderSide(color: AppColors.accent, width: 1.6),
+          borderSide: BorderSide(color: AppColors.accentText, width: 1.6),
         ),
         labelStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 14),
         hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgCard,
-        selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textMuted,
+        selectedItemColor: AppColors.accentText,
+        unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
         elevation: 0,
@@ -524,11 +545,11 @@ ThemeData buildAppTheme() => ThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((s) => GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+              color: s.contains(WidgetState.selected) ? AppColors.accentText : AppColors.textSecondary,
             )),
         iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
               size: 22,
-              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+              color: s.contains(WidgetState.selected) ? AppColors.accentText : AppColors.textSecondary,
             )),
       ),
       dividerTheme: DividerThemeData(
@@ -551,7 +572,7 @@ ThemeData buildAppTheme() => ThemeData(
         shape: RoundedRectangleBorder(borderRadius: AppRadius.rSheet),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: AppColors.accent,
+        labelColor: AppColors.accentText,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
         indicatorSize: TabBarIndicatorSize.label,
@@ -572,7 +593,7 @@ ThemeData buildAppTheme() => ThemeData(
           color: AppColors.textPrimary, fontSize: 14.5, fontWeight: FontWeight.w600,
         ),
         subtitleTextStyle: GoogleFonts.inter(
-          color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w400,
         ),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
       ),
@@ -633,6 +654,7 @@ ThemeData buildDarkTheme() => ThemeData(
       scaffoldBackgroundColor: AppColors.bgMain,
       colorScheme: ColorScheme.dark(
         primary: AppColors.accent,
+        onPrimary: AppColors.accentInk,
         secondary: AppColors.accentDark,
         surface: AppColors.bgCard,
       ),
@@ -662,9 +684,9 @@ ThemeData buildDarkTheme() => ThemeData(
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.onAccent,
+          foregroundColor: AppColors.accentInk,
           disabledBackgroundColor: AppColors.accent.withValues(alpha: 0.45),
-          disabledForegroundColor: AppColors.onAccent,
+          disabledForegroundColor: AppColors.accentInk,
           elevation: 0,
           minimumSize: const Size(0, 50),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
@@ -683,7 +705,7 @@ ThemeData buildDarkTheme() => ThemeData(
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.accent,
+          foregroundColor: AppColors.accentText,
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700),
         ),
       ),
@@ -701,15 +723,15 @@ ThemeData buildDarkTheme() => ThemeData(
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: AppRadius.bInput,
-          borderSide: BorderSide(color: AppColors.accent, width: 1.6),
+          borderSide: BorderSide(color: AppColors.accentText, width: 1.6),
         ),
         labelStyle: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 14),
         hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: AppColors.bgCard,
-        selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textMuted,
+        selectedItemColor: AppColors.accentText,
+        unselectedItemColor: AppColors.textSecondary,
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: true,
         elevation: 0,
@@ -724,11 +746,11 @@ ThemeData buildDarkTheme() => ThemeData(
         labelTextStyle: WidgetStateProperty.resolveWith((s) => GoogleFonts.inter(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+              color: s.contains(WidgetState.selected) ? AppColors.accentText : AppColors.textSecondary,
             )),
         iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
               size: 22,
-              color: s.contains(WidgetState.selected) ? AppColors.accent : AppColors.textMuted,
+              color: s.contains(WidgetState.selected) ? AppColors.accentText : AppColors.textSecondary,
             )),
       ),
       dividerTheme: DividerThemeData(
@@ -751,7 +773,7 @@ ThemeData buildDarkTheme() => ThemeData(
         shape: RoundedRectangleBorder(borderRadius: AppRadius.rSheet),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: AppColors.accent,
+        labelColor: AppColors.accentText,
         unselectedLabelColor: AppColors.textSecondary,
         indicatorColor: AppColors.accent,
         indicatorSize: TabBarIndicatorSize.label,
@@ -772,7 +794,7 @@ ThemeData buildDarkTheme() => ThemeData(
           color: AppColors.textPrimary, fontSize: 14.5, fontWeight: FontWeight.w600,
         ),
         subtitleTextStyle: GoogleFonts.inter(
-          color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w400,
         ),
         shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
       ),

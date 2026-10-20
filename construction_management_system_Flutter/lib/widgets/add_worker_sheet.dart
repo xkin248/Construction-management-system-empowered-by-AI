@@ -91,7 +91,7 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
+                  foregroundColor: AppColors.accentInk,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),

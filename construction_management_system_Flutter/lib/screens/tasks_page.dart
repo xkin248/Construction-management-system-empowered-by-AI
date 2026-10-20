@@ -1087,7 +1087,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       onPressed: () => _saveAssignments(selectedIds),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.onAccent,
+                        foregroundColor: AppColors.accentInk,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                       ),
@@ -1192,7 +1192,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
             SizedBox(width: double.infinity, child: ElevatedButton(
               onPressed: _saveProgress,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.blue, foregroundColor: AppColors.onAccent,
+                backgroundColor: AppColors.blue, foregroundColor: AppColors.accentInk,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               child: Text(AppStrings.t('tasks.saveProgress'),
@@ -1288,7 +1288,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
+                  foregroundColor: AppColors.accentInk,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
@@ -1322,13 +1322,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 onPressed: null,
                 icon: SizedBox(
                   width: 16, height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onAccent),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentInk),
                 ),
                 label: const Text('Assigning…',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
+                  foregroundColor: AppColors.accentInk,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
@@ -1398,7 +1398,7 @@ class _WorkerTile extends StatelessWidget {
             onPressed: onToggle,
             style: ElevatedButton.styleFrom(
               backgroundColor: selected ? AppColors.green : AppColors.accent,
-              foregroundColor: AppColors.onAccent,
+              foregroundColor: AppColors.accentInk,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
               minimumSize: const Size(70, 36),

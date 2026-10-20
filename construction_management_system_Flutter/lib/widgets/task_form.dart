@@ -301,7 +301,7 @@ class _TaskFormState extends State<TaskForm> {
                       onPressed: _submitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
-                        foregroundColor: AppColors.onAccent,
+                        foregroundColor: AppColors.accentInk,
                         shape: RoundedRectangleBorder(
                             borderRadius: AppRadius.rMd),
                       ),
@@ -310,7 +310,7 @@ class _TaskFormState extends State<TaskForm> {
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.onAccent))
+                                  strokeWidth: 2, color: AppColors.accentInk))
                           : Text(
                               _isEdit ? 'Save Changes' : 'Create Task',
                               style: GoogleFonts.inter(

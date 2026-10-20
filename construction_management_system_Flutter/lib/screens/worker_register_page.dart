@@ -338,7 +338,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                         onPressed: ld ? null : _register,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.green,
-                                          foregroundColor: AppColors.onAccent,
+                                          foregroundColor: AppColors.accentInk,
                                           disabledBackgroundColor: AppColors.green.withValues(alpha: 0.5),
                                           shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                                           elevation: 0,
@@ -346,7 +346,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                         child: ld
                                             ? const SizedBox(
                                                 height: 20, width: 20,
-                                                child: CircularProgressIndicator(color: AppColors.onAccent, strokeWidth: 2.2))
+                                                child: CircularProgressIndicator(color: AppColors.accentInk, strokeWidth: 2.2))
                                             : Text(AppStrings.t('worker.register.submit'),
                                                 style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
                                       ),

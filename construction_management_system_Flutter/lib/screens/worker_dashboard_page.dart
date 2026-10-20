@@ -634,7 +634,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                     ? null
                     : (showCheckOut ? _doCheckOut : _doCheckIn)),
             icon: _checkInLoading
-                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(color: AppColors.onAccent, strokeWidth: 2))
+                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(color: AppColors.accentInk, strokeWidth: 2))
                 : Icon(showCheckOut ? Icons.logout_rounded : Icons.fingerprint_rounded, size: 22),
             label: Text(
               _checkedOut

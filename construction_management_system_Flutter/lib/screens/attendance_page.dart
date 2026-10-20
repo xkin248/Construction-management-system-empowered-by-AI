@@ -113,7 +113,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                         style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700)),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.onAccent,
+                      foregroundColor: AppColors.accentInk,
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                     ),
