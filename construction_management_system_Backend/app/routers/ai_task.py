@@ -287,6 +287,18 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return _serialize_task(task)
 
 
+@router.get("/tasks/{task_id}")
+def get_task(task_id: int, db: Session = Depends(get_db)):
+    """Single-task detail — used by the worker task detail page, which needs
+    one fresh task record (status / progress / notes) without pulling the whole
+    project task list. Must be declared before any other GET /tasks/{...}
+    sub-path so the literal segments win over path parameters."""
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+    return _serialize_task(task)
+
+
 @router.put("/tasks/{task_id}")
 def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)):
     task = db.query(Task).options(*_task_load_options()).get(task_id)
@@ -624,6 +636,11 @@ def worker_task_board(
             assigned_at=link.assigned_at if link else None,
             part_section=_ai_infer_part_section(t, worker, used_sections),
             work_instructions=_ai_work_instructions(t, worker),
+            progress=int(round(
+                t.progress
+                if t.progress is not None
+                else STATUS_TO_PROGRESS.get(t.status or "pending", 0)
+            )),
         ))
 
     summary = _ai_build_summary(worker, query)

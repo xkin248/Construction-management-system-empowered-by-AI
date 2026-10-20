@@ -127,6 +127,9 @@ class WorkerTaskItem(BaseModel):
     assigned_at: Optional[datetime] = None
     part_section: Optional[str] = None
     work_instructions: Optional[str] = None
+    # Exposed so the worker board can render a progress bar consistent with the
+    # detail page instead of guessing from the status label alone.
+    progress: int = 0
 class WorkerTaskBoardResponse(BaseModel):
     worker_id: int
     worker_name: str

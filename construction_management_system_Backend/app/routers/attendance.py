@@ -103,6 +103,26 @@ def _to_out(a: AttendanceLog) -> AttendanceOut:
 def _format_hhmm(dt: Optional[datetime]) -> str:
     return dt.strftime("%H:%M") if dt else "-"
 
+
+def _rejection_reason(db: Session, a: AttendanceLog) -> Optional[str]:
+    """Human-readable explanation for a rejected attendance attempt.
+
+    The client uses this to show the worker *why* the check-in was refused
+    instead of guessing from a bare "rejected" status.
+    """
+    if (a.status or "") != "rejected":
+        return None
+    project = db.query(Project).get(a.project_id) if a.project_id else None
+    allowed = int(project.fence_radius) if project and project.fence_radius else None
+    dist = int(a.in_distance_m) if a.in_distance_m is not None else None
+    if allowed and dist is not None:
+        return (
+            f"Outside the site geofence: you are about {dist}m from the site centre, "
+            f"but the allowed range is {allowed}m. Move closer to the site and try again."
+        )
+    return "Rejected: the check-in location is outside the project boundary."
+
+
 def _in_time_window(t: time, start: time, end: time) -> bool:
     return start <= t <= end
 
@@ -408,6 +428,9 @@ def worker_today_authenticated(
     if not a:
         return {
             "checked_in": False,
+            "checked_out": False,
+            "status": None,
+            "rejection_reason": None,
             "attendance": None,
             "window_enforced": False,
             "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
@@ -421,6 +444,7 @@ def worker_today_authenticated(
         "checked_in": a.status == "checked_in",
         "checked_out": a.status == "checked_out",
         "status": a.status,
+        "rejection_reason": _rejection_reason(db, a),
         "hours_today": hours,
         "window_enforced": False,
         "attendance": _to_out(a),

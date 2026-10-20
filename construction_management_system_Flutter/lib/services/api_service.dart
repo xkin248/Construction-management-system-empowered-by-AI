@@ -305,6 +305,8 @@ class ApiService {
 
   Future<List> getTasks(int pid) async =>
       (await dio.get('/projects/$pid/tasks')).data as List;
+  Future<Map> getTask(int taskId) async =>
+      Map.from((await dio.get('/tasks/$taskId')).data);
   Future<Map> createTask(Map d) async =>
       Map.from((await dio.post('/tasks', data: d)).data);
   Future<Map> updateTask(int taskId, Map d) async =>

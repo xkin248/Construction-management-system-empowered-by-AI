@@ -13,6 +13,7 @@ import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
 import '../utils/date_helper.dart';
 import 'attendance_geo_helper.dart';
+import 'worker_task_detail_page.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
   const WorkerDashboardPage({super.key});
@@ -143,7 +144,21 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             _workHours = '${inWin.first} - ${outWin.last}';
           }
           final att = r['attendance'] as Map?;
-          if (att != null) {
+          final rawStatus = (r['status'] ?? att?['status'] ?? '').toString().toLowerCase();
+          if (rawStatus == 'rejected') {
+            // The server refused the last attempt (geofence / window). Never
+            // report "checked in" in that case — surface the reason instead.
+            _checkInError = true;
+            _checkedIn = false;
+            _checkedOut = false;
+            _attendanceId = null;
+            final reason = r['rejection_reason']?.toString();
+            _statusMsg = (reason != null && reason.isNotEmpty)
+                ? '❌ Check-in rejected — $reason'
+                : '❌ Check-in rejected — you are outside the site geofence. '
+                    'Move closer to the site and try again.';
+          } else if (att != null) {
+            _checkInError = false;
             _attendanceId = att['attendance_id'] as int?;
             final ci = att['check_in_time'];
             final co = att['check_out_time'] ?? att['checked_out_time'];
@@ -154,6 +169,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                   ? '👋 Checked out — completed today at $tt'
                   : '✅ Currently checked in — arrived at $tt';
             }
+          } else {
+            _checkInError = false;
+            _attendanceId = null;
           }
         });
       }
@@ -177,6 +195,28 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       }
     } catch (e) {
       if (mounted) setState(() => _loadingTasks = false);
+    }
+  }
+
+  /// Open the worker task detail page; refresh the board when it reports a
+  /// status/progress change so the card and the record never diverge.
+  Future<void> _openTask(Map<String, dynamic> task) async {
+    final id = task['task_id'] ?? task['id'];
+    final taskId = id is int ? id : int.tryParse(id?.toString() ?? '');
+    if (taskId == null) {
+      toast('Task id missing — cannot open details');
+      return;
+    }
+    var changed = false;
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => WorkerTaskDetailPage(
+        taskId: taskId,
+        initial: task,
+        onChanged: () => changed = true,
+      ),
+    ));
+    if (changed && mounted) {
+      await _loadTaskBoard();
     }
   }
 
@@ -246,24 +286,54 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         deviceType: _deviceType,
         deviceId: _deviceId,
       );
+      // The backend also answers 200 with status=rejected on some deployments,
+      // so never trust the HTTP code alone — check what was really recorded.
+      final inStatus = (r['status'] ?? '').toString().toLowerCase();
+      if (inStatus != 'checked_in') {
+        // "rejected" is the common case, but any unexpected status must not be
+        // reported as success: the card has to mirror what the server stored.
+        setState(() {
+          _checkedIn = false;
+          _checkedOut = false;
+          _attendanceId = null;
+          _checkInError = true;
+          _statusMsg = inStatus == 'rejected'
+              ? '❌ Check-in rejected — you are outside the site geofence. '
+                  'Move closer to the site and try again.'
+              : '❌ Check-in not recorded (server status: '
+                  '${inStatus.isEmpty ? 'unknown' : inStatus}).';
+          _checkInLoading = false;
+        });
+        toast(inStatus == 'rejected'
+            ? 'Check-in rejected — you are outside the site geofence'
+            : 'Check-in was not recorded by the server');
+        await _loadAttendance();
+        return;
+      }
       setState(() {
         _checkedIn = true;
         _checkInError = false;
         _attendanceId = r['attendance_id'] as int?;
-        final t = r['check_in_time']?.toString().substring(11, 16) ?? _fmtNow();
-        _statusMsg = 'Checked in successfully at $t';
+        _statusMsg = 'Checked in successfully at ${_fmtTime(r['check_in_time'])}';
         _checkInLoading = false;
       });
       toast('Checked in! Device: $_deviceType');
+      // Re-sync with the server so the card can never drift from the record.
+      await _loadAttendance();
     } on DioException catch (e) {
       setState(() {
-        _statusMsg = e.message ?? 'Check-in failed';
+        _checkedIn = false;
+        _checkedOut = false;
+        _attendanceId = null;
+        _statusMsg = '❌ Check-in failed — ${_apiError(e)}';
         _checkInError = true;
         _checkInLoading = false;
       });
+      toast('Check-in failed: ${_apiError(e)}');
+      await _loadAttendance();
     } catch (e) {
       setState(() {
-        _statusMsg = 'Error: $e';
+        _statusMsg = '❌ Error: $e';
         _checkInError = true;
         _checkInLoading = false;
       });
@@ -304,60 +374,119 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         deviceType: _deviceType,
         deviceId: _deviceId,
       );
+      final webStatus = (r['status'] ?? '').toString().toLowerCase();
+      if (webStatus != 'checked_in') {
+        setState(() {
+          _checkedIn = false;
+          _checkedOut = false;
+          _attendanceId = null;
+          _checkInError = true;
+          _statusMsg = '❌ Check-in rejected — outside the site geofence.';
+          _checkInLoading = false;
+        });
+        toast('Check-in rejected — you are outside the site geofence');
+        await _loadAttendance();
+        return;
+      }
       setState(() {
         _checkedIn = true;
+        _checkInError = false;
         _attendanceId = r['attendance_id'] as int?;
-        final t = r['check_in_time']?.toString().substring(11, 16) ?? _fmtNow();
-        _statusMsg = '✅ Checked in (simulated GPS) at $t';
+        _statusMsg = '✅ Checked in (simulated GPS) at ${_fmtTime(r['check_in_time'])}';
         _checkInLoading = false;
       });
       toast('✅ Web demo: Checked in successfully!');
+      await _loadAttendance();
     } on DioException catch (e) {
       setState(() {
-        _statusMsg = e.message ?? 'Check-in failed';
+        _checkedIn = false;
+        _attendanceId = null;
+        _checkInError = true;
+        _statusMsg = '❌ Check-in failed — ${_apiError(e)}';
         _checkInLoading = false;
       });
+      toast('Check-in failed: ${_apiError(e)}');
+      await _loadAttendance();
     } catch (e) {
       setState(() {
-        _statusMsg = 'Error: $e';
+        _statusMsg = '❌ Error: $e';
         _checkInLoading = false;
       });
     }
   }
 
   Future<void> _doCheckOut() async {
-    if (_attendanceId == null) return;
+    if (_attendanceId == null) {
+      toast('No active check-in found on the server. Refresh and try again.');
+      await _loadAttendance();
+      return;
+    }
     setState(() {
       _checkInLoading = true;
       _statusMsg = 'Processing check-out...';
     });
     try {
-      final c = _projectCenter();
-      final defaultLat = c[0];
-      final defaultLng = c[1];
+      // Check-out must use the device's real position: sending the project
+      // centre (as this used to) always passes the geofence and would mark a
+      // worker as checked out while they are nowhere near the site.
+      double outLat;
+      double outLng;
+      if (kIsWeb) {
+        final c = _projectCenter();
+        outLat = c[0];
+        outLng = c[1];
+      } else {
+        final pos = await GeoHelper.getCurrentPosition();
+        if (pos == null) {
+          setState(() {
+            _checkInError = true;
+            _statusMsg = '❌ Check-out failed — location permission denied or GPS unavailable';
+            _checkInLoading = false;
+          });
+          toast('Check-out failed: location unavailable');
+          return;
+        }
+        outLat = pos['lat']!;
+        outLng = pos['lng']!;
+      }
       final r = await ApiService().workerCheckOut(
-        lat: defaultLat,
-        lng: defaultLng,
+        lat: outLat,
+        lng: outLng,
         deviceInfo: _deviceInfo,
         deviceType: _deviceType,
       );
+      if ((r['status'] ?? '').toString().toLowerCase() == 'rejected') {
+        setState(() {
+          _checkInError = true;
+          _statusMsg = '❌ Check-out rejected — outside the site geofence. '
+              'Your session is still open on the server.';
+          _checkInLoading = false;
+        });
+        toast('Check-out rejected — you are outside the site geofence');
+        await _loadAttendance();
+        return;
+      }
       setState(() {
         _checkedIn = false;
         _checkedOut = true;
+        _checkInError = false;
         _attendanceId = null;
-        final t = _fmtTime(r['check_out_time']);
-        _statusMsg = '👋 Checked out at $t. Thank you for today!';
+        _statusMsg = '👋 Checked out at ${_fmtTime(r['check_out_time'])}. Thank you for today!';
         _checkInLoading = false;
       });
       toast('👋 Checked out successfully. See you tomorrow!');
+      await _loadAttendance();
     } on DioException catch (e) {
       setState(() {
-        _statusMsg = e.message ?? 'Check-out failed';
+        _statusMsg = '❌ Check-out failed — ${_apiError(e)}';
+        _checkInError = true;
         _checkInLoading = false;
       });
+      toast('Check-out failed: ${_apiError(e)}');
+      await _loadAttendance();
     } catch (e) {
       setState(() {
-        _statusMsg = 'Error: $e';
+        _statusMsg = '❌ Error: $e';
         _checkInLoading = false;
       });
     }
@@ -376,6 +505,15 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     if (s.length >= 16) return s.substring(11, 16);
     if (s.length >= 5) return s.substring(0, 5);
     return s;
+  }
+
+  /// Prefer the backend `detail` text over Dio's generic status-code message so
+  /// the worker reads the real reason (geofence distance, "already checked in").
+  String _apiError(DioException e) {
+    final data = e.response?.data;
+    if (data is Map && data['detail'] != null) return data['detail'].toString();
+    if (data is String && data.isNotEmpty) return data;
+    return e.message ?? 'unknown error';
   }
 
   @override
@@ -717,11 +855,15 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           )
         else
           LayoutBuilder(builder: (ctx, c) {
-            final tiles = tasks.asMap().entries.map((e) => _TaskTile(
-                  idx: e.key,
-                  task: Map<String, dynamic>.from(e.value as Map),
-                  inGrid: isWide,
-                )).toList();
+            final tiles = tasks.asMap().entries.map((e) {
+              final task = Map<String, dynamic>.from(e.value as Map);
+              return _TaskTile(
+                idx: e.key,
+                task: task,
+                inGrid: isWide,
+                onTap: () => _openTask(task),
+              );
+            }).toList();
             if (!isWide) return Column(children: tiles);
             final w = c.maxWidth;
             return Wrap(
@@ -741,7 +883,8 @@ class _TaskTile extends StatelessWidget {
   final int idx;
   final Map<String, dynamic> task;
   final bool inGrid;
-  const _TaskTile({required this.idx, required this.task, this.inGrid = false});
+  final VoidCallback? onTap;
+  const _TaskTile({required this.idx, required this.task, this.inGrid = false, this.onTap});
 
   Color _priorityColor(String? p) {
     switch (p?.toLowerCase()) {
@@ -763,17 +906,35 @@ class _TaskTile extends StatelessWidget {
     final part = task['part_section']?.toString() ?? 'General Section';
     final instructions = task['work_instructions']?.toString() ?? '';
     final projectName = task['project_name']?.toString() ?? '';
+    final rawPct = task['progress'];
+    final pct = rawPct is num
+        ? rawPct.round().clamp(0, 100)
+        : (status.toLowerCase().replaceAll(' ', '_') == 'completed'
+            ? 100
+            : (status.toLowerCase().replaceAll(' ', '_') == 'in_progress' ? 50 : 0));
+    final sKey = status.toLowerCase().replaceAll(' ', '_');
+    final barColor = sKey == 'completed'
+        ? AppColors.green
+        : sKey == 'in_progress'
+            ? AppColors.blue
+            : AppColors.yellow;
 
-    return Container(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Material(
         color: AppColors.bgCard,
         borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        child: InkWell(
+          borderRadius: AppRadius.rMd,
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: AppRadius.rMd,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
             Expanded(
               child: Container(
@@ -850,7 +1011,30 @@ class _TaskTile extends StatelessWidget {
               ]),
             ),
           ],
-        ]),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: AppRadius.rSm,
+                      child: LinearProgressIndicator(
+                        value: pct / 100,
+                        minHeight: 6,
+                        backgroundColor: AppColors.border,
+                        valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('$pct%',
+                      style: GoogleFonts.inter(
+                          fontSize: 13, fontWeight: FontWeight.w800, color: barColor)),
+                  const SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.accent),
+                ]),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }
