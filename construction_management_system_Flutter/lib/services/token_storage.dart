@@ -84,6 +84,25 @@ class TokenStorage {
     if (projectId    != null) await sp.setInt(_kProject,    projectId);
   }
 
+  /// Drops only the authentication state (JWT + cached identity), leaving
+  /// user preferences (theme / language / …) intact.
+  ///
+  /// Used on every cold start so the app always opens on the login page.
+  static Future<void> clearAuth() async {
+    try {
+      await deleteToken();
+    } catch (_) {
+      // Secure storage may be unavailable (e.g. web / revoked keystore).
+      // The in-memory client is still reset to anonymous by the caller.
+    }
+    final sp = await _sp;
+    await sp.remove(_kUserType);
+    await sp.remove(_kUserRole);
+    await sp.remove(_kWorkerId);
+    await sp.remove(_kSupervisor);
+    await sp.remove(_kProject);
+  }
+
   /// Clears everything — call on logout or 401.
   static Future<void> clearAll() async {
     // Secure storage is not available on web (and may throw there), so only

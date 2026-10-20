@@ -6,8 +6,6 @@ import 'services/api_service.dart';
 import 'services/fcm_service.dart';
 import 'services/token_storage.dart';
 import 'screens/login_page.dart';
-import 'screens/home_shell.dart';
-import 'screens/worker_home_shell.dart';
 import 'services/app_settings.dart';
 import 'services/gps_notification_service.dart';
 
@@ -200,37 +198,24 @@ class _SplashGateState extends State<SplashGate> {
   }
 
   Future<void> _boot() async {
-    // ── 1. Read persisted auth state ────────────────────────────────────────
-    // Each read is guarded on its own: storage can be unavailable on some
-    // platforms (e.g. web), and one failing read must never abort the startup
-    // sequence nor leave a stale/partial value behind.
-    String? token;
-    String? userType;
-    String? userRole;
-
+    // ── 1. Force a clean, logged-out start ──────────────────────────────────
+    // Product requirement: EVERY cold launch must land on the login page, so
+    // any token / cached identity left over from a previous session is
+    // dropped before anything else runs. Only auth keys are cleared — user
+    // preferences (theme, language, …) must survive a restart.
     try {
-      token = await TokenStorage.getToken();
+      await TokenStorage.clearAuth();
     } catch (e, st) {
-      debugPrint('[Boot] getToken failed: $e\n$st');
-    }
-    try {
-      userType = await TokenStorage.getUserType();
-    } catch (e, st) {
-      debugPrint('[Boot] getUserType failed: $e\n$st');
-    }
-    try {
-      userRole = await TokenStorage.getUserRole();
-    } catch (e, st) {
-      debugPrint('[Boot] getUserRole failed: $e\n$st');
+      debugPrint('[Boot] clearAuth failed: $e\n$st');
     }
 
     // ── 2. Initialise the API client — UNCONDITIONAL ────────────────────────
     // ApiService is a singleton used by every screen; it must be initialised
-    // even when the stored token could not be read (null token = anonymous),
-    // otherwise later calls run against an unconfigured client and crash.
+    // even when no token is available (null token = anonymous), otherwise
+    // later calls run against an unconfigured client and crash.
     try {
       ApiService().init(
-        token: token,
+        token: null,
         onUnauthorized: () async {
           await TokenStorage.clearAll();
           navigatorKey.currentState?.pushAndRemoveUntil(
@@ -252,15 +237,12 @@ class _SplashGateState extends State<SplashGate> {
 
     if (!mounted) return;
 
-    // ── 4. Route to the correct shell ───────────────────────────────────────
-    final hasToken = token != null && token.isNotEmpty;
-    final isWorker = userType == 'worker' || userRole == 'worker';
-    final Widget home =
-        hasToken ? (isWorker ? const WorkerHomeShell() : const HomeShell()) : const LoginPage();
-
+    // ── 4. Always start at the login page ───────────────────────────────────
+    // Session restore is intentionally disabled: the user must authenticate
+    // on every launch, then the login screen pushes the matching shell.
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => home),
+      MaterialPageRoute(builder: (_) => const LoginPage()),
     );
   }
 
