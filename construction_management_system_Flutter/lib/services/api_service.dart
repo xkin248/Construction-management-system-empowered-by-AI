@@ -391,6 +391,19 @@ class ApiService {
     return (await dio.get('/files', queryParameters: params)).data as List;
   }
 
+  /// Upload from in-memory bytes. Required on Flutter Web (and safe on mobile):
+  /// file_picker's `path` is null on web and its cache file can be deleted on
+  /// Android, so we always send bytes instead of re-reading the file.
+  Future<Map> uploadFileBytes(Uint8List bytes, String fileName,
+      {int? pid, String? category}) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+      if (pid != null && pid > 0) 'project_id': pid,
+      if (category != null && category != 'all') 'file_category': category,
+    });
+    return Map.from((await dio.post('/files/upload', data: formData)).data);
+  }
+
   Future<Map> uploadFile(File file, {int? pid, String? category}) async {
     final fileName = file.path.split(RegExp(r'[/\\]')).last;
     final formData = FormData.fromMap({

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -144,7 +145,7 @@ class _FilesPageState extends State<FilesPage> {
     String cat = _selectedCategory == 'all'
         ? 'documents'
         : (_selectedCategory == 'drawings_photos' ? 'drawings_photos' : _selectedCategory);
-    String? pickedPath;
+    Uint8List? pickedBytes;
     String? pickedName;
 
     showModalBottomSheet(
@@ -184,15 +185,16 @@ class _FilesPageState extends State<FilesPage> {
                 // Pick file from system file picker (mobile friendly)
                 OutlinedButton.icon(
                   onPressed: () async {
-                    final res = await FilePicker.platform.pickFiles();
+                    final res =
+                        await FilePicker.platform.pickFiles(withData: true);
                     if (res == null || res.files.isEmpty) return;
                     final f = res.files.single;
-                    if (f.path == null) {
-                      toast('Could not resolve file path');
+                    if (f.bytes == null) {
+                      toast('Could not read the selected file');
                       return;
                     }
                     setD(() {
-                      pickedPath = f.path;
+                      pickedBytes = f.bytes;
                       pickedName = f.name;
                       // Infer the concrete category from the file extension
                       // when the merged "Drawings & Photos" or legacy "All"
@@ -259,7 +261,7 @@ class _FilesPageState extends State<FilesPage> {
                 ElevatedButton(
                   onPressed: () async {
                     // Mandatory: file + project + category.
-                    if (pickedPath == null || pickedPath!.isEmpty) {
+                    if (pickedBytes == null || pickedBytes!.isEmpty) {
                       toast('Please pick a file first');
                       return;
                     }
@@ -272,7 +274,8 @@ class _FilesPageState extends State<FilesPage> {
                       return;
                     }
                     try {
-                      await ApiService().uploadFile(File(pickedPath!),
+                      await ApiService().uploadFileBytes(
+                          pickedBytes!, pickedName ?? 'upload.bin',
                           pid: pid, category: _resolveUploadCategory(cat, pickedName ?? ''));
                       if (ctx.mounted) Navigator.pop(ctx);
                       toast('File uploaded!');
@@ -283,7 +286,7 @@ class _FilesPageState extends State<FilesPage> {
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.onAccent,
+                    foregroundColor: AppColors.accentInk,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: AppRadius.rMd),
@@ -375,7 +378,7 @@ class _FilesPageState extends State<FilesPage> {
                 label: Text(AppStrings.t('files.downloadOpen')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.onAccent,
+                  foregroundColor: AppColors.accentInk,
                   shape: RoundedRectangleBorder(
                       borderRadius: AppRadius.rMd),
                 ),
@@ -439,7 +442,7 @@ class _FilesPageState extends State<FilesPage> {
           heroTag: const ValueKey('fab_files'),
           onPressed: _openUpload,
           backgroundColor: AppColors.accent,
-          child: const Icon(Icons.upload_file_rounded, color: AppColors.onAccent),
+          child: const Icon(Icons.upload_file_rounded, color: AppColors.accentInk),
         ),
       ),
       body: Column(children: [
