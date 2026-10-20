@@ -515,7 +515,10 @@ def weekly_attendance_stats(
         ]
         present_workers = len({a.worker_id for a in day_logs})
         days.append({
-            "date": day_start.strftime("%Y-%m-%d"),
+            # Business-day label must be the KL-local calendar date, not the
+            # UTC-normalised window start (which is 8h earlier and can fall on
+            # the previous day).
+            "date": (monday + timedelta(days=i)).isoformat(),
             "weekday": i,
             "present_workers": present_workers,
             "check_in_count": len(day_logs),
