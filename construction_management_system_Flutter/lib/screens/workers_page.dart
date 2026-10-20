@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/add_worker_sheet.dart';
+import 'worker_detail_page.dart';
 
 class WorkersPage extends StatefulWidget {
   const WorkersPage({super.key});
@@ -166,7 +167,16 @@ class _WorkersPageState extends State<WorkersPage> {
   }
 
   Widget _workerCard(Map w, {bool inGrid = false}) {
-    return sectionCard(
+    // Tapping a card opens the read-only worker profile (P1: cards previously
+    // had no entry point at all).
+    final wid = w['worker_id'] ?? w['id'];
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: wid is int
+          ? () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => WorkerDetailPage(workerId: wid, initial: w)))
+          : null,
+      child: sectionCard(
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       child: Row(children: [
         initialsAvatar(w['name'] ?? '?', radius: 22),
@@ -216,6 +226,7 @@ class _WorkersPageState extends State<WorkersPage> {
           ]),
         ),
       ]),
+      ),
     );
   }
 
