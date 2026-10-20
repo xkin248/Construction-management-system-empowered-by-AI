@@ -457,8 +457,15 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
     if (_name.text.trim().isEmpty) { toast(t('Project name is required', 'Nama projek diperlukan')); return; }
     if (_loc.text.trim().isEmpty)  { toast(t('Location address is required', 'Alamat tapak diperlukan')); return; }
     if (!_hasGps) {
-      toast(_gpsFailed ? t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.') : t('Please capture the site GPS location first', 'Sila tangkap lokasi GPS tapak dahulu'));
-      return;
+      // Auto-capture the site location on save so the button never appears
+      // unresponsive; only block when the GPS fix itself fails.
+      _gpsFailed = false;
+      await _getGps();
+      if (!mounted) return;
+      if (!_hasGps) {
+        toast(_gpsFailed ? t('Location failed. Please enable GPS and try again.', 'Lokasi gagal. Sila hidupkan GPS dan cuba lagi.') : t('Please capture the site GPS location first', 'Sila tangkap lokasi GPS tapak dahulu'));
+        return;
+      }
     }
 
     setState(() => _saving = true);
@@ -724,12 +731,12 @@ class _ProjectFormSheetState extends State<_ProjectFormSheet> {
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.accent,
-              foregroundColor: AppColors.onAccent,
+              foregroundColor: AppColors.accentInk,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
             ),
             child: _saving
-                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onAccent))
+                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentInk))
                 : Text(_isEdit ? t('Save Changes', 'Simpan Perubahan') : t('Create Project', 'Cipta Projek'),
                     style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
           ),
