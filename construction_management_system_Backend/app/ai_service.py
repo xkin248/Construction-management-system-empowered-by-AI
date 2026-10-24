@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import time
 from collections import defaultdict
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
@@ -23,13 +24,45 @@ except ImportError:
     SEMANTIC_AVAILABLE = False
 
 from app.database import get_db
-from app.models import Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue, PredictionHistory
+from app.models import (
+    Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue,
+    PredictionHistory, AIDecisionLog,
+)
 from app.worker_pool import get_project_workers
 
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+# ── Trade decision thresholds ────────────────────────────────────────────────
+# The deterministic pipeline (keyword rules + semantic matcher) is trusted when
+# the best candidate scores at least LLM_TRADE_MIN_SCORE and beats the runner-up
+# by LLM_TRADE_MIN_GAP. Anything weaker is ambiguous and triggers one Gemini
+# verdict; if that verdict is still below SKIP_CONFIDENCE_THRESHOLD the task is
+# skipped instead of being assigned to a guessed trade.
+LLM_TRADE_MIN_SCORE = 0.5
+LLM_TRADE_MIN_GAP = 0.1
+SKIP_CONFIDENCE_THRESHOLD = 0.5
+# Hard ceiling for the Gemini trade call so a slow API never blocks auto-assign.
+LLM_TRADE_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TRADE_TIMEOUT", "8"))
+
+# Forced-JSON prompt for the ambiguous-trade fallback. Kept as one constant so
+# tests and future tuning share the same wording.
+TRADE_DECISION_PROMPT = """You are a construction trade classifier.
+Decide which single trade is required to execute the task below.
+
+Task: {task_text}
+
+Candidate trades: {candidates}
+
+Rules:
+- Answer with exactly one trade from the candidate list.
+- confidence is a number between 0 and 1 (how sure you are).
+- reason is one short English sentence.
+
+Return JSON only, no markdown:
+{{"trade": "<candidate>", "confidence": 0.0, "reason": "<short reason>"}}"""
 
 if GEMINI_AVAILABLE and GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -205,22 +238,73 @@ def _detect_trade_groups(task_text: str) -> set:
     }
 
 
-def _resolve_detected_trades(task_text: str, detected: set, semantic_scores: Dict[str, float]) -> set:
-    """Resolve ambiguous multi-hit keyword detection with the semantic matcher.
+def _resolve_detected_trades(
+    task_text: str,
+    detected: set,
+    semantic_scores: Dict[str, float],
+    trace: Optional[Dict[str, Any]] = None,
+) -> set:
+    """Resolve ambiguous multi-hit keyword detection, with a Gemini fallback.
 
     When several trades match task keywords (e.g. "tile bathroom floor with
     ceramic" hits both tiling and flooring), prefer the trade with the highest
-    semantic score so we do not fall back to alphabetical order. If the semantic
-    matcher is unavailable or gives no strong preference, keep all hits.
+    semantic score so we do not fall back to alphabetical order.
+
+    The deterministic pipeline is trusted only when the best candidate scores at
+    least ``LLM_TRADE_MIN_SCORE`` AND beats the runner-up by
+    ``LLM_TRADE_MIN_GAP``. Below that the wording is genuinely ambiguous, so one
+    forced-JSON Gemini verdict is requested for the candidate set. A missing API
+    key, a timeout, an unparsable answer or a trade outside the candidate list
+    all degrade to the previous rule/semantic result - the LLM can never block
+    or break the pipeline. A verdict whose confidence is still below
+    ``SKIP_CONFIDENCE_THRESHOLD`` returns an empty set, i.e. the task stays
+    unassignable ("skip") instead of being guessed.
+
+    ``trace`` (optional out-parameter) receives the decision metadata
+    (source / confidence / llm_used / llm_reason) used for logging.
     """
-    if len(detected) <= 1 or not semantic_scores:
+    candidates = [g for g in detected]
+    scores = {g: float(semantic_scores.get(g, 0.0)) for g in candidates}
+    ordered = sorted(scores.values(), reverse=True)
+    best_score = ordered[0] if ordered else 0.0
+    runner_up = ordered[1] if len(ordered) > 1 else 0.0
+    gap = best_score - runner_up
+    best = max(candidates, key=lambda g: scores[g]) if candidates else None
+
+    def _fill(**kwargs) -> None:
+        if trace is not None:
+            trace.update(kwargs)
+
+    # A single (or empty) candidate cannot be ambiguous: nothing to choose from.
+    if len(detected) <= 1:
+        _fill(
+            source="rule" if detected else "skip",
+            confidence=(best_score if best_score else (0.9 if detected else 0.0)),
+            llm_used=False,
+            llm_reason=None,
+        )
         return detected
-    best = max(detected, key=lambda g: semantic_scores.get(g, 0.0))
-    best_score = semantic_scores.get(best, 0.0)
-    runner_up = sorted((semantic_scores.get(g, 0.0) for g in detected), reverse=True)
-    runner_up = runner_up[1] if len(runner_up) > 1 else 0.0
-    if best_score >= 0.55 and (best_score - runner_up) >= 0.10:
+
+    if best_score >= LLM_TRADE_MIN_SCORE and gap >= LLM_TRADE_MIN_GAP:
+        _fill(source="rule", confidence=best_score, llm_used=False, llm_reason=None)
         return {best}
+
+    # Ambiguous: ask the LLM once, then decide.
+    llm = _llm_trade_decision(task_text, candidates)
+    if llm:
+        _fill(
+            source="llm",
+            confidence=llm["confidence"],
+            llm_used=True,
+            llm_reason=llm.get("reason") or None,
+        )
+        if llm["confidence"] >= SKIP_CONFIDENCE_THRESHOLD:
+            return {llm["trade"]}
+        # Low-confidence LLM verdict: do not guess, keep the task unassignable.
+        return set()
+
+    # Degraded path (no key / timeout / parse failure): original behaviour.
+    _fill(source="rule", confidence=best_score, llm_used=False, llm_reason=None)
     return detected
 
 
@@ -253,12 +337,154 @@ def get_gemini_model():
         return None
 
 
+# ──────────────────────────────────────────────────────────────
+#  AI decision logging (data loop for later hold-out evaluation)
+# ──────────────────────────────────────────────────────────────
+
+def _json_field(value: Any) -> Optional[str]:
+    """Serialise a small structure for a TEXT column; None when empty."""
+    if value is None:
+        return None
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    except Exception:
+        return None
+
+
+def record_ai_decision(
+    db,
+    *,
+    stage: str = "trade_resolution",
+    task_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    task_text: str = "",
+    rule_trades: Any = None,
+    semantic_scores: Any = None,
+    final_trade: Optional[str] = None,
+    source: str = "rule",
+    confidence: Optional[float] = None,
+    elapsed_ms: Optional[int] = None,
+    llm_used: bool = False,
+    llm_reason: Optional[str] = None,
+    skip_reason: Optional[str] = None,
+) -> Optional["AIDecisionLog"]:
+    """Append one audit row; never raise into the caller.
+
+    The log is the raw material for the future evaluation set, so it must be
+    written on every decision - but it is observability only: if the insert
+    fails (missing table on an old DB, disk error, ...) the assignment pipeline
+    still has to complete. A SAVEPOINT keeps a failed insert from poisoning the
+    session that the caller is still using for task writes.
+    """
+    if db is None:
+        return None
+    row = AIDecisionLog(
+        stage=stage,
+        task_id=task_id,
+        project_id=project_id,
+        task_text=(task_text or "")[:2000] or None,
+        rule_trades=_json_field(sorted(rule_trades) if isinstance(rule_trades, (set, list, tuple)) else rule_trades),
+        semantic_scores=_json_field(
+            {k: round(float(v), 4) for k, v in semantic_scores.items()}
+            if isinstance(semantic_scores, dict) else semantic_scores
+        ),
+        final_trade=final_trade,
+        source=source,
+        confidence=(round(float(confidence), 4) if confidence is not None else None),
+        elapsed_ms=elapsed_ms,
+        llm_used=bool(llm_used),
+        llm_reason=(llm_reason or None),
+        skip_reason=skip_reason,
+        was_overridden=False,
+    )
+    try:
+        with db.begin_nested():
+            db.add(row)
+    except Exception:
+        return None
+    return row
+
+
+def mark_decision_overridden(db, task_id: int, override_trade: Optional[str]) -> int:
+    """Back-fill ``was_overridden`` when a supervisor hand-edits a task's trade.
+
+    Only the newest ``auto_assign``/``trade_resolution`` row of that task is
+    flagged: it is the prediction the supervisor actually reacted to. Returns
+    the number of rows updated (0 when no AI decision existed).
+    """
+    if db is None or task_id is None:
+        return 0
+    try:
+        row = (
+            db.query(AIDecisionLog)
+            .filter(AIDecisionLog.task_id == task_id)
+            .order_by(AIDecisionLog.log_id.desc())
+            .first()
+        )
+        if row is None:
+            return 0
+        row.was_overridden = True
+        row.override_trade = (override_trade or None)
+        db.flush()
+        return 1
+    except Exception:
+        return 0
+
+
+def _llm_trade_decision(task_text: str, candidates: List[str]) -> Optional[Dict[str, Any]]:
+    """Ask Gemini for a single forced-JSON trade verdict.
+
+    Returns ``{"trade", "confidence", "reason"}`` or ``None`` when the model is
+    unavailable, the call fails/times out, or the payload cannot be parsed. The
+    caller treats ``None`` as "keep the rule-based result", so a degraded model
+    never changes behaviour.
+    """
+    model = get_gemini_model()
+    if not model or not candidates:
+        return None
+    prompt = TRADE_DECISION_PROMPT.format(
+        task_text=(task_text or "")[:1500],
+        candidates=", ".join(sorted(candidates)),
+    )
+    try:
+        try:
+            resp = model.generate_content(
+                prompt, request_options={"timeout": LLM_TRADE_TIMEOUT_SECONDS}
+            )
+        except TypeError:
+            # Older google-generativeai releases reject request_options; the
+            # call then runs without an explicit timeout (still guarded by the
+            # try/except below so a failure degrades gracefully).
+            resp = model.generate_content(prompt)
+        parsed = _extract_json(getattr(resp, "text", "") or "")
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+
+    raw_trade = str(parsed.get("trade") or "").strip().lower()
+    trade = next((c for c in sorted(candidates) if c.lower() == raw_trade), None)
+    if trade is None:
+        return None
+    try:
+        confidence = float(parsed.get("confidence"))
+    except (TypeError, ValueError):
+        return None
+    return {
+        "trade": trade,
+        "confidence": max(0.0, min(1.0, confidence)),
+        "reason": str(parsed.get("reason") or "")[:500],
+    }
+
+
 def analyze_task(
     db,
     task_info: Dict[str, Any],
     project_id: int,
     same_project_only: bool = False,
+    log_decision: bool = True,
 ) -> Dict[str, Any]:
+    started = time.perf_counter()
     if same_project_only:
         workers = get_project_workers(db, project_id)
     else:
@@ -268,6 +494,11 @@ def analyze_task(
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
     task_text = f"{task_name} {description}".lower()
+
+    # Decision bookkeeping (audit log + confidence returned to the caller).
+    trace: Dict[str, Any] = {}
+    keyword_trades: set = set()
+    raw_semantic_scores: Dict[str, float] = {}
 
     # 1. Explicit trade selection (user picked a trade from the dropdown when
     #    creating/editing a task) takes priority over any keyword/semantic
@@ -280,30 +511,56 @@ def analyze_task(
         detected_trades = {explicit_group}
         semantic_scores = {explicit_group: 1.0}
         trade_source = "explicit"
+        trace = {"source": "rule", "confidence": 1.0, "llm_used": False, "llm_reason": None}
     else:
-        semantic_scores = _semantic_trade_scores(task_text)
+        raw_semantic_scores = _semantic_trade_scores(task_text)
+        semantic_scores = raw_semantic_scores
         # 2. Keyword detection first (TASK_KEYWORDS substring match — reliable, no false positives).
-        detected_trades = _detect_trade_groups(task_text)
-        # 2b. Ambiguous multi-hit: resolve with semantic scores when possible.
-        detected_trades = _resolve_detected_trades(task_text, detected_trades, semantic_scores)
+        keyword_trades = _detect_trade_groups(task_text)
+        # 2b. Ambiguous multi-hit: resolve with semantic scores / LLM fallback.
+        detected_trades = _resolve_detected_trades(task_text, keyword_trades, semantic_scores, trace=trace)
         # 3. Semantic detection as a supplement — only when keywords found nothing AND
         #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
         #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
         #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
-        if not detected_trades:
+        #    A low-confidence LLM verdict deliberately leaves ``detected_trades`` empty
+        #    (trace source == "llm"); the supplement must not resurrect a guess there.
+        if not detected_trades and trace.get("source") != "llm":
             if semantic_scores:
                 best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
                 sorted_scores = sorted(semantic_scores.values(), reverse=True)
                 gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
                 if best_score >= 0.6 and gap >= 0.15:
                     detected_trades = {best_trade}
-        else:
+                    trace = {"source": "semantic", "confidence": best_score,
+                             "llm_used": False, "llm_reason": None}
+        elif detected_trades:
             semantic_scores = {canonical: 1.0 for canonical in detected_trades}
         trade_source = "semantic"
 
     # Vague-text guard: no explicit trade AND nothing keyword/semantic could
-    # identify (e.g. "test"/"test") -> never auto-assign such a task.
+    # identify (e.g. "test"/"test") -> never auto-assign such a task. A trade
+    # decided by the LLM only counts when its confidence clears the skip
+    # threshold, so a hesitant verdict keeps the task unassignable.
     low_confidence = explicit_group is None and not detected_trades
+
+    if explicit_group:
+        confidence = 1.0
+    elif detected_trades:
+        confidence = float(trace.get("confidence") or 0.0)
+        if confidence <= 0.0:
+            confidence = max((raw_semantic_scores.get(g, 0.0) for g in detected_trades), default=0.0)
+        if confidence <= 0.0:
+            # No semantic model available: a single unambiguous keyword hit is
+            # strong evidence, several competing hits are not.
+            confidence = 0.9 if len(detected_trades) == 1 else 0.6
+    else:
+        confidence = 0.0
+
+    if low_confidence:
+        trace.setdefault("source", "skip")
+        trace["confidence"] = 0.0
+
 
     suggested_workers = []
     matched_any = False
@@ -380,6 +637,30 @@ def analyze_task(
     else:
         notice = ""
 
+    source = str(trace.get("source") or ("rule" if explicit_group else "semantic"))
+    if low_confidence:
+        source = "skip"
+        confidence = 0.0
+    elapsed_ms = int((time.perf_counter() - started) * 1000)
+
+    if log_decision:
+        record_ai_decision(
+            db,
+            stage="trade_resolution",
+            task_id=task_info.get("task_id"),
+            project_id=project_id,
+            task_text=task_text,
+            rule_trades=sorted(keyword_trades) if keyword_trades else None,
+            semantic_scores=raw_semantic_scores or None,
+            final_trade=(sorted(detected_trades)[0] if detected_trades else None),
+            source=source,
+            confidence=confidence,
+            elapsed_ms=elapsed_ms,
+            llm_used=bool(trace.get("llm_used")),
+            llm_reason=trace.get("llm_reason"),
+            skip_reason=("no trade identified from task text" if low_confidence else None),
+        )
+
     return {
         "suggested_workers": suggested_workers[:5],
         "estimated_duration": duration_estimate,
@@ -391,6 +672,14 @@ def analyze_task(
         "notice": notice,
         "low_confidence": low_confidence,
         "assignable": not low_confidence,
+        # Decision metadata (consumed by auto-assign logging; harmless elsewhere).
+        "confidence": confidence,
+        "decision_source": source,
+        "llm_used": bool(trace.get("llm_used")),
+        "llm_reason": trace.get("llm_reason"),
+        "elapsed_ms": elapsed_ms,
+        "keyword_trades": sorted(keyword_trades),
+        "semantic_scores": {k: round(float(v), 4) for k, v in (semantic_scores or {}).items()},
     }
 
 
@@ -523,7 +812,21 @@ def _extract_json(text: str) -> Optional[Any]:
         return None
 
 
-def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5, same_project_only: bool = False) -> Dict[str, Any]:
+def _copy_decision_meta(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    """Copy trade-decision metadata onto a Gemini-shaped recommendation payload.
+
+    ``recommend_workers_for_task`` may return the model's own dict; the decision
+    provenance (and the guard flags) must survive that path or auto-assign would
+    log an empty decision and could bypass the low-confidence guard.
+    """
+    for key in ("low_confidence", "assignable", "matched_trades", "confidence",
+                "decision_source", "llm_used", "llm_reason", "elapsed_ms",
+                "keyword_trades", "semantic_scores"):
+        if key in source:
+            target[key] = source[key]
+
+
+def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5, same_project_only: bool = False, log_decision: bool = True) -> Dict[str, Any]:
     if same_project_only:
         workers = get_project_workers(db, project_id)
     else:
@@ -557,7 +860,7 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
                 )
             )
             parsed = _extract_json(getattr(resp, "text", "") or "")
-            base_for_trades = analyze_task(db, task_info, project_id, same_project_only=same_project_only)
+            base_for_trades = analyze_task(db, task_info, project_id, same_project_only=same_project_only, log_decision=log_decision)
             if isinstance(parsed, dict) and isinstance(parsed.get("suggested_workers"), list):
                 out = parsed
                 out["suggested_workers"] = out["suggested_workers"][:top_k]
@@ -565,16 +868,19 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
                 out["matched_trades"] = base_for_trades.get("matched_trades") or []
                 out["low_confidence"] = base_for_trades.get("low_confidence", False)
                 out["assignable"] = base_for_trades.get("assignable", True)
+                _copy_decision_meta(out, base_for_trades)
                 return out
             if isinstance(parsed, list):
-                return {"suggested_workers": parsed[:top_k], "semantic_used": True,
-                        "matched_trades": base_for_trades.get("matched_trades") or [],
-                        "low_confidence": base_for_trades.get("low_confidence", False),
-                        "assignable": base_for_trades.get("assignable", True)}
+                out = {"suggested_workers": parsed[:top_k], "semantic_used": True,
+                       "matched_trades": base_for_trades.get("matched_trades") or [],
+                       "low_confidence": base_for_trades.get("low_confidence", False),
+                       "assignable": base_for_trades.get("assignable", True)}
+                _copy_decision_meta(out, base_for_trades)
+                return out
         except Exception:
             pass
 
-    base = analyze_task(db, task_info, project_id, same_project_only=same_project_only)
+    base = analyze_task(db, task_info, project_id, same_project_only=same_project_only, log_decision=log_decision)
     base["suggested_workers"] = (base.get("suggested_workers") or [])[:top_k]
     return base
 
@@ -608,15 +914,59 @@ def auto_assign_tasks(
 
     assignments = []
     for t in tasks:
-        task_info = {"task_name": t.task_name, "description": t.description or "", "trade": t.trade or ""}
-        rec = recommend_workers_for_task(db, task_info, project_id, top_k=max(1, top_k), same_project_only=same_project_only)
+        task_started = time.perf_counter()
+        task_info = {
+            "task_id": t.task_id,
+            "task_name": t.task_name,
+            "description": t.description or "",
+            "trade": t.trade or "",
+        }
+        # ``log_decision=False``: auto-assign writes its own single row per task
+        # (stage="auto_assign") that also carries the final assignment outcome,
+        # so one evaluation sample == one row.
+        rec = recommend_workers_for_task(
+            db, task_info, project_id, top_k=max(1, top_k),
+            same_project_only=same_project_only, log_decision=False,
+        )
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])
+
+        def _log(task=t, rec=rec, started=task_started, source=None, skip_reason=None,
+                 chosen_ids=None, matched=None):
+            """Write one auto_assign audit row for this task (best effort).
+
+            Dry runs are pure previews and must not touch the audit table, so
+            the row is only written when ``dry_run`` is False.
+            """
+            if dry_run:
+                return
+            trades = matched if matched is not None else set(rec.get("matched_trades") or [])
+            if skip_reason and not trades and rec.get("low_confidence"):
+                decided_source = "skip"
+            else:
+                decided_source = source or str(rec.get("decision_source") or "rule")
+            record_ai_decision(
+                db,
+                stage="auto_assign",
+                task_id=t.task_id,
+                project_id=t.project_id,
+                task_text=f"{t.task_name} {t.description or ''}".strip(),
+                rule_trades=(rec.get("keyword_trades") or None),
+                semantic_scores=(rec.get("semantic_scores") or None),
+                final_trade=(sorted(trades)[0] if trades else None),
+                source=decided_source,
+                confidence=float(rec.get("confidence") or 0.0),
+                elapsed_ms=int((time.perf_counter() - started) * 1000),
+                llm_used=bool(rec.get("llm_used")),
+                llm_reason=rec.get("llm_reason"),
+                skip_reason=skip_reason,
+            )
 
         # Vague-task guard: text could not identify a required trade and there
         # is no explicit trade -> never auto-assign (prevents e.g. "test/test"
         # being dumped on an arbitrary worker).
         if rec.get("low_confidence"):
+            skip_reason = "Task text too vague to identify required trade; set explicit trade or specific description"
             assignments.append({
                 "task_id": t.task_id,
                 "task_name": t.task_name,
@@ -625,8 +975,9 @@ def auto_assign_tasks(
                 "suggested_workers": [],
                 "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
                 "skipped": True,
-                "skip_reason": "Task text too vague to identify required trade; set explicit trade or specific description",
+                "skip_reason": skip_reason,
             })
+            _log(skip_reason=skip_reason, source="skip")
             continue
 
         # Missing-trade guard: the task demands a trade but no worker in the
@@ -635,6 +986,9 @@ def auto_assign_tasks(
         if matched_trades:
             pool_trade_hit = any(_worker_trade_group(w.trade) in matched_trades for w in workers)
             if not pool_trade_hit:
+                skip_reason = "No worker with required trade ({}) is available in the worker pool; add a worker with that trade or edit the task".format(
+                    "/".join(sorted(matched_trades))
+                )
                 assignments.append({
                     "task_id": t.task_id,
                     "task_name": t.task_name,
@@ -643,10 +997,9 @@ def auto_assign_tasks(
                     "suggested_workers": [],
                     "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
                     "skipped": True,
-                    "skip_reason": "No worker with required trade ({}) is available in the worker pool; add a worker with that trade or edit the task".format(
-                        "/".join(sorted(matched_trades))
-                    ),
+                    "skip_reason": skip_reason,
                 })
+                _log(skip_reason=skip_reason)
                 continue
 
         # Re-evaluate tasks that already have a full assignment: skip them only
@@ -700,6 +1053,7 @@ def auto_assign_tasks(
             "skipped": False,
             "skip_reason": None,
         })
+        _log(chosen_ids=chosen_ids)
 
     if not dry_run:
         db.commit()

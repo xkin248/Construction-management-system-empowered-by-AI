@@ -9,6 +9,8 @@ Usage: call ``ensure_settings_columns(engine)`` right after ``create_all``.
 """
 from sqlalchemy import inspect, text
 
+from app import models  # noqa: F401  (registers every table on Base.metadata)
+
 # New columns added to the settings table over time: {column: server_default}
 _SETTINGS_ADDITIONS = {
     "check_in_start": "08:00",
@@ -232,3 +234,20 @@ def ensure_task_progress_columns(engine) -> list:
             )
             added.append(f"tasks.{col}")
     return added
+
+
+def ensure_ai_decision_log_table(engine) -> bool:
+    """Create the ``ai_decision_log`` table on databases that predate it.
+
+    ``Base.metadata.create_all`` already creates missing tables, but this helper
+    keeps the schema bootstrap explicit (and order-independent) so an old SQLite
+    file or a fresh PostgreSQL instance both end up with the audit table before
+    the AI endpoints write their first decision row. Safe to call repeatedly.
+    Returns True when the table exists after the call.
+    """
+    table = models.AIDecisionLog.__table__
+    inspector = inspect(engine)
+    if table.name in set(inspector.get_table_names()):
+        return True
+    table.create(bind=engine, checkfirst=True)
+    return True

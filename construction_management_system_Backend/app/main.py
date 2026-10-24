@@ -6,7 +6,7 @@ import os
 
 from app.database import engine, Base, SessionLocal, settings
 from app import models
-from app.db_migrate import ensure_settings_columns, ensure_fcm_columns, ensure_attendance_columns, ensure_task_timestamp_columns, ensure_task_progress_columns
+from app.db_migrate import ensure_settings_columns, ensure_fcm_columns, ensure_attendance_columns, ensure_task_timestamp_columns, ensure_task_progress_columns, ensure_ai_decision_log_table
 
 logger = logging.getLogger("buildsmart.startup")
 
@@ -30,6 +30,7 @@ def _bootstrap_database() -> None:
         ensure_attendance_columns(engine)
         ensure_task_timestamp_columns(engine)
         ensure_task_progress_columns(engine)
+        ensure_ai_decision_log_table(engine)
         # Ensure the single-row settings table exists with default values on startup.
         with SessionLocal() as db:
             if db.query(models.Settings).count() == 0:

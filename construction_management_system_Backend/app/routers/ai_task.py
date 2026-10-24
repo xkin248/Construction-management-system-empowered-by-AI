@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Project, Task, TaskProgressLog, TaskWorker, Worker
+from app.ai_service import mark_decision_overridden
 from app.schemas import (
     AIMatchResult, TaskOut, TaskProgressLogOut,
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
@@ -386,7 +387,14 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
             _recalc_project_status(db, task.project_id)
 
     if "trade" in payload:
-        task.trade = str(payload.get("trade") or "").strip() or None
+        previous_trade = task.trade
+        new_trade = str(payload.get("trade") or "").strip() or None
+        task.trade = new_trade
+        # A supervisor hand-editing the trade is the ground truth for the AI
+        # decision that produced the old value: flag the latest decision row so
+        # the pair (prediction, corrected label) can be used for evaluation.
+        if (new_trade or "") != (previous_trade or ""):
+            mark_decision_overridden(db, task.task_id, new_trade)
 
     if "due_date" in payload or "due" in payload:
         task.due_date = _parse_date(payload.get("due_date") or payload.get("due"))

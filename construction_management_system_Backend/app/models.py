@@ -320,6 +320,45 @@ class PredictionHistory(Base):
     project = relationship("Project")
 
 
+class AIDecisionLog(Base):
+    """Audit trail of one AI trade/assignment decision.
+
+    Two stages are recorded so the team can close the data loop and evaluate the
+    AI on a real hold-out set later:
+
+    * ``trade_resolution`` - how the required trade was decided (keyword rule,
+      semantic matcher, Gemini fallback or a skip).
+    * ``auto_assign`` - the final per-task outcome of an auto-assign run.
+
+    ``was_overridden`` is back-filled when a supervisor later edits the task's
+    trade by hand, which turns every row into a labelled sample
+    (prediction vs. ground truth). Logging is best-effort: a write failure must
+    never block the assignment pipeline.
+    """
+    __tablename__ = "ai_decision_log"
+    log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    stage = Column(String(30), nullable=False, server_default="trade_resolution")
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    task_text = Column(Text, nullable=True)
+    # JSON list of trades matched by the deterministic keyword rules.
+    rule_trades = Column(Text, nullable=True)
+    # JSON object {trade: score} produced by the semantic matcher.
+    semantic_scores = Column(Text, nullable=True)
+    # Canonical trade finally decided (None when the decision was a skip).
+    final_trade = Column(String(100), nullable=True)
+    # rule | semantic | llm | skip
+    source = Column(String(20), nullable=False, server_default="rule")
+    confidence = Column(Float, nullable=True)
+    elapsed_ms = Column(Integer, nullable=True)
+    llm_used = Column(Boolean, nullable=False, server_default="0")
+    llm_reason = Column(Text, nullable=True)
+    skip_reason = Column(Text, nullable=True)
+    was_overridden = Column(Boolean, nullable=False, server_default="0", index=True)
+    override_trade = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class WorkerNotification(Base):
     """In-app notification for workers (FCM push is mirrored here).
 

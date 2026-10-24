@@ -320,6 +320,16 @@ class AITaskAnalysisResponse(BaseModel):
     estimated_duration: Optional[str] = None
     priority_suggestion: Optional[str] = None
     safety_notes: Optional[str] = None
+    # Decision transparency: lets the UI tell an unsure verdict (skip / low
+    # confidence) apart from a normal one without guessing from worker lists.
+    matched_trades: List[str] = []
+    low_confidence: bool = False
+    assignable: bool = True
+    confidence: Optional[float] = None
+    decision_source: Optional[str] = None
+    llm_used: bool = False
+    llm_reason: Optional[str] = None
+    notice: Optional[str] = None
 
 class AIAutoAssignRequest(BaseModel):
     project_id: Optional[int] = None

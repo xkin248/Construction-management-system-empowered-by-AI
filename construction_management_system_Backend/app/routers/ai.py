@@ -32,6 +32,7 @@ def task_analysis(
             joinedload(Task.project)
         ).filter(Task.task_id == request.task_id).first()
         if task:
+            task_info["task_id"] = task.task_id
             task_info["task_name"] = task.task_name
             task_info["description"] = task.description
             task_info["trade"] = task.trade
@@ -46,6 +47,9 @@ def task_analysis(
         db, task_info, request.project_id,
         same_project_only=request.same_project_only,
     )
+    # analyze_task appends an ai_decision_log row (the future evaluation set);
+    # persist it so the preview actually feeds the data loop.
+    db.commit()
     return AITaskAnalysisResponse(**result)
 
 
