@@ -477,6 +477,83 @@ def _llm_trade_decision(task_text: str, candidates: List[str]) -> Optional[Dict[
     }
 
 
+def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str, Any]:
+    """Resolve the required trade for a task text using the production pipeline.
+
+    Order (identical to what ``analyze_task`` has always done):
+      1. explicit trade picked by the user (dropdown) wins outright;
+      2. keyword detection ``_detect_trade_groups``;
+      3. ``_resolve_detected_trades`` arbitration of multi-hit keyword sets
+         (semantic scores, optional Gemini fallback when configured);
+      4. semantic supplement only when keywords found nothing AND the model has a
+         clear winner (best >= 0.6 and gap >= 0.15 from runner-up).
+
+    Extracted so the offline holdout evaluation in
+    ``scripts/eval_holdout.py`` exercises exactly the same code path instead of a
+    copy that can silently drift from production.
+    """
+    trace: Dict[str, Any] = {}
+    keyword_trades: set = set()
+    raw_semantic_scores: Dict[str, float] = {}
+
+    explicit = (explicit_trade or "").strip().lower()
+    explicit_group = _worker_trade_group(explicit) if explicit else None
+    if explicit_group:
+        detected_trades = {explicit_group}
+        semantic_scores: Dict[str, float] = {explicit_group: 1.0}
+        trade_source = "explicit"
+        trace = {"source": "rule", "confidence": 1.0, "llm_used": False, "llm_reason": None}
+    else:
+        raw_semantic_scores = _semantic_trade_scores(task_text)
+        semantic_scores = raw_semantic_scores
+        keyword_trades = _detect_trade_groups(task_text)
+        detected_trades = _resolve_detected_trades(
+            task_text, keyword_trades, semantic_scores, trace=trace
+        )
+        if not detected_trades and trace.get("source") != "llm":
+            if semantic_scores:
+                best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
+                sorted_scores = sorted(semantic_scores.values(), reverse=True)
+                gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
+                if best_score >= 0.6 and gap >= 0.15:
+                    detected_trades = {best_trade}
+                    trace = {"source": "semantic", "confidence": best_score,
+                             "llm_used": False, "llm_reason": None}
+        elif detected_trades:
+            semantic_scores = {canonical: 1.0 for canonical in detected_trades}
+        trade_source = "semantic"
+
+    if explicit_group:
+        confidence = 1.0
+    elif detected_trades:
+        confidence = float(trace.get("confidence") or 0.0)
+        if confidence <= 0.0:
+            confidence = max((raw_semantic_scores.get(g, 0.0) for g in detected_trades), default=0.0)
+        if confidence <= 0.0:
+            # No semantic model available: a single unambiguous keyword hit is
+            # strong evidence, several competing hits are not.
+            confidence = 0.9 if len(detected_trades) == 1 else 0.6
+    else:
+        confidence = 0.0
+
+    low_confidence = explicit_group is None and not detected_trades
+    if low_confidence:
+        trace.setdefault("source", "skip")
+        trace["confidence"] = 0.0
+
+    return {
+        "detected_trades": detected_trades,
+        "semantic_scores": semantic_scores,
+        "raw_semantic_scores": raw_semantic_scores,
+        "keyword_trades": keyword_trades,
+        "trace": trace,
+        "confidence": confidence,
+        "low_confidence": low_confidence,
+        "explicit_group": explicit_group,
+        "trade_source": trade_source,
+    }
+
+
 def analyze_task(
     db,
     task_info: Dict[str, Any],
@@ -495,71 +572,19 @@ def analyze_task(
     description = task_info.get("description", "")
     task_text = f"{task_name} {description}".lower()
 
-    # Decision bookkeeping (audit log + confidence returned to the caller).
-    trace: Dict[str, Any] = {}
-    keyword_trades: set = set()
-    raw_semantic_scores: Dict[str, float] = {}
-
-    # 1. Explicit trade selection (user picked a trade from the dropdown when
-    #    creating/editing a task) takes priority over any keyword/semantic
-    #    guess: map the raw value to its canonical group. If it maps, skip
-    #    keyword/semantic detection entirely; if it does not map, ignore it
-    #    and fall through to the normal text-based detection.
-    explicit = (task_info.get("trade") or "").strip().lower()
-    explicit_group = _worker_trade_group(explicit) if explicit else None
-    if explicit_group:
-        detected_trades = {explicit_group}
-        semantic_scores = {explicit_group: 1.0}
-        trade_source = "explicit"
-        trace = {"source": "rule", "confidence": 1.0, "llm_used": False, "llm_reason": None}
-    else:
-        raw_semantic_scores = _semantic_trade_scores(task_text)
-        semantic_scores = raw_semantic_scores
-        # 2. Keyword detection first (TASK_KEYWORDS substring match — reliable, no false positives).
-        keyword_trades = _detect_trade_groups(task_text)
-        # 2b. Ambiguous multi-hit: resolve with semantic scores / LLM fallback.
-        detected_trades = _resolve_detected_trades(task_text, keyword_trades, semantic_scores, trace=trace)
-        # 3. Semantic detection as a supplement — only when keywords found nothing AND
-        #    the semantic model has a clear winner (score >= 0.6 & gap >= 0.15 from runner-up).
-        #    This prevents the old bug where "electric" scored 0.35 for ALL trades and
-        #    max() picked the alphabetically-first 'carpenter', mis-assigning electrical tasks.
-        #    A low-confidence LLM verdict deliberately leaves ``detected_trades`` empty
-        #    (trace source == "llm"); the supplement must not resurrect a guess there.
-        if not detected_trades and trace.get("source") != "llm":
-            if semantic_scores:
-                best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
-                sorted_scores = sorted(semantic_scores.values(), reverse=True)
-                gap = best_score - (sorted_scores[1] if len(sorted_scores) > 1 else 0.0)
-                if best_score >= 0.6 and gap >= 0.15:
-                    detected_trades = {best_trade}
-                    trace = {"source": "semantic", "confidence": best_score,
-                             "llm_used": False, "llm_reason": None}
-        elif detected_trades:
-            semantic_scores = {canonical: 1.0 for canonical in detected_trades}
-        trade_source = "semantic"
-
-    # Vague-text guard: no explicit trade AND nothing keyword/semantic could
-    # identify (e.g. "test"/"test") -> never auto-assign such a task. A trade
-    # decided by the LLM only counts when its confidence clears the skip
-    # threshold, so a hesitant verdict keeps the task unassignable.
-    low_confidence = explicit_group is None and not detected_trades
-
-    if explicit_group:
-        confidence = 1.0
-    elif detected_trades:
-        confidence = float(trace.get("confidence") or 0.0)
-        if confidence <= 0.0:
-            confidence = max((raw_semantic_scores.get(g, 0.0) for g in detected_trades), default=0.0)
-        if confidence <= 0.0:
-            # No semantic model available: a single unambiguous keyword hit is
-            # strong evidence, several competing hits are not.
-            confidence = 0.9 if len(detected_trades) == 1 else 0.6
-    else:
-        confidence = 0.0
-
-    if low_confidence:
-        trace.setdefault("source", "skip")
-        trace["confidence"] = 0.0
+    # Trade resolution (explicit trade > keyword detection > arbitration > semantic
+    # supplement). Extracted into resolve_trade_decision() so the offline holdout
+    # evaluation runs the exact same pipeline; see its docstring for the order.
+    decision = resolve_trade_decision(task_text, task_info.get("trade") or "")
+    detected_trades = decision["detected_trades"]
+    semantic_scores = decision["semantic_scores"]
+    raw_semantic_scores = decision["raw_semantic_scores"]
+    keyword_trades = decision["keyword_trades"]
+    trace = decision["trace"]
+    confidence = decision["confidence"]
+    low_confidence = decision["low_confidence"]
+    explicit_group = decision["explicit_group"]
+    trade_source = decision["trade_source"]
 
 
     suggested_workers = []

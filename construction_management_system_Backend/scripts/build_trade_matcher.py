@@ -76,8 +76,14 @@ STOP_WORDS = (
     | set(ENGLISH_STOP_WORDS)
 )
 
-def build_profiles():
-    df = pd.read_parquet(DATA / "job_categorization.parquet")
+def build_profiles(df: pd.DataFrame = None):
+    """Build per-trade profile titles from the dataset.
+
+    ``df`` lets callers (e.g. the holdout evaluation) train on a data subset;
+    default reads the full parquet so the production artefact is unchanged.
+    """
+    if df is None:
+        df = pd.read_parquet(DATA / "job_categorization.parquet")
     profiles = {}
     titles_all = []
     trade_labels = []
@@ -91,8 +97,14 @@ def build_profiles():
             trade_labels.append(trade)
     return profiles, titles_all, trade_labels
 
-def main():
-    profiles, titles_all, trade_labels = build_profiles()
+
+def train_matcher(profiles):
+    """Fit the TF-IDF trade matcher from per-trade profile titles.
+
+    Returns the joblib payload dict (vectorizer / trade_names / trade_vectors)
+    without touching disk, so the holdout evaluation can train on its 80% split
+    and keep production files untouched.
+    """
     # Profile text = dataset titles + seed keywords repeated for weight.
     docs = []
     for trade in CANONICAL:
@@ -109,14 +121,19 @@ def main():
         max_features=20000,
     )
     X = vec.fit_transform(docs)
+    return {"vectorizer": vec, "trade_names": CANONICAL, "trade_vectors": X}
+
+
+def main():
+    profiles, titles_all, trade_labels = build_profiles()
+    matcher = train_matcher(profiles)
+    vec = matcher["vectorizer"]
+    X = matcher["trade_vectors"]
     print("vocab size:", len(vec.vocabulary_))
     for i, trade in enumerate(CANONICAL):
         print(f"  {trade}: {len(profiles[trade])} titles, {X[i].nnz} nz features")
 
-    joblib.dump(
-        {"vectorizer": vec, "trade_names": CANONICAL, "trade_vectors": X},
-        DATA / "trade_matcher.joblib",
-    )
+    joblib.dump(matcher, DATA / "trade_matcher.joblib")
     with open(DATA / "trade_profiles.json", "w", encoding="utf-8") as f:
         json.dump(profiles, f, ensure_ascii=False, indent=2)
     print("saved:", DATA / "trade_matcher.joblib")
