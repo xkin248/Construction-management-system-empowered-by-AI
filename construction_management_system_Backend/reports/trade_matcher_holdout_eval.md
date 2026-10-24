@@ -1,6 +1,6 @@
 # Trade Matcher Holdout Evaluation
 
-- Generated: 2026-10-24 18:15
+- Generated: 2026-10-24 18:22
 - Script: `scripts/eval_holdout.py` (re-runnable, fixed seed)
 - Data: `data/job_categorization.parquet`
 - Seed: `42`, holdout size: `20%` (grouped by cleaned title, identical text never splits)
@@ -33,13 +33,15 @@ Ambiguous categories (a title legitimately belongs to more than one trade, e.g. 
 | --- | --- | --- |
 | Top-1 accuracy (prediction ∈ expected trades) | **78.8%** | 93.3% |
 | Exact trade-set match | 72.1% | 87.5% |
-| Macro recall over 16 trades | 76.2% | 88.8% |
+| Macro recall over 16 trades | 81.6% | 94.2% |
 | Macro strict recall (primary label) | 74.6% | 88.1% |
 | No trade identified (skip) | 7 (6.7%) | 0 (0.0%) |
 
 The shipped model was fitted on the full dataset, so it has already seen every holdout title. It scores 93.3% versus 78.8% for the leak-free model — a +14.4 pp optimism that quantifies how much of the previously reported accuracy came from memorising the training titles rather than generalising.
 
 ## 3. Per-trade recall (honest holdout)
+
+`Recall` credits a row when the decision is correct for that trade, i.e. the predicted trade is a member of the expected set; ambiguous categories therefore give credit to every trade they can legitimately map to. `Strict recall` only credits the primary label, so it drops for trades that are usually the secondary side of an ambiguity (e.g. `flooring`, `insulation`).
 
 | Trade | Support (rows where trade is expected) | Recall | Primary support | Strict recall |
 | --- | ---: | ---: | ---: | ---: |
@@ -51,7 +53,7 @@ The shipped model was fitted on the full dataset, so it has already seen every h
 | welding | 8 | 100.0% | 8 | 100.0% |
 | hvac | 7 | 57.1% | 7 | 57.1% |
 | roofing | 4 | 100.0% | 4 | 100.0% |
-| tiling | 7 | 14.3% | 7 | 14.3% |
+| tiling | 7 | 100.0% | 7 | 14.3% |
 | drywall | 5 | 100.0% | 5 | 100.0% |
 | glazing | 1 | 100.0% | 1 | 100.0% |
 | flooring | 6 | 100.0% | 0 | n/a |

@@ -183,7 +183,10 @@ def metrics(preds: list[dict]) -> dict:
     per_trade = {}
     for trade in CANONICAL:
         support = [p for p in preds if trade in p["expected"]]
-        hits = [p for p in support if trade in p["predicted"]]
+        # Recall is credited per expected trade: any prediction that is a member of
+        # the expected set counts (so tiling/flooring style ambiguities are not
+        # double-penalised). Strict recall below only credits the primary label.
+        hits = [p for p in support if p["correct_top1"]]
         strict_support = [p for p in preds if p["expected_primary"] == trade]
         strict_hits = [p for p in strict_support if p["predicted_primary"] == trade]
         per_trade[trade] = {
@@ -318,6 +321,12 @@ def render_report(ctx: dict) -> str:
     add("")
 
     add("## 3. Per-trade recall (honest holdout)")
+    add("")
+    add("`Recall` credits a row when the decision is correct for that trade, i.e. the predicted "
+        "trade is a member of the expected set; ambiguous categories therefore give credit to "
+        "every trade they can legitimately map to. `Strict recall` only credits the primary "
+        "label, so it drops for trades that are usually the secondary side of an ambiguity "
+        "(e.g. `flooring`, `insulation`).")
     add("")
     add("| Trade | Support (rows where trade is expected) | Recall | Primary support | Strict recall |")
     add("| --- | ---: | ---: | ---: | ---: |")
