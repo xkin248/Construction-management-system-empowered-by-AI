@@ -6,7 +6,7 @@ Why this exists
 from the same seed keywords used to build the model, so its accuracy is
 optimistic and cannot tell us how the matcher behaves on unseen wording.
 
-This script measures the *honest* generalisation number:
+This is the dev / tuning split (seed 42). It is **not** a generalisation estimate:
 
 1. Load ``data/job_categorization.parquet`` and keep only the rows whose
    ``category`` is mapped to one of the 16 canonical construction trades
@@ -262,7 +262,13 @@ def render_report(ctx: dict) -> str:
     lines: list[str] = []
     add = lines.append
 
-    add("# Trade Matcher Holdout Evaluation")
+    add("# Trade Matcher - dev split evaluation (tuning set, seed 42)")
+    add("")
+    add("> **This is the dev / tuning split, not a generalisation estimate.**")
+    add("> The keyword tables were designed against the failures of exactly these 104 rows,")
+    add("> so the accuracy below is an upper bound fitted to this split. The honest number")
+    add("> comes from the untouched test split in `reports/trade_matcher_tuning.md`")
+    add("> (`scripts/eval_trade_test.py`, seed 2026, scored once).")
     add("")
     add(f"- Generated: {ctx['generated_at']}")
     add(f"- Script: `scripts/eval_holdout.py` (re-runnable, fixed seed)")
@@ -320,7 +326,7 @@ def render_report(ctx: dict) -> str:
         f"accuracy came from memorising the training titles rather than generalising.")
     add("")
 
-    add("## 3. Per-trade recall (honest holdout)")
+    add("## 3. Per-trade recall (dev split)")
     add("")
     add("`Recall` credits a row when the decision is correct for that trade, i.e. the predicted "
         "trade is a member of the expected set; ambiguous categories therefore give credit to "
@@ -340,7 +346,7 @@ def render_report(ctx: dict) -> str:
         add(f"Trades with **zero** recall on the holdout: {', '.join(f'`{t}`' for t in zero)}.")
         add("")
 
-    add("## 4. Decision source breakdown (honest holdout)")
+    add("## 4. Decision source breakdown (dev split)")
     add("")
     add("| Source | Rows | Correct | Accuracy |")
     add("| --- | ---: | ---: | ---: |")
@@ -349,7 +355,7 @@ def render_report(ctx: dict) -> str:
         add(f"| {src} | {agg['n']} | {agg['correct']} | {fmt_pct(acc)} |")
     add("")
 
-    add("## 5. Confusion matrix (honest holdout)")
+    add("## 5. Confusion matrix (dev split)")
     add("")
     labels, cols, matrix = ctx["confusion"]
     add("Rows = expected trade (primary label), columns = predicted trade, `skip` = no trade "
@@ -371,7 +377,7 @@ def render_report(ctx: dict) -> str:
         add(f"| **{row}** | " + " | ".join(cells) + " |")
     add("")
 
-    add("## 6. Top failure cases (honest holdout)")
+    add("## 6. Top failure cases (dev split)")
     add("")
     add("`confidence` is the raw pipeline confidence; for semantic decisions it can exceed 1.0 "
         "because the score formula adds a seed-hit bonus on top of the normalised cosine "
@@ -426,9 +432,10 @@ def render_report(ctx: dict) -> str:
 
     add("## 8. How to read these numbers")
     add("")
-    add(f"- **{fmt_pct(honest['accuracy'])} is the number to trust** for unseen wording; the "
-        f"previous {fmt_pct(prod['accuracy'])}-style figures were measured on text the model had "
-        f"already memorised.")
+    add("- **This split is the dev / tuning set.** The keyword tables in `app/ai_service.py` were "
+        "revised against its failures, so the accuracy above is an upper bound fitted to these rows - "
+        "do not quote it as the model's generalisation. Use `reports/trade_matcher_tuning.md` "
+        "(fresh test split, seed 2026) for that.")
     add("- The gap is not purely \"the model is weak\": the 80% model also has a smaller TF-IDF "
         "vocabulary (some holdout words never appear in the 80% titles), which is a realistic "
         "stand-in for new site wording the production model has not seen.")
@@ -605,7 +612,7 @@ def main() -> int:
                 json.dumps(p["scores"], ensure_ascii=False),
             ])
 
-    print(f"honest holdout accuracy: {honest_metrics['accuracy'] * 100:.1f}% "
+    print(f"dev-split accuracy (tuned on): {honest_metrics['accuracy'] * 100:.1f}% "
           f"(n={honest_metrics['n']}, skipped={honest_metrics['skipped']})")
     print(f"shipped model accuracy:  {prod_metrics['accuracy'] * 100:.1f}%")
     print(f"report: {report_path}")
