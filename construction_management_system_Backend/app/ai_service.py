@@ -89,7 +89,7 @@ TRADE_ALIASES: Dict[str, List[str]] = {
     "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
     "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
-    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
+    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
     "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
     "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
     "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面", "bumbung", "atap"],
@@ -111,9 +111,9 @@ TASK_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai", "marquetry", "inlay", "cabinetmaker"],
     "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel", "wirer", "wireman"],
     "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump"],
-    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforc", "post tension", "curbstone", "kiln"],
-    "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料", "mengecat", "pengecat"],
-    "welding": ["welding", "weld", "steel", "metal", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
+    "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforc", "post tension", "curbstone", "kiln", "cement patcher", "furnace mason", "refractory"],
+    "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "wallpaper", "wallpapering", "decorator"],
+    "welding": ["welding", "weld", "steel", "metal", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli", "solder", "soldering", "brazing", "boilermaker", "sub arc", "arc weld", "spot weld", "boiler installer", "boiler mechanic"],
     "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan", "boiler", "furnace", "stoker", "refrigeration", "cold room"],
     "roofing": ["roofing", "roofer", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面", "bumbung", "atap"],
     "tiling": ["tiling", "tile", "tiler", "ceramic", "grout", "backsplash", "瓷砖", "地砖", "jubin", "mozek"],
@@ -121,7 +121,7 @@ TASK_KEYWORDS: Dict[str, List[str]] = {
     "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗", "kaca", "tingkap"],
     "flooring": ["flooring", "floor", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
     "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan", "detailer", "wash", "washer", "landscap", "shrub", "sod", "planter", "groundskeep", "lawn", "mover", "loader", "sign post", "sign board", "sign installation"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan", "detailer", "wash", "washer", "landscap", "shrub", "sod", "planter", "groundskeep", "lawn", "mover", "loader", "sign post", "sign board", "sign installation", "material handler", "cargo handler", "package handler", "freight handler"],
     "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca", "asbestos", "hazardous", "abatement"],
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
@@ -131,9 +131,9 @@ SEED_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai", "marquetry", "inlay", "cabinetmaker"],
     "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel", "wirer", "wireman"],
     "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump"],
-    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforcing", "post tension", "curbstone", "kiln", "granite"],
-    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding"],
-    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli"],
+    "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforcing", "post tension", "curbstone", "kiln", "granite", "cement patcher", "furnace mason", "refractory"],
+    "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
+    "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli", "solder", "soldering", "brazing", "boilermaker", "sub arc", "arc weld", "spot weld", "boiler installer", "boiler mechanic"],
     "hvac": ["hvac", "air conditioning", "aircon", "cooling", "ventilation", "ahu", "duct", "refrigerant", "vent", "air vent", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan", "boiler", "furnace", "stoker", "refrigeration", "stationary engineer"],
     "roofing": ["roofer", "roofing", "roof", "shingle", "membrane", "waterproof", "bitumen", "屋顶", "屋面", "bumbung", "atap"],
     "tiling": ["tile", "tiler", "tiling", "ceramic", "grout", "backsplash", "瓷砖", "地砖", "jubin", "mozek"],
@@ -141,7 +141,7 @@ SEED_KEYWORDS: Dict[str, List[str]] = {
     "glazing": ["glazier", "glass", "window", "glazing", "玻璃", "门窗安装", "kaca", "tingkap"],
     "flooring": ["floor", "flooring", "linoleum", "carpet", "vinyl", "laminate", "epoxy", "wooden floor", "grind", "grinding", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
     "equipment": ["operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "forklift", "concrete pump", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan", "detailer", "wash", "washer", "landscap", "shrub", "sod", "planter", "groundskeep", "lawn", "mover", "loader", "sign post", "sign board", "sign installation"],
+    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "clean", "debris", "scaffold", "scaffolding", "barrier", "demolish", "demolition", "carry", "haul", "unload", "jackhammer", "signage", "breaking", "chipping", "rubble", "sweep", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan", "detailer", "wash", "washer", "landscap", "shrub", "sod", "planter", "groundskeep", "lawn", "mover", "loader", "sign post", "sign board", "sign installation", "material handler", "cargo handler", "package handler", "freight handler"],
     "insulation": ["insulation", "insulator", "insulate", "rockwool", "fiberglass", "foam", "cavity", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca", "asbestos", "hazardous", "abatement", "radiological"],
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "工地主任", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
@@ -162,6 +162,13 @@ _SEMANTIC_STOP = (
 )
 
 _TRADE_MATCHER: Any = None
+_TRADE_CLASSIFIER: Any = None
+
+# Supervised classifier settings. The classifier is the primary decision maker;
+# the keyword rules stay as a hard prior and the profile matcher as the degraded
+# path (older artefact, missing file, unexpected sklearn version, ...).
+TRADE_CLASSIFIER_PRIOR_WEIGHT = 0.5   # +50% probability when a rule keyword hits
+TRADE_CLASSIFIER_SKIP_PROB = 0.25     # below this with no keyword hit -> "skip"
 
 
 def _load_trade_matcher():
@@ -180,9 +187,99 @@ def _load_trade_matcher():
     return _TRADE_MATCHER or None
 
 
+def _load_trade_classifier():
+    """Lazily load the supervised trade classifier (``data/trade_classifier.joblib``).
+
+    Returns ``None`` (never raises) when the artefact is absent or cannot be
+    deserialised, so a missing/old model degrades to the keyword + profile path
+    instead of breaking task analysis.
+    """
+    global _TRADE_CLASSIFIER
+    if _TRADE_CLASSIFIER is not None:
+        return _TRADE_CLASSIFIER or None
+    if not SEMANTIC_AVAILABLE:
+        _TRADE_CLASSIFIER = False
+        return None
+    try:
+        p = Path(__file__).resolve().parent.parent / "data" / "trade_classifier.joblib"
+        _TRADE_CLASSIFIER = joblib.load(p)
+    except Exception:
+        _TRADE_CLASSIFIER = False
+    return _TRADE_CLASSIFIER or None
+
+
 def _clean_text(text: str) -> str:
     t = re.sub(r"[^a-zA-Z0-9\u4e00-\u9fff ]+", " ", str(text).lower())
     return re.sub(r"\s+", " ", t).strip()
+
+
+def _classifier_trade_scores(task_text: str) -> Dict[str, float]:
+    """Return {canonical_trade: probability} from the supervised classifier.
+
+    Empty dict when the classifier is unavailable, the text is empty after
+    cleaning, or prediction fails - callers must treat that as "degrade".
+    """
+    bundle = _load_trade_classifier()
+    if not bundle:
+        return {}
+    try:
+        text = _clean_text(task_text)
+        if not text:
+            return {}
+        probs = bundle["model"].predict_proba([text])[0]
+        return {
+            str(cls): float(p)
+            for cls, p in zip(bundle["model"].classes_, probs)
+        }
+    except Exception:
+        return {}
+
+
+def _classifier_trade_decision(
+    task_text: str,
+    keyword_trades: set,
+    trace: Optional[Dict[str, Any]] = None,
+) -> Optional[set]:
+    """Decide the trade from the supervised classifier.
+
+    Rules (in order):
+
+    * no classifier available -> ``None`` so the caller falls back to the legacy
+      keyword + profile pipeline;
+    * keyword hits act as a prior (+``TRADE_CLASSIFIER_PRIOR_WEIGHT`` of the
+      probability) because the rule layer is hand-checked domain knowledge, but
+      they can no longer *own* a trade on their own: a title like
+      ``precast concrete ironworker`` hits masonry keywords while the classifier
+      knows it is a welding occupation;
+    * when the winning probability is below ``TRADE_CLASSIFIER_SKIP_PROB`` and no
+      keyword fired, return an empty set ("unassignable"): we prefer the existing
+      low-confidence path (LLM worker suggestion) over a coin-flip guess.
+    """
+    scores = _classifier_trade_scores(task_text)
+    if not scores:
+        return None
+    fused = {
+        trade: prob * (1.0 + TRADE_CLASSIFIER_PRIOR_WEIGHT if trade in keyword_trades else 1.0)
+        for trade, prob in scores.items()
+    }
+    best = max(fused, key=lambda t: fused[t])
+    best_prob = float(scores.get(best, 0.0))
+    if trace is not None:
+        trace.clear()
+        trace.update({
+            "source": "classifier",
+            "confidence": best_prob,
+            "llm_used": False,
+            "llm_reason": None,
+            "classifier_top": best,
+            "classifier_prob": round(best_prob, 4),
+        })
+    if not keyword_trades and best_prob < TRADE_CLASSIFIER_SKIP_PROB:
+        if trace is not None:
+            trace["source"] = "skip"
+            trace["confidence"] = 0.0
+        return set()
+    return {best}
 
 
 def _semantic_trade_scores(task_text: str) -> Dict[str, float]:
@@ -236,6 +333,56 @@ def _detect_trade_groups(task_text: str) -> set:
         group for group, keywords in TASK_KEYWORDS.items()
         if any(kw in task_text for kw in keywords)
     }
+
+
+# Toggle for the family rules below (kept as a module flag so the evaluation
+# scripts can measure the classifier both with and without them).
+_STRUCTURED_RULES = True
+
+# Compound title families where the deciding token is the head noun, and where
+# bag-of-words similarity is structurally blind. Each entry: (regex, trade).
+# Rationale for every family:
+#   * boilermaker / boiler installer / boiler mechanic are pressure-vessel
+#     fabricators, i.e. the welding group - not HVAC ("boiler operator" is,
+#     which is why the rule needs the occupational suffixes);
+#   * <cargo|package|freight|material> handler moves goods - a laborer, not an
+#     insulator (insulation only owns *hazardous* material handling);
+#   * wallpaper hangers are painters (the dataset files them under painting);
+#   * a soldering / brazing / arc machine operator is a welding trade even
+#     though the word "operator" belongs to the equipment group;
+#   * a furnace mason builds refractory brickwork - masonry, not HVAC.
+_STRUCTURED_TITLE_RULES: List[tuple] = [
+    # (pattern, trade, needs_role_hint)
+    (r"\bboiler\s*(?:maker|installer|mechanic|setter|fitter|erector|repairer)", "welding", False),
+    (r"\b(?:cargo|package|freight|stock|baggage|luggage|material)\s+handler", "laborer", False),
+    (r"\bwallpaper", "painting", False),
+    (r"\b(?:soldering|brazing|sub\s*arc|arc\s*weld\w*|spot\s*weld\w*|seam\s*weld\w*)", "welding", True),
+    (r"\bfurnace\s+mason", "masonry", False),
+]
+
+# Welding processes are only decisive when the title names a machine role
+# ("soldering machine setter", "sub arc operator"); a plain "soldering" mention
+# must not steal a labouring row.
+_ROLE_HINTS = ("operator", "tender", "setter", "setup", "machine")
+
+
+def _structured_title_trade(task_text: str) -> Optional[str]:
+    """Return a trade for the compound title families, or None.
+
+    These families are decided by a head noun ("boiler*", "* handler",
+    "wallpaper*") that a similarity model cannot see: the surrounding words
+    (installer, machine, material) pull it towards HVAC / equipment /
+    insulation instead. Deliberately narrow and literal - a rule that fires
+    wrongly is worse than a rule that does not exist, so each pattern pins both
+    the head noun and its occupational suffix.
+    """
+    for pattern, trade, needs_role in _STRUCTURED_TITLE_RULES:
+        if not re.search(pattern, task_text):
+            continue
+        if needs_role and not any(hint in task_text for hint in _ROLE_HINTS):
+            continue
+        return trade
+    return None
 
 
 def _resolve_detected_trades(
@@ -480,11 +627,15 @@ def _llm_trade_decision(task_text: str, candidates: List[str]) -> Optional[Dict[
 def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str, Any]:
     """Resolve the required trade for a task text using the production pipeline.
 
-    Order (identical to what ``analyze_task`` has always done):
+    Order:
       1. explicit trade picked by the user (dropdown) wins outright;
-      2. keyword detection ``_detect_trade_groups``;
-      3. ``_resolve_detected_trades`` arbitration of multi-hit keyword sets
-         (semantic scores, optional Gemini fallback when configured);
+      2. supervised classifier ``_classifier_trade_decision`` (dataset labels,
+         keyword hits used as a prior) - this is what fixes the structural
+         failures the keyword + centroid layers could not express;
+      3. when the classifier is unavailable, OR when it abstains (lowest
+         confidence) while keywords did fire: ``_detect_trade_groups`` +
+         ``_resolve_detected_trades`` arbitration (semantic scores, optional
+         Gemini fallback when configured);
       4. semantic supplement only when keywords found nothing AND the model has a
          clear winner (best >= 0.6 and gap >= 0.15 from runner-up).
 
@@ -495,6 +646,7 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
     trace: Dict[str, Any] = {}
     keyword_trades: set = set()
     raw_semantic_scores: Dict[str, float] = {}
+    classifier_scores: Dict[str, float] = {}
 
     explicit = (explicit_trade or "").strip().lower()
     explicit_group = _worker_trade_group(explicit) if explicit else None
@@ -504,12 +656,44 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
         trade_source = "explicit"
         trace = {"source": "rule", "confidence": 1.0, "llm_used": False, "llm_reason": None}
     else:
-        raw_semantic_scores = _semantic_trade_scores(task_text)
-        semantic_scores = raw_semantic_scores
         keyword_trades = _detect_trade_groups(task_text)
-        detected_trades = _resolve_detected_trades(
-            task_text, keyword_trades, semantic_scores, trace=trace
-        )
+        # Compound-title families first (boilermaker / * handler / wallpaper /
+        # soldering-machine operator): the deciding token is the head noun, which
+        # no similarity model can weigh against the surrounding words.
+        structured = _structured_title_trade(task_text) if _STRUCTURED_RULES else None
+        classified = None
+        if structured:
+            detected_trades = {structured}
+            semantic_scores = {structured: 1.0}
+            trade_source = "title-rule"
+            trace = {"source": "rule", "confidence": 0.95, "llm_used": False,
+                     "llm_reason": None, "rule": structured}
+        else:
+            # Classifier next: it is the only layer trained on the row labels, and
+            # it is where the plasterer / material-handler / machine-operator
+            # families are resolved. ``None`` = no artefact -> legacy path.
+            classified = _classifier_trade_decision(task_text, keyword_trades, trace=trace)
+            if classified is not None:
+                detected_trades = classified
+                classifier_scores = _classifier_trade_scores(task_text)
+                semantic_scores = raw_semantic_scores = classifier_scores
+                trade_source = "classifier"
+                # The classifier refused to guess, but the hand-checked keyword
+                # layer saw something: let the arbitration (keyword scores +
+                # optional LLM) take over rather than dropping the task.
+                if not detected_trades and keyword_trades:
+                    detected_trades = _resolve_detected_trades(
+                        task_text, keyword_trades, dict(_semantic_trade_scores(task_text)),
+                        trace=trace,
+                    )
+                    trade_source = "semantic"
+            else:
+                raw_semantic_scores = _semantic_trade_scores(task_text)
+                semantic_scores = raw_semantic_scores
+                detected_trades = _resolve_detected_trades(
+                    task_text, keyword_trades, semantic_scores, trace=trace
+                )
+                trade_source = "semantic"
         if not detected_trades and trace.get("source") != "llm":
             if semantic_scores:
                 best_trade, best_score = max(semantic_scores.items(), key=lambda x: x[1])
@@ -521,7 +705,6 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
                              "llm_used": False, "llm_reason": None}
         elif detected_trades:
             semantic_scores = {canonical: 1.0 for canonical in detected_trades}
-        trade_source = "semantic"
 
     if explicit_group:
         confidence = 1.0
@@ -546,6 +729,7 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
         "semantic_scores": semantic_scores,
         "raw_semantic_scores": raw_semantic_scores,
         "keyword_trades": keyword_trades,
+        "classifier_scores": classifier_scores,
         "trace": trace,
         "confidence": confidence,
         "low_confidence": low_confidence,

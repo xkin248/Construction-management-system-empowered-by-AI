@@ -34,6 +34,9 @@ def project(db):
 # ── decision log writing ────────────────────────────────────────────────────
 
 def test_analyze_task_writes_trade_resolution_log(db, project, no_gemini, monkeypatch):
+    # Force the keyword path: this test asserts the classic rule/log wiring, and the
+    # supervised classifier (which now runs first) is covered by test_trade_keywords.py.
+    monkeypatch.setattr(ai_service, "_TRADE_CLASSIFIER", False)
     monkeypatch.setattr(ai_service, "_semantic_trade_scores",
                         lambda text: {"electrical": 0.92, "plumbing": 0.11})
     monkeypatch.setattr(ai_service, "_detect_trade_groups", lambda text: {"electrical"})
@@ -86,7 +89,7 @@ def test_auto_assign_writes_decision_log(db, project, no_gemini, monkeypatch):
     row = db.query(AIDecisionLog).filter(AIDecisionLog.task_id == task.task_id).one()
     assert row.stage == "auto_assign"
     assert row.final_trade == "electrical"
-    assert row.source in ("rule", "semantic")
+    assert row.source in ("rule", "semantic", "classifier", "title-rule")
     assert row.confidence > 0
     assert row.llm_used is False
 
