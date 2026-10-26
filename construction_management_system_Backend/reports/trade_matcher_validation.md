@@ -185,6 +185,7 @@ These rows were read, not repaired: editing keywords or thresholds against them 
 | new dependencies | **none** - scikit-learn / numpy were already required by the profile matcher |
 | runtime memory | one short string → one sparse row; the loaded model is a few MB of coefficients, comfortably inside a Render free instance (512 MB) |
 | per-request cost | 2 `transform` + 1 `predict_proba` over 16 classes, sub-millisecond for a single row |
+| sklearn version drift | both committed artefacts are pickled with scikit-learn **1.9.0**, while `requirements.txt` still pins `scikit-learn==1.5.2` / `numpy==1.26.4`. This is pre-existing: the previous `trade_matcher.joblib` was built the same way and serves fine. Loading a newer pickle on an older sklearn prints `InconsistentVersionWarning`; `_load_trade_classifier` / `_load_trade_matcher` wrap the load in `try/except` and degrade to the keyword layer, so the worst case is 'no classifier', never a 500. Aligning the pins would drag numpy 1.26 -> 2.5 and other transitive deps with it, so it is left as a separate, deliberate upgrade |
 | embedding / torch | **not used** - hundreds of MB of image for a gain that cannot exist on a 518-row label set; the char n-gram block already absorbs the spelling variants an embedding would have covered |
 
 ## 8. What is still unsolved, and why
