@@ -267,3 +267,8 @@ Runtime visibility added in `app/ai_service.py` / `app/main.py`: `MODEL_STATUS` 
 `models_ok`. A silent keyword-only fallback is no longer reachable without a log line and a
 `models_ok: false` in the health payload.
 
+End-to-end check in the pinned venv, on the committed bytes: `/health` reports
+`models_ok: true`, both artefacts `loaded`, `degraded: []`, `version_mismatch: []`, and
+`catch_warnings` records zero `InconsistentVersionWarning`. Landed as `2ca95d2` on `main`
+(on top of `644ac4c`), together with the retrained bundles and `tests/test_model_artifacts.py`.
+
