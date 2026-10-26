@@ -199,13 +199,35 @@ These rows were read, not repaired: editing keywords or thresholds against them 
 | `* operator` beyond welding | partial | welding-process operators are handled; `bolting machine operator`, `transformer maker` and similar one-off titles remain wrong and are visible in §6 |
 | BM / Chinese wording | partial | seed keywords cover both, but neither the titles nor the classifier were trained on real BM/Chinese task text |
 
-## 9. Reproduce
+## 9. Tests and repository state
+
+`pytest -q` in `construction_management_system_Backend` is green: **75 passed**.
+
+| guard added this round | what it locks |
+| --- | --- |
+| `test_snapshot_plus_additions_equals_live_tables` | `scripts/fixtures/trade_keywords_pre_v2.json` + `ADDED_V2` reproduces the live `TASK_KEYWORDS` / `SEED_KEYWORDS` exactly, so the `before` column of §3 stays reproducible after future edits |
+| `test_compound_title_rules_are_narrow` | `boilermaker` / `boiler installer` / `boiler mechanic` → welding, `boiler operator` → **not** welding (HVAC), `* handler` → laborer, `wallpaper*` → painting, `soldering machine *` → welding, `furnace mason` → masonry, bare trade names → no rule |
+| `test_classifier_artefact_loads_and_predicts` | the shipped `.joblib` deserialises offline and scores `electrical` for wiring text |
+| `test_resolve_trade_decision_reports_known_source` | `trade_source` stays inside the documented enum (`explicit` / `title-rule` / `classifier` / `rule` / `semantic` / `skip`) |
+
+`tests/test_ai_decision_log.py` was updated, not loosened: the trade-resolution test now pins
+`_TRADE_CLASSIFIER = False` to assert the legacy keyword → `source == "rule"` wiring on purpose,
+and the auto-assign test accepts the two new sources (`classifier`, `title-rule`) alongside the old
+ones.
+
+Models were retrained on the full 518-row label set and written to disk
+(`data/trade_classifier.joblib`, `data/trade_matcher.joblib`); both are committed, so Render picks
+them up without a build step. Repo state: commit `523b447` on `main`, pushed. The repository has no
+backend CI workflow (the only workflows are the Android-release and GitHub-Pages jobs, path-filtered
+to the Flutter app), so the test run above is the verification of record.
+
+## 10. Reproduce
 
 ```bash
 cd construction_management_system_Backend
 python scripts/build_trade_matcher.py        # retrain matcher + classifier on full data
 python scripts/eval_trade_validation.py      # this report (valid split)
 python scripts/eval_trade_test.py            # previous round, dev + test (consumed)
-pytest tests/test_trade_keywords.py -q       # vocabulary / pipeline guards
+pytest -q                                    # full backend suite (includes the guards above)
 ```
 
