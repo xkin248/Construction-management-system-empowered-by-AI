@@ -1,5 +1,7 @@
 import os
 import json
+import logging
+import platform
 import re
 import time
 from collections import defaultdict
@@ -17,11 +19,14 @@ except ImportError:
 try:
     import joblib
     import numpy as np
+    import sklearn
     from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
     from sklearn.metrics.pairwise import cosine_similarity
     SEMANTIC_AVAILABLE = True
 except ImportError:
     SEMANTIC_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models import (
@@ -171,19 +176,133 @@ TRADE_CLASSIFIER_PRIOR_WEIGHT = 0.5   # +50% probability when a rule keyword hit
 TRADE_CLASSIFIER_SKIP_PROB = 0.25     # below this with no keyword hit -> "skip"
 
 
+# ── Artefact ↔ runtime alignment ─────────────────────────────────────────────
+# Both joblib bundles are pickles of scikit-learn estimators, so they only behave
+# like the validated models when they are loaded under the same scikit-learn /
+# numpy pair that produced them. That mismatch used to be swallowed by a bare
+# ``except`` and the pipeline silently fell back to keywords, which means a
+# retrained model could ship and never actually run. Every load now records its
+# outcome in MODEL_STATUS, warns loudly, and is surfaced on /health and in the
+# startup log, so "the semantic layer is not running" is visible.
+MODEL_ARTIFACTS = {
+    "trade_matcher": "trade_matcher.joblib",
+    "trade_classifier": "trade_classifier.joblib",
+}
+
+MODEL_STATUS: Dict[str, Dict[str, Any]] = {
+    name: {"state": "not_loaded", "path": None, "built_with": None,
+           "error": None, "loaded": False}
+    for name in MODEL_ARTIFACTS
+}
+
+
+def runtime_versions() -> Dict[str, Optional[str]]:
+    """Versions of the libraries that own the pickle format, as installed here."""
+    return {
+        "scikit-learn": getattr(sklearn, "__version__", None) if SEMANTIC_AVAILABLE else None,
+        "numpy": getattr(np, "__version__", None) if SEMANTIC_AVAILABLE else None,
+        "joblib": getattr(joblib, "__version__", None) if SEMANTIC_AVAILABLE else None,
+        "python": platform.python_version(),
+    }
+
+
+def _pickle_sklearn_version(bundle: Any) -> Optional[str]:
+    """Read the version stamp scikit-learn writes into every pickled estimator."""
+    stack, seen = [bundle], set()
+    while stack:
+        cur = stack.pop()
+        if id(cur) in seen:
+            continue
+        seen.add(id(cur))
+        version = getattr(cur, "_sklearn_version", None)
+        if isinstance(version, str):
+            return version
+        if isinstance(cur, dict):
+            stack.extend(cur.values())
+        elif isinstance(cur, (list, tuple, set)):
+            stack.extend(cur)
+        elif hasattr(cur, "__dict__") and not isinstance(cur, type):
+            stack.extend(vars(cur).values())
+    return None
+
+
+def _artifact_build_info(bundle: Any) -> Dict[str, Any]:
+    """Build-time library versions recorded next to the estimator."""
+    raw = bundle.get("meta") if isinstance(bundle, dict) else None
+    meta = dict(raw) if isinstance(raw, dict) else {}
+    if not meta.get("scikit-learn"):
+        stamped = _pickle_sklearn_version(bundle)
+        if stamped:
+            meta["scikit-learn"] = stamped
+            meta.setdefault("source", "pickle_stamp")
+    return meta
+
+
+def _load_artifact(name: str) -> Any:
+    """Load one joblib artefact, recording (never hiding) why it failed."""
+    entry = MODEL_STATUS[name]
+    path = Path(__file__).resolve().parent.parent / "data" / MODEL_ARTIFACTS[name]
+    entry["path"] = str(path)
+
+    if not SEMANTIC_AVAILABLE:
+        entry.update({
+            "state": "unavailable", "loaded": False,
+            "error": "scikit-learn / joblib cannot be imported in this environment",
+        })
+        logger.warning("Model artefact %s disabled: %s", name, entry["error"])
+        return None
+
+    try:
+        bundle = joblib.load(path)
+    except FileNotFoundError:
+        entry.update({"state": "missing", "loaded": False,
+                      "error": f"file not found: {path}"})
+        logger.warning(
+            "Model artefact %s is MISSING at %s - task analysis falls back to "
+            "keyword rules.", name, path,
+        )
+        return None
+    except Exception as exc:
+        entry.update({"state": "failed", "loaded": False,
+                      "error": f"{type(exc).__name__}: {str(exc).splitlines()[0]}"})
+        logger.warning(
+            "Model artefact %s FAILED to load from %s (%s) - task analysis falls "
+            "back to keyword rules. Rebuild it with scripts/build_trade_matcher.py "
+            "under the versions pinned in requirements.txt.", name, path, entry["error"],
+        )
+        return None
+
+    entry["built_with"] = _artifact_build_info(bundle) or None
+    entry["loaded"] = True
+    built_sklearn = (entry["built_with"] or {}).get("scikit-learn")
+    runtime_sklearn = runtime_versions().get("scikit-learn")
+
+    if built_sklearn and runtime_sklearn and built_sklearn != runtime_sklearn:
+        entry.update({
+            "state": "version_mismatch",
+            "error": f"built with scikit-learn {built_sklearn}, runtime has {runtime_sklearn}",
+        })
+        logger.warning(
+            "Model artefact %s was built with scikit-learn %s but this runtime has "
+            "%s (%s). It loaded, but its predictions may differ from the validated "
+            "ones - rebuild the artefact under the pinned versions.",
+            name, built_sklearn, runtime_sklearn, path,
+        )
+    else:
+        entry.update({"state": "loaded", "error": None})
+        logger.info(
+            "Model artefact %s loaded (built with scikit-learn %s).",
+            name, built_sklearn or "unknown",
+        )
+    return bundle
+
+
 def _load_trade_matcher():
     """Lazily load the dataset-trained task->trade semantic matcher (joblib)."""
     global _TRADE_MATCHER
     if _TRADE_MATCHER is not None:
         return _TRADE_MATCHER or None
-    if not SEMANTIC_AVAILABLE:
-        _TRADE_MATCHER = False
-        return None
-    try:
-        p = Path(__file__).resolve().parent.parent / "data" / "trade_matcher.joblib"
-        _TRADE_MATCHER = joblib.load(p)
-    except Exception:
-        _TRADE_MATCHER = False
+    _TRADE_MATCHER = _load_artifact("trade_matcher") or False
     return _TRADE_MATCHER or None
 
 
@@ -192,20 +311,61 @@ def _load_trade_classifier():
 
     Returns ``None`` (never raises) when the artefact is absent or cannot be
     deserialised, so a missing/old model degrades to the keyword + profile path
-    instead of breaking task analysis.
+    instead of breaking task analysis. The reason is recorded in MODEL_STATUS and
+    logged as a warning rather than silently swallowed.
     """
     global _TRADE_CLASSIFIER
     if _TRADE_CLASSIFIER is not None:
         return _TRADE_CLASSIFIER or None
-    if not SEMANTIC_AVAILABLE:
-        _TRADE_CLASSIFIER = False
-        return None
-    try:
-        p = Path(__file__).resolve().parent.parent / "data" / "trade_classifier.joblib"
-        _TRADE_CLASSIFIER = joblib.load(p)
-    except Exception:
-        _TRADE_CLASSIFIER = False
+    _TRADE_CLASSIFIER = _load_artifact("trade_classifier") or False
     return _TRADE_CLASSIFIER or None
+
+
+def model_status() -> Dict[str, Any]:
+    """Load both artefacts (cached) and report how well they match this runtime."""
+    _load_trade_matcher()
+    _load_trade_classifier()
+    degraded = [n for n, e in MODEL_STATUS.items() if not e["loaded"]]
+    mismatched = [n for n, e in MODEL_STATUS.items() if e["state"] == "version_mismatch"]
+    return {
+        "runtime": runtime_versions(),
+        "artifacts": {name: dict(entry) for name, entry in MODEL_STATUS.items()},
+        "degraded": degraded,
+        "version_mismatch": mismatched,
+        "all_loaded": not degraded,
+    }
+
+
+def log_model_status() -> Dict[str, Any]:
+    """Startup self-check: one explicit log line per artefact, error when degraded."""
+    status = model_status()
+    if status["degraded"]:
+        logger.error(
+            "SEMANTIC MODEL DEGRADED - %s could not be loaded, so task analysis runs "
+            "on keyword rules only. Causes: %s",
+            ", ".join(status["degraded"]),
+            "; ".join(f"{n} -> {MODEL_STATUS[n]['error']}" for n in status["degraded"]),
+        )
+    else:
+        logger.info(
+            "Semantic models loaded: %s. Runtime %s.",
+            ", ".join(f"{n} (built %s)" % (MODEL_STATUS[n]["built_with"] or {}).get("scikit-learn", "?")
+                      for n in MODEL_STATUS),
+            status["runtime"].get("scikit-learn"),
+        )
+    for name in status["version_mismatch"]:
+        logger.warning("Artefact %s / runtime version skew: %s", name, MODEL_STATUS[name]["error"])
+    return status
+
+
+def reset_model_cache() -> None:
+    """Forget the cached artefacts so the next call reloads them (tests/self-check)."""
+    global _TRADE_MATCHER, _TRADE_CLASSIFIER
+    _TRADE_MATCHER = None
+    _TRADE_CLASSIFIER = None
+    for entry in MODEL_STATUS.values():
+        entry.update({"state": "not_loaded", "loaded": False,
+                      "built_with": None, "error": None})
 
 
 def _clean_text(text: str) -> str:

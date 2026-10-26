@@ -51,6 +51,19 @@ def _bootstrap_database() -> None:
 
 _bootstrap_database()
 
+# Semantic-model self-check. The joblib artefacts are scikit-learn pickles, and a
+# version skew used to be swallowed at request time (silent fallback to keyword
+# rules). Loading them once at boot turns "the classifier never actually ran" into
+# an explicit startup log line, and /health keeps reporting the outcome.
+try:
+    from app import ai_service as _ai_service
+    _ai_service.log_model_status()
+except Exception as _exc:  # never block boot on the model check
+    logger.error(
+        "Semantic model self-check FAILED: %s",
+        f"{type(_exc).__name__}: {_exc}".splitlines()[0],
+    )
+
 app = FastAPI(title="Construction Management System API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True,
@@ -72,10 +85,19 @@ def root():
 
 @app.get("/health")
 def health():
+    # Expose the semantic-model state: a silently degraded classifier (missing or
+    # version-skewed artefact) is otherwise indistinguishable from a healthy API.
+    try:
+        models = _ai_service.model_status()
+    except Exception as exc:  # health must still answer
+        models = {"all_loaded": False, "error": f"{type(exc).__name__}: {exc}"}
     return {
         "status": "ok",
         "database": "ok" if DB_READY else "unavailable",
         "database_error": DB_BOOTSTRAP_ERROR or None,
+        "models": models,
+        "models_ok": bool(models.get("all_loaded"))
+        and not models.get("version_mismatch"),
     }
 
 # ✅ Register routers

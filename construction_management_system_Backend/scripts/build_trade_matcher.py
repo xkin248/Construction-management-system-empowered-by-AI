@@ -11,6 +11,7 @@ Expanded seed keywords fix the 16 failing cases found in eval:
   - tiling: grout/backsplash/ceramic
 """
 import json
+import platform
 import re
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +19,34 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import FeatureUnion, Pipeline
 
 BACKEND = Path(__file__).resolve().parent.parent  # Backend/scripts -> Backend
 DATA = BACKEND / "data"
+
+
+def build_meta(**extra) -> dict:
+    """Library versions of the environment doing the build.
+
+    The artefacts are pickles of scikit-learn estimators, so they only behave like
+    the validated models under the same scikit-learn / numpy pair that produced
+    them. Recording the build environment lets ``app.ai_service`` flag a mismatch
+    at load time and lets the tests compare the artefact against
+    ``requirements.txt`` instead of guessing from the installed wheels.
+    """
+    meta = {
+        "scikit-learn": sklearn.__version__,
+        "numpy": np.__version__,
+        "joblib": joblib.__version__,
+        "python": platform.python_version(),
+        "built_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+    meta.update(extra)
+    return meta
+
 
 CANONICAL = ["carpenter", "electrical", "plumbing", "masonry", "painting", "welding",
              "hvac", "roofing", "tiling", "drywall", "glazing", "flooring",
@@ -124,7 +147,16 @@ def train_matcher(profiles):
         max_features=20000,
     )
     X = vec.fit_transform(docs)
-    return {"vectorizer": vec, "trade_names": CANONICAL, "trade_vectors": X}
+    return {
+        "vectorizer": vec,
+        "trade_names": CANONICAL,
+        "trade_vectors": X,
+        "meta": build_meta(
+            algorithm="tfidf profile centroid",
+            trades=len(CANONICAL),
+            profiles={t: len(profiles[t]) for t in CANONICAL},
+        ),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +183,7 @@ CLASSIFIER_C = 50.0             # tuned in grouped CV on the dev pool (5-fold)
 CLASSIFIER_PATH = DATA / "trade_classifier.joblib"
 
 
-def build_classifier_corpus(df: pd.DataFrame = None):
+def build_classifier_corpus(df: pd.DataFrame = None, stats: dict = None):
     """Return (texts, labels) for supervised training.
 
     Row titles come from ``build_profiles`` (already cleaned and per-trade, so a
@@ -159,18 +191,32 @@ def build_classifier_corpus(df: pd.DataFrame = None):
     per trade). Seed keywords are appended ``CLASSIFIER_SEED_REPEAT`` times so the
     classifier keeps the vocabulary the rule layer relies on even for trades with
     few dataset titles.
+
+    ``stats`` (optional, filled in place) reports how the sample count splits into
+    dataset titles vs repeated seeds, so the artefact metadata can say "518
+    labelled titles" instead of the misleading "6539 parquet rows".
     """
     profiles = build_profiles(df)[0]
     texts: list[str] = []
     labels: list[str] = []
+    title_rows = 0
     for trade in CANONICAL:
         texts.extend(profiles[trade])
         labels.extend([trade] * len(profiles[trade]))
+        title_rows += len(profiles[trade])
+    seed_rows = 0
     for trade in CANONICAL:
         seeds = [clean(s) for s in SEED_KEYWORDS.get(trade, [])]
         seeds = [s for s in seeds if s]
         texts.extend(seeds * CLASSIFIER_SEED_REPEAT)
         labels.extend([trade] * len(seeds) * CLASSIFIER_SEED_REPEAT)
+        seed_rows += len(seeds) * CLASSIFIER_SEED_REPEAT
+    if stats is not None:
+        stats.update(
+            labelled_titles=title_rows,
+            seed_rows=seed_rows,
+            dataset_rows=int(len(df)) if df is not None else None,
+        )
     return texts, labels
 
 
@@ -182,7 +228,8 @@ def train_classifier(df: pd.DataFrame = None) -> dict:
     compound titles the word analyser splits ("materialhandler") still match.
     Returns the joblib payload ``{model, classes, meta}`` without writing disk.
     """
-    texts, labels = build_classifier_corpus(df)
+    stats: dict = {}
+    texts, labels = build_classifier_corpus(df, stats)
     model = Pipeline([
         ("features", FeatureUnion([
             ("word", TfidfVectorizer(
@@ -208,14 +255,16 @@ def train_classifier(df: pd.DataFrame = None) -> dict:
     return {
         "model": model,
         "classes": [str(c) for c in model.classes_],
-        "meta": {
-            "algorithm": "tfidf(word 1-2 + char_wb 3-5) + LogisticRegression",
-            "C": CLASSIFIER_C,
-            "seed_repeat": CLASSIFIER_SEED_REPEAT,
-            "samples": len(texts),
-            "dataset_rows": int(len(df)) if df is not None else None,
-            "trained_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        },
+        "meta": build_meta(
+            algorithm="tfidf(word 1-2 + char_wb 3-5) + LogisticRegression",
+            C=CLASSIFIER_C,
+            seed_repeat=CLASSIFIER_SEED_REPEAT,
+            samples=len(texts),
+            labelled_titles=stats.get("labelled_titles"),
+            seed_rows=stats.get("seed_rows"),
+            dataset_rows=stats.get("dataset_rows"),
+            trained_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        ),
     }
 
 

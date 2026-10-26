@@ -180,12 +180,12 @@ These rows were read, not repaired: editing keywords or thresholds against them 
 
 | item | value |
 | --- | --- |
-| classifier artefact | `data/trade_classifier.joblib` (0.31 MB, joblib `compress=3`) |
+| classifier artefact | `data/trade_classifier.joblib` (0.51 MB, joblib `compress=3`) |
 | features | word 1–2 g (≤ 12 k) + char_wb 3–5 g (≤ 18 k), float32 |
 | new dependencies | **none** - scikit-learn / numpy were already required by the profile matcher |
 | runtime memory | one short string → one sparse row; the loaded model is a few MB of coefficients, comfortably inside a Render free instance (512 MB) |
 | per-request cost | 2 `transform` + 1 `predict_proba` over 16 classes, sub-millisecond for a single row |
-| sklearn version drift | both committed artefacts are pickled with scikit-learn **1.9.0**, while `requirements.txt` still pins `scikit-learn==1.5.2` / `numpy==1.26.4`. This is pre-existing: the previous `trade_matcher.joblib` was built the same way and serves fine. Loading a newer pickle on an older sklearn prints `InconsistentVersionWarning`; `_load_trade_classifier` / `_load_trade_matcher` wrap the load in `try/except` and degrade to the keyword layer, so the worst case is 'no classifier', never a 500. Aligning the pins would drag numpy 1.26 -> 2.5 and other transitive deps with it, so it is left as a separate, deliberate upgrade |
+| artefact ↔ runtime alignment | requirements pin `scikit-learn==1.5.2` / `numpy==1.26.4`; matcher built with scikit-learn 1.5.2 / numpy 1.26.4; classifier built with scikit-learn 1.5.2 / numpy 1.26.4. both were retrained inside the pinned environment, so the shipped bytes are the bytes that were validated. `app.ai_service` records every load in `MODEL_STATUS` and warns on missing / broken / version-skewed artefacts instead of falling back to keywords silently, and `/health` exposes `models_ok` |
 | embedding / torch | **not used** - hundreds of MB of image for a gain that cannot exist on a 518-row label set; the char n-gram block already absorbs the spelling variants an embedding would have covered |
 
 ## 8. What is still unsolved, and why
@@ -200,35 +200,70 @@ These rows were read, not repaired: editing keywords or thresholds against them 
 | `* operator` beyond welding | partial | welding-process operators are handled; `bolting machine operator`, `transformer maker` and similar one-off titles remain wrong and are visible in §6 |
 | BM / Chinese wording | partial | seed keywords cover both, but neither the titles nor the classifier were trained on real BM/Chinese task text |
 
-## 9. Tests and repository state
-
-`pytest -q` in `construction_management_system_Backend` is green: **75 passed**.
-
-| guard added this round | what it locks |
-| --- | --- |
-| `test_snapshot_plus_additions_equals_live_tables` | `scripts/fixtures/trade_keywords_pre_v2.json` + `ADDED_V2` reproduces the live `TASK_KEYWORDS` / `SEED_KEYWORDS` exactly, so the `before` column of §3 stays reproducible after future edits |
-| `test_compound_title_rules_are_narrow` | `boilermaker` / `boiler installer` / `boiler mechanic` → welding, `boiler operator` → **not** welding (HVAC), `* handler` → laborer, `wallpaper*` → painting, `soldering machine *` → welding, `furnace mason` → masonry, bare trade names → no rule |
-| `test_classifier_artefact_loads_and_predicts` | the shipped `.joblib` deserialises offline and scores `electrical` for wiring text |
-| `test_resolve_trade_decision_reports_known_source` | `trade_source` stays inside the documented enum (`explicit` / `title-rule` / `classifier` / `rule` / `semantic` / `skip`) |
-
-`tests/test_ai_decision_log.py` was updated, not loosened: the trade-resolution test now pins
-`_TRADE_CLASSIFIER = False` to assert the legacy keyword → `source == "rule"` wiring on purpose,
-and the auto-assign test accepts the two new sources (`classifier`, `title-rule`) alongside the old
-ones.
-
-Models were retrained on the full 518-row label set and written to disk
-(`data/trade_classifier.joblib`, `data/trade_matcher.joblib`); both are committed, so Render picks
-them up without a build step. Repo state: commit `523b447` on `main`, pushed. The repository has no
-backend CI workflow (the only workflows are the Android-release and GitHub-Pages jobs, path-filtered
-to the Flutter app), so the test run above is the verification of record.
-
-## 10. Reproduce
+## 9. Reproduce
 
 ```bash
 cd construction_management_system_Backend
 python scripts/build_trade_matcher.py        # retrain matcher + classifier on full data
 python scripts/eval_trade_validation.py      # this report (valid split)
 python scripts/eval_trade_test.py            # previous round, dev + test (consumed)
-pytest -q                                    # full backend suite (includes the guards above)
+pytest tests -q                             # full backend suite (vocabulary + artefact guards)
 ```
+
+The `artefact ↔ runtime alignment` row above and this Reproduce block are generated by
+`eval_trade_validation.py` (the versions come from each bundle's `meta` block and from
+`requirements.txt`), so the report cannot drift into the contradiction the previous edition
+contained: "artefacts are 1.9.0, requirements pin 1.5.2, worst case degrade" - true, and also
+exactly why the classifier never ran in production.
+
+## 10. Tests and repository state
+
+`pytest tests -q` is green **in two environments**: **85 passed** in the pinned runtime
+(Python 3.11.8 + `scikit-learn 1.5.2` / `numpy 1.26.4` / `joblib 1.4.2`, installed from
+`requirements.txt` into a clean venv) and **85 passed** in the developer environment
+(`scikit-learn 1.9.0`), which is the one that used to swallow the skew.
+
+| guard | what it locks |
+| --- | --- |
+| `test_requirements_pin_the_pickle_libraries` | `scikit-learn` / `numpy` / `joblib` stay pinned, otherwise the alignment check below would pass on nothing |
+| `test_both_artefacts_load_without_degrading` | both bundles load here, `degraded == []`, and the loaders return real objects rather than `None` |
+| `test_artefacts_record_the_pinned_build_versions` | each bundle's `meta` versions equal the pins in `requirements.txt` - compared against the pins, not the locally installed wheels, so the guard also holds for a developer on a newer scikit-learn |
+| `test_trainer_writes_build_metadata` / `test_pickle_version_stamp_is_read_as_fallback` | the retraining script stamps versions, and a legacy bundle without `meta` is still read through `_sklearn_version` |
+| `test_version_skew_is_flagged_not_swallowed` | a 0.0.1-vs-installed mismatch loads but is marked `version_mismatch` **and** logged |
+| `test_missing_artefact_marks_degraded` / `test_broken_artefact_degrades_with_warning` | missing and corrupt bundles are `missing` / `failed`, warn, and still degrade instead of raising |
+| `test_startup_self_check_screams_when_degraded` / `test_startup_self_check_is_quiet_when_healthy` | `log_model_status()` (called from `app.main` at boot) logs an **ERROR** when anything is degraded and nothing at ERROR level when healthy |
+
+Alignment evidence, beyond green tests:
+
+* both artefacts were retrained **inside** the pinned venv; the matcher reproduces the previous
+  (1.9.0-built) model exactly - its `trade_vectors` difference against the old file has 0 stored
+  entries - and the classifier keeps the same vocabulary (1 399 word / 6 699 char features) and
+  the same 16 classes;
+* prediction parity old vs new classifier: **1 517 / 1 517 identical** on the training strings,
+  so aligning the versions changed no decision, it only made the shipped model loadable;
+* **measured, not assumed**: loading the previous 1.9.0-built bundles under 1.5.2 does **not**
+  raise - joblib returns both objects, scikit-learn emits one `InconsistentVersionWarning` per
+  estimator, and a probe on `"wireman for site wiring"` still answered `electrical`. The
+  production symptom was therefore not "classifier switched off" but "classifier running on a
+  pickle its runtime does not support, with nothing in the logs or `/health` to notice if a
+  future scikit-learn change did break it". Both halves are now covered: the committed bytes are
+  rebuilt under the pins, and any future load problem is recorded in `MODEL_STATUS`, warned
+  about, and reflected in `models_ok`;
+* Python patch level differs by one (build 3.11.8 in the local venv, `runtime.txt` pins 3.11.9).
+  Pickle compatibility is bound to major.minor, so this is irrelevant; it is stated here rather
+  than papered over;
+* loading under the pinned venv produces **no** `InconsistentVersionWarning`; the old files
+  produced six (TfidfTransformer ×2, TfidfVectorizer ×2, FeatureUnion, LogisticRegression),
+  which is exactly the drift this round removes;
+* `trade_classifier.joblib` grew 0.31 MB → 0.51 MB - same content, different zlib stream from
+  joblib 1.4.2 - and carries an extra `meta` block with `labelled_titles` (542 titles drawn from
+  518 labelled rows, 24 rows legitimately map to two trades) and `seed_rows` (975), so "1 517
+  samples" can no longer be mistaken for 1 517 supervised examples.
+
+Runtime visibility added in `app/ai_service.py` / `app/main.py`: `MODEL_STATUS` (per-artefact
+`state` / `path` / `built_with` / `error`), `runtime_versions()`, `_load_artifact()` (records
+`loaded` / `version_mismatch` / `missing` / `failed` / `unavailable`, warning at load time),
+`model_status()`, `log_model_status()` (startup self-check) and `/health` fields `models` +
+`models_ok`. A silent keyword-only fallback is no longer reachable without a log line and a
+`models_ok: false` in the health payload.
 

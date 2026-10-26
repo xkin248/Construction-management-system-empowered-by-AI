@@ -45,6 +45,7 @@ import csv
 import json
 import math
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -87,6 +88,67 @@ REPORTS = BACKEND / "reports"
 DEV_SEED, DEV_SIZE = 42, 0.20
 TEST_SEED, TEST_SIZE = 2026, 0.20
 VALID_SEED, VALID_SIZE = 31337, 0.25
+
+
+def requirement_pins() -> dict[str, str]:
+    """``library==version`` pins from requirements.txt, lowercase keys."""
+    pins: dict[str, str] = {}
+    req = BACKEND / "requirements.txt"
+    if not req.exists():
+        return pins
+    for line in req.read_text(encoding="utf-8").splitlines():
+        match = re.match(r"\s*([A-Za-z0-9_.\-]+)\s*==\s*([^\s;#]+)", line)
+        if match:
+            pins[match.group(1).lower()] = match.group(2)
+    return pins
+
+
+def artifact_meta(path: Path) -> dict:
+    """Build metadata stamped into a joblib payload by build_trade_matcher.py."""
+    if not path.exists():
+        return {}
+    try:
+        bundle = joblib.load(path)
+    except Exception:  # noqa: BLE001 - a broken artefact is reported, not raised
+        return {}
+    meta = bundle.get("meta") if isinstance(bundle, dict) else None
+    return dict(meta) if isinstance(meta, dict) else {}
+
+
+def alignment_summary() -> str:
+    """Generated (never typed) statement of artefact-vs-pin alignment.
+
+    Read straight from the bundles' ``meta`` blocks and requirements.txt, so this
+    row cannot drift from reality the way a hand-written note did: it used to say
+    "artefacts are 1.9.0 while requirements pin 1.5.2, worst case degrade", which
+    was true and also meant the classifier never ran in production.
+    """
+    pins = requirement_pins()
+    wanted = pins.get("scikit-learn", "unpinned")
+    wanted_numpy = pins.get("numpy", "unpinned")
+    parts, aligned = [], True
+    for label, path in (
+        ("matcher", DATA / "trade_matcher.joblib"),
+        ("classifier", DATA / "trade_classifier.joblib"),
+    ):
+        meta = artifact_meta(path)
+        built = meta.get("scikit-learn", "unknown")
+        aligned = aligned and built == wanted
+        parts.append(f"{label} built with scikit-learn {built} / numpy {meta.get('numpy', '?')}")
+    verdict = (
+        "both were retrained inside the pinned environment, so the shipped bytes are the "
+        "bytes that were validated"
+        if aligned
+        else "**artefacts do NOT match the pins** - rerun scripts/build_trade_matcher.py in an "
+        "environment installed from requirements.txt before shipping"
+    )
+    return (
+        f"requirements pin `scikit-learn=={wanted}` / `numpy=={wanted_numpy}`; "
+        + "; ".join(parts)
+        + f". {verdict}. `app.ai_service` records every load in `MODEL_STATUS` and warns on "
+        "missing / broken / version-skewed artefacts instead of falling back to keywords "
+        "silently, and `/health` exposes `models_ok`"
+    )
 
 
 def fmt_pct(v) -> str:
@@ -479,6 +541,7 @@ def main() -> int:
         "coefficients, comfortably inside a Render free instance (512 MB) |")
     add("| per-request cost | 2 `transform` + 1 `predict_proba` over 16 classes, sub-millisecond "
         "for a single row |")
+    add(f"| artefact ↔ runtime alignment | {alignment_summary()} |")
     add("| embedding / torch | **not used** - hundreds of MB of image for a gain that cannot exist "
         "on a 518-row label set; the char n-gram block already absorbs the spelling variants an "
         "embedding would have covered |")
@@ -519,7 +582,7 @@ def main() -> int:
     add("python scripts/build_trade_matcher.py        # retrain matcher + classifier on full data")
     add("python scripts/eval_trade_validation.py      # this report (valid split)")
     add("python scripts/eval_trade_test.py            # previous round, dev + test (consumed)")
-    add("pytest tests/test_trade_keywords.py -q       # vocabulary / pipeline guards")
+    add("pytest tests -q                             # full backend suite (vocabulary + artefact guards)")
     add("```")
     add("")
 
