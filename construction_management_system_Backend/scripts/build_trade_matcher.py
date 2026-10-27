@@ -182,13 +182,108 @@ CLASSIFIER_CHAR_FEATURES = 18000
 CLASSIFIER_C = 50.0             # tuned in grouped CV on the dev pool (5-fold)
 CLASSIFIER_PATH = DATA / "trade_classifier.joblib"
 
+# Synthetic task corpus (``scripts/synth_trade_tasks.py``). Only the quality
+# filtered rows are used; the generator caches raw API answers separately.
+SYNTH_TASKS_PATH = DATA / "synthetic_trade_tasks.jsonl"
 
-def build_classifier_corpus(df: pd.DataFrame = None, stats: dict = None):
+# Multi-label decision rule. A secondary trade joins the answer when its fused
+# probability clears MULTI_THRESHOLD *and* stays within MULTI_MARGIN of the
+# winner *and* the pair (winner, secondary) is a co-occurring pair in the
+# training taxonomy (``MULTI_PAIR_SUPPORT`` or more shared titles). Tuned on the
+# dev pool (seed 42); the valid set (seed 31337) only ever sees the final numbers.
+#
+# Why the co-occurrence guard: a bare threshold/margin rule happily promotes a
+# random runner-up ("automobile detailer" -> laborer + painting), which costs
+# more exact-set matches than the dual-label rows it wins. The dataset itself
+# says which trades genuinely overlap (Carpet Installers / Floor Layers / Floor
+# Sanders are mapped to both flooring and tiling), so the guard restricts extra
+# labels to those pairs.
+MULTI_THRESHOLD = 0.35
+MULTI_MARGIN = 0.25
+MULTI_PAIR_SUPPORT = 5
+# One-vs-Rest needs its own regularisation: each label sees ~60 positives among
+# ~3800 samples, so the single-label C=50 saturates every column at 0/1 and the
+# threshold never fires. Balanced class weights + C=4 keeps the probabilities
+# readable (dev sweep, seed 42).
+MULTI_C = 4.0
+
+
+def cooccurring_pairs(labels, min_support: int = 0) -> dict:
+    """Count trade pairs that share a training title (``>= min_support`` kept).
+
+    ``labels`` is the per-sample label list from ``build_classifier_corpus``; a
+    sample with two trades means the dataset maps one title to both, i.e. the
+    taxonomy itself is ambiguous there. The multi-label decision layer only lets
+    such pairs grow a second label, which stops random runner-ups from being
+    promoted.
+    """
+    counts: dict = {}
+    for label_set in labels:
+        trades = sorted(set(label_set if isinstance(label_set, (list, tuple, set))
+                            else [label_set]))
+        for i, first in enumerate(trades):
+            for second in trades[i + 1:]:
+                counts[(first, second)] = counts.get((first, second), 0) + 1
+    return {pair: n for pair, n in counts.items() if n >= min_support}
+
+
+def load_synthetic(split: str = "train", path: Path = None,
+                   exclude_titles: set = None) -> list[dict]:
+    """Read the quality-filtered synthetic tasks for classifier training.
+
+    ``split`` keeps the generator's probe rows (15 % of titles, reserved so the
+    synthetic corpus itself can be checked) out of training. ``exclude_titles``
+    drops every row generated *from* a held-out title: a paraphrase of a valid
+    title is still the valid title's content, so training on it would leak the
+    hold-out set into the model and inflate the evaluation.
+    """
+    path = Path(path) if path else SYNTH_TASKS_PATH
+    if not path.exists():
+        return []
+    exclude = {clean(t) for t in (exclude_titles or set())}
+    rows: list[dict] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if split and rec.get("split") != split:
+            continue
+        text = clean(rec.get("task_text") or "")
+        labels = [t for t in rec.get("trades") or [] if t in CANONICAL]
+        if not text or not labels:
+            continue
+        if exclude and clean(rec.get("source_title") or "") in exclude:
+            continue
+        rows.append({"text": text, "labels": labels,
+                     "source_title": rec.get("source_title")})
+    return rows
+
+
+
+def build_classifier_corpus(df: pd.DataFrame = None, stats: dict = None,
+                            synthetic: bool = False, label_mode: str = "single",
+                            exclude_titles: set = None):
     """Return (texts, labels) for supervised training.
 
-    Row titles come from ``build_profiles`` (already cleaned and per-trade, so a
-    title that a category legitimately maps to two trades contributes one sample
-    per trade). Seed keywords are appended ``CLASSIFIER_SEED_REPEAT`` times so the
+    Row titles come from ``build_profiles`` (already cleaned and per-trade).
+
+    * ``label_mode="single"`` - the historical layout: a title that a category
+      legitimately maps to two trades contributes one sample per trade, and the
+      trainer fits a multiclass ``LogisticRegression``.
+    * ``label_mode="multi"`` - one sample per unique title carrying its *set* of
+      trades, so a dual-label title ("wall to wall carpet installer") teaches
+      both labels instead of being split into two competing rows.
+
+    ``synthetic=True`` appends the quality-filtered synthetic task descriptions
+    (``data/synthetic_trade_tasks.jsonl``). ``exclude_titles`` holds the titles
+    of a held-out split: every synthetic row paraphrasing one of them is dropped
+    so the hold-out set never leaks into training through its own paraphrases.
+
+    Seed keywords are appended ``CLASSIFIER_SEED_REPEAT`` times so the
     classifier keeps the vocabulary the rule layer relies on even for trades with
     few dataset titles.
 
@@ -196,74 +291,160 @@ def build_classifier_corpus(df: pd.DataFrame = None, stats: dict = None):
     dataset titles vs repeated seeds, so the artefact metadata can say "518
     labelled titles" instead of the misleading "6539 parquet rows".
     """
+    if label_mode not in ("single", "multi"):
+        raise ValueError(f"label_mode must be 'single' or 'multi', got {label_mode!r}")
     profiles = build_profiles(df)[0]
+
     texts: list[str] = []
-    labels: list[str] = []
-    title_rows = 0
-    for trade in CANONICAL:
-        texts.extend(profiles[trade])
-        labels.extend([trade] * len(profiles[trade]))
-        title_rows += len(profiles[trade])
+    labels: list = []
     seed_rows = 0
+
+    if label_mode == "single":
+        title_rows = 0
+        for trade in CANONICAL:
+            texts.extend(profiles[trade])
+            labels.extend([trade] * len(profiles[trade]))
+            title_rows += len(profiles[trade])
+    else:
+        by_title: dict[str, list[str]] = {}
+        for trade in CANONICAL:
+            for title in profiles[trade]:
+                by_title.setdefault(title, []).append(trade)
+        title_rows = len(by_title)
+        for title, trades in by_title.items():
+            texts.append(title)
+            labels.append(trades)
+
     for trade in CANONICAL:
         seeds = [clean(s) for s in SEED_KEYWORDS.get(trade, [])]
         seeds = [s for s in seeds if s]
         texts.extend(seeds * CLASSIFIER_SEED_REPEAT)
-        labels.extend([trade] * len(seeds) * CLASSIFIER_SEED_REPEAT)
+        if label_mode == "single":
+            labels.extend([trade] * len(seeds) * CLASSIFIER_SEED_REPEAT)
+        else:
+            labels.extend([[trade] for _ in range(len(seeds) * CLASSIFIER_SEED_REPEAT)])
         seed_rows += len(seeds) * CLASSIFIER_SEED_REPEAT
+
+    synth_rows = 0
+    if synthetic:
+        for rec in load_synthetic(split="train", exclude_titles=exclude_titles):
+            texts.append(rec["text"])
+            labels.append(rec["labels"][0] if label_mode == "single" else rec["labels"])
+            synth_rows += 1
+
     if stats is not None:
         stats.update(
+            label_mode=label_mode,
             labelled_titles=title_rows,
             seed_rows=seed_rows,
+            synthetic_rows=synth_rows,
             dataset_rows=int(len(df)) if df is not None else None,
         )
     return texts, labels
 
 
-def train_classifier(df: pd.DataFrame = None) -> dict:
+def train_classifier(df: pd.DataFrame = None, synthetic: bool = False,
+                     label_mode: str = "single", threshold: float = MULTI_THRESHOLD,
+                     margin: float = MULTI_MARGIN, exclude_titles: set = None,
+                     c_value: float = None, pair_support: int = MULTI_PAIR_SUPPORT) -> dict:
     """Fit the supervised trade classifier on the labelled dataset.
 
     Word 1-2 grams capture phrases ("spray painter", "machine operator"), char
     3-5 grams absorb morphology so "plasterer"/"plastering"/"plastered" and
     compound titles the word analyser splits ("materialhandler") still match.
-    Returns the joblib payload ``{model, classes, meta}`` without writing disk.
+
+    ``label_mode="multi"`` wraps the same features in a ``OneVsRestClassifier``
+    over the 16 canonical trades, so the payload returns one probability per
+    trade and the decision layer can keep every label above the threshold. The
+    returned payload stays ``{model, classes, meta}`` for backward compatibility;
+    ``trade_names`` / ``label_mode`` / ``decision`` are added for the multi case.
+
+    Returns the joblib payload without writing disk.
     """
     stats: dict = {}
-    texts, labels = build_classifier_corpus(df, stats)
+    texts, labels = build_classifier_corpus(
+        df, stats, synthetic=synthetic, label_mode=label_mode,
+        exclude_titles=exclude_titles,
+    )
+    features = FeatureUnion([
+        ("word", TfidfVectorizer(
+            sublinear_tf=True,
+            stop_words=sorted(STOP_WORDS),
+            ngram_range=(1, 2),
+            min_df=1,
+            max_features=CLASSIFIER_WORD_FEATURES,
+            dtype=np.float32,
+        )),
+        ("char", TfidfVectorizer(
+            analyzer="char_wb",
+            sublinear_tf=True,
+            ngram_range=(3, 5),
+            min_df=1,
+            max_features=CLASSIFIER_CHAR_FEATURES,
+            dtype=np.float32,
+        )),
+    ])
+    meta_extra = dict(
+        seed_repeat=CLASSIFIER_SEED_REPEAT,
+        samples=len(texts),
+        labelled_titles=stats.get("labelled_titles"),
+        seed_rows=stats.get("seed_rows"),
+        synthetic_rows=stats.get("synthetic_rows", 0),
+        synthetic_corpus=SYNTH_TASKS_PATH.name if synthetic else None,
+        label_mode=label_mode,
+        dataset_rows=stats.get("dataset_rows"),
+        trained_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+
+    if label_mode == "multi":
+        from sklearn.multiclass import OneVsRestClassifier
+        from sklearn.preprocessing import MultiLabelBinarizer
+
+        encoder = MultiLabelBinarizer(classes=CANONICAL)
+        targets = encoder.fit_transform(labels)
+        c_multi = float(c_value if c_value is not None else MULTI_C)
+        model = Pipeline([
+            ("features", features),
+            ("clf", OneVsRestClassifier(
+                LogisticRegression(C=c_multi, max_iter=3000,
+                                   class_weight="balanced"), n_jobs=1)),
+        ])
+        model.fit(texts, targets)
+        pairs = cooccurring_pairs(labels, pair_support)
+        return {
+            "model": model,
+            "classes": [str(c) for c in encoder.classes_],
+            "trade_names": [str(c) for c in encoder.classes_],
+            "label_mode": "multi",
+            "decision": {
+                "threshold": float(threshold),
+                "margin": float(margin),
+                "pairs": [list(p) for p in sorted(pairs)],
+                "pair_support": int(pair_support),
+            },
+            "meta": build_meta(
+                algorithm="tfidf(word 1-2 + char_wb 3-5) + OneVsRest(LogisticRegression, balanced)",
+                C=c_multi, pair_support=int(pair_support),
+                cooccurring_pairs={f"{a}+{b}": n for (a, b), n in
+                                   sorted(cooccurring_pairs(labels).items())},
+                **meta_extra,
+            ),
+        }
+
     model = Pipeline([
-        ("features", FeatureUnion([
-            ("word", TfidfVectorizer(
-                sublinear_tf=True,
-                stop_words=sorted(STOP_WORDS),
-                ngram_range=(1, 2),
-                min_df=1,
-                max_features=CLASSIFIER_WORD_FEATURES,
-                dtype=np.float32,
-            )),
-            ("char", TfidfVectorizer(
-                analyzer="char_wb",
-                sublinear_tf=True,
-                ngram_range=(3, 5),
-                min_df=1,
-                max_features=CLASSIFIER_CHAR_FEATURES,
-                dtype=np.float32,
-            )),
-        ])),
+        ("features", features),
         ("clf", LogisticRegression(C=CLASSIFIER_C, max_iter=3000)),
     ])
     model.fit(texts, labels)
     return {
         "model": model,
         "classes": [str(c) for c in model.classes_],
+        "trade_names": [str(c) for c in model.classes_],
+        "label_mode": "single",
+        "decision": {"threshold": float(threshold), "margin": float(margin)},
         "meta": build_meta(
             algorithm="tfidf(word 1-2 + char_wb 3-5) + LogisticRegression",
-            C=CLASSIFIER_C,
-            seed_repeat=CLASSIFIER_SEED_REPEAT,
-            samples=len(texts),
-            labelled_titles=stats.get("labelled_titles"),
-            seed_rows=stats.get("seed_rows"),
-            dataset_rows=stats.get("dataset_rows"),
-            trained_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+            C=CLASSIFIER_C, **meta_extra,
         ),
     }
 
@@ -290,11 +471,16 @@ def main():
     print("saved:", DATA / "trade_matcher.joblib")
 
     df = pd.read_parquet(DATA / "job_categorization.parquet")
-    bundle = train_classifier(df)
+    # Production artefact: every legitimate sample is used, including the
+    # synthetic corpus and the rows generated from the evaluation titles (nothing
+    # is held out once the numbers have been reported).
+    bundle = train_classifier(df, synthetic=True, label_mode="multi")
     saved = save_classifier(bundle)
     size_mb = saved.stat().st_size / 1048576
     print(f"saved: {saved} ({size_mb:.2f} MB, {bundle['meta']['samples']} training samples, "
-          f"{len(bundle['classes'])} classes)")
+          f"{len(bundle['classes'])} classes, label_mode={bundle['label_mode']}, "
+          f"synthetic={bundle['meta']['synthetic_rows']})")
+    print("decision rule:", bundle["decision"])
 
 if __name__ == "__main__":
     main()

@@ -174,6 +174,20 @@ _TRADE_CLASSIFIER: Any = None
 # path (older artefact, missing file, unexpected sklearn version, ...).
 TRADE_CLASSIFIER_PRIOR_WEIGHT = 0.5   # +50% probability when a rule keyword hits
 TRADE_CLASSIFIER_SKIP_PROB = 0.25     # below this with no keyword hit -> "skip"
+# Balanced One-vs-Rest columns put their intercept at the positive rate, so a
+# text the model has never seen scores ~0.45 on the majority trade ("test" ->
+# electrical 0.47) and would clear any sensible threshold. Below this share of
+# in-vocabulary word tokens the classifier signal is treated as absent, whatever
+# the probability says. Vague titles then take the historical low-confidence path
+# (LLM worker suggestion) instead of a coin-flip trade.
+TRADE_CLASSIFIER_MIN_COVERAGE = 0.34
+
+# Multi-label decision rule (only used when the classifier artefact is a
+# One-vs-Rest model, i.e. ``label_mode == "multi"``). Kept in sync with
+# scripts/build_trade_matcher.py: the artefact carries its own tuned values, these
+# are the fallback for old bundles. Tuned on dev (seed 42); valid is untouched.
+TRADE_MULTI_THRESHOLD = 0.30          # absolute floor for a secondary label
+TRADE_MULTI_MARGIN = 0.30             # secondary must reach 30 % of the winner
 
 
 # ── Artefact ↔ runtime alignment ─────────────────────────────────────────────
@@ -376,8 +390,12 @@ def _clean_text(text: str) -> str:
 def _classifier_trade_scores(task_text: str) -> Dict[str, float]:
     """Return {canonical_trade: probability} from the supervised classifier.
 
-    Empty dict when the classifier is unavailable, the text is empty after
-    cleaning, or prediction fails - callers must treat that as "degrade".
+    Handles both artefact layouts: the historical single-label multiclass model
+    (one probability per class, columns aligned with ``classes_``) and the
+    multi-label One-vs-Rest model (one probability per canonical trade, columns
+    aligned with ``trade_names``). Empty dict when the classifier is unavailable,
+    the text is empty after cleaning, or prediction fails - callers must treat
+    that as "degrade".
     """
     bundle = _load_trade_classifier()
     if not bundle:
@@ -386,13 +404,45 @@ def _classifier_trade_scores(task_text: str) -> Dict[str, float]:
         text = _clean_text(task_text)
         if not text:
             return {}
-        probs = bundle["model"].predict_proba([text])[0]
-        return {
-            str(cls): float(p)
-            for cls, p in zip(bundle["model"].classes_, probs)
-        }
+        probs = np.asarray(bundle["model"].predict_proba([text]))
+        if probs.ndim == 1:                     # defensive: single-column output
+            probs = probs.reshape(1, -1)
+        row = probs[0]
+        names = bundle.get("trade_names")
+        if not names:
+            names = [str(c) for c in getattr(bundle["model"], "classes_", [])]
+        if len(names) != len(row):
+            # A single-class OvR artefact collapses to one column; nothing usable.
+            return {}
+        return {str(name): float(p) for name, p in zip(names, row)}
     except Exception:
         return {}
+
+
+def _classifier_token_coverage(task_text: str) -> float:
+    """Share of the text's word tokens that the classifier vocabulary knows.
+
+    A One-vs-Rest probability is only meaningful when the text shares tokens with
+    the training corpus; an all-unknown title still produces ~0.45 on the biggest
+    class. ``1.0`` is returned whenever the vocabulary cannot be inspected, so a
+    degraded artefact keeps the historical (probability-only) behaviour.
+    """
+    bundle = _load_trade_classifier() or {}
+    model = bundle.get("model")
+    try:
+        features = model.named_steps["features"]
+        analysers = dict(features.transformer_list)
+        if "word" in analysers:
+            vectorizer = analysers["word"]
+        else:  # plain TfidfVectorizer pipeline
+            vectorizer = model.named_steps["features"]
+        tokens = vectorizer.build_analyzer()(task_text or "")
+        vocabulary = vectorizer.vocabulary_
+    except Exception:
+        return 1.0
+    if not tokens:
+        return 0.0
+    return sum(1.0 for token in tokens if token in vocabulary) / len(tokens)
 
 
 def _classifier_trade_decision(
@@ -411,6 +461,12 @@ def _classifier_trade_decision(
       they can no longer *own* a trade on their own: a title like
       ``precast concrete ironworker`` hits masonry keywords while the classifier
       knows it is a welding occupation;
+    * **multi-label artefacts** return *every* trade above the decision rule
+      (``threshold`` + ``margin``, stored in the bundle and tuned on dev): a
+      dual-trade task such as ``wall to wall carpet installer`` (tiling +
+      flooring) gets both, instead of the argmax coin flip the single-label model
+      had to make. Single-label artefacts keep the historical argmax behaviour,
+      so old bundles remain valid;
     * when the winning probability is below ``TRADE_CLASSIFIER_SKIP_PROB`` and no
       keyword fired, return an empty set ("unassignable"): we prefer the existing
       low-confidence path (LLM worker suggestion) over a coin-flip guess.
@@ -418,12 +474,58 @@ def _classifier_trade_decision(
     scores = _classifier_trade_scores(task_text)
     if not scores:
         return None
+    bundle = _load_trade_classifier() or {}
+    label_mode = bundle.get("label_mode", "single")
+    rule = bundle.get("decision") or {}
     fused = {
         trade: prob * (1.0 + TRADE_CLASSIFIER_PRIOR_WEIGHT if trade in keyword_trades else 1.0)
         for trade, prob in scores.items()
     }
     best = max(fused, key=lambda t: fused[t])
     best_prob = float(scores.get(best, 0.0))
+    best_fused = float(fused[best])
+    coverage = _classifier_token_coverage(task_text)
+
+    # The coverage guard exists for the One-vs-Rest model, whose balanced columns
+    # score ~0.45 on out-of-vocabulary text. The historical multiclass model is
+    # softmax-normalised and never had this failure mode, so the guard stays off
+    # for ``label_mode == "single"`` - applying it there silently drops rows the
+    # pre-registered configuration used to get right (valid 92.8 % -> 89.2 %).
+    if label_mode == "multi" and not keyword_trades and coverage < TRADE_CLASSIFIER_MIN_COVERAGE:
+        if trace is not None:
+            trace.clear()
+            trace.update({
+                "source": "skip",
+                "confidence": 0.0,
+                "llm_used": False,
+                "llm_reason": None,
+                "classifier_top": best,
+                "classifier_prob": round(best_prob, 4),
+                "label_mode": label_mode,
+                "classifier_set": [],
+                "coverage": round(coverage, 3),
+            })
+        return set()
+
+    picked = {best}
+    if label_mode == "multi":
+        threshold = float(rule.get("threshold", TRADE_MULTI_THRESHOLD))
+        margin = float(rule.get("margin", TRADE_MULTI_MARGIN))
+        # Only trade pairs the training taxonomy actually declares ambiguous may
+        # grow a second label; an unguarded threshold promotes a random runner-up
+        # ("automobile detailer" -> laborer + painting) and costs more exact-set
+        # matches than it wins. An empty/missing pair list keeps the plain rule
+        # so older artefacts still behave.
+        pairs = {tuple(sorted(p)) for p in (rule.get("pairs") or [])}
+        picked = {best}
+        for trade, value in fused.items():
+            if trade == best:
+                continue
+            if pairs and tuple(sorted((best, trade))) not in pairs:
+                continue
+            if value >= threshold and value >= margin * best_fused:
+                picked.add(trade)
+
     if trace is not None:
         trace.clear()
         trace.update({
@@ -433,13 +535,16 @@ def _classifier_trade_decision(
             "llm_reason": None,
             "classifier_top": best,
             "classifier_prob": round(best_prob, 4),
+            "label_mode": label_mode,
+            "classifier_set": sorted(picked),
         })
     if not keyword_trades and best_prob < TRADE_CLASSIFIER_SKIP_PROB:
         if trace is not None:
             trace["source"] = "skip"
             trace["confidence"] = 0.0
+            trace["classifier_set"] = []
         return set()
-    return {best}
+    return picked
 
 
 def _semantic_trade_scores(task_text: str) -> Dict[str, float]:
