@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
-from typing import List, Dict, Any
-from datetime import date
+from typing import List, Dict, Any, Optional
+from datetime import date, datetime
 
 from app.database import get_db
 from app.models import (
@@ -16,6 +17,7 @@ from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
     analyze_task, auto_assign_tasks, predict_site_progress
 )
+from app.ai_stats import build_decision_stats, empty_stats
 
 router = APIRouter(tags=["🤖 AI Services"])
 
@@ -124,3 +126,61 @@ def prediction_history(
             "created_at": r.created_at.isoformat() if r.created_at else None,
         })
     return out
+
+
+@router.get("/ai/decision-log/stats")
+def decision_log_stats(
+    project_id: Optional[int] = Query(None, description="Restrict to one project"),
+    start: Optional[datetime] = Query(None, description="Inclusive lower bound on created_at (ISO 8601)"),
+    end: Optional[datetime] = Query(None, description="Inclusive upper bound on created_at (ISO 8601)"),
+    stage: Optional[str] = Query(None, pattern="^(trade_resolution|auto_assign)$",
+                                 description="Restrict to one decision stage"),
+    top_n: int = Query(5, ge=1, le=50, description="How many skip reasons / trades to return"),
+    low_confidence_threshold: float = Query(0.5, ge=0.0, le=1.0,
+                                            description="Confidence below this counts as low confidence"),
+    db: Session = Depends(get_db),
+    current_user=Depends(require_site_supervisor),
+):
+    """Read-only statistics over ``ai_decision_log`` (closed-loop observability).
+
+    Everything is computed with SQL aggregates, so the endpoint stays cheap on a
+    table that grows by one row per AI decision. Empty table / empty time window
+    still returns the full structure with zero counts and ``null`` rates - the
+    dashboard never has to special-case "no data yet". Fields:
+
+    * ``total_decisions`` / ``decided`` / ``skip_count`` - volume and coverage.
+    * ``by_source`` - which layer decided (rule / classifier / semantic / llm / skip).
+    * ``by_final_trade`` - top trades produced, the class balance of the sample.
+    * ``skip_reasons`` - why the pipeline refused to guess (top N + total).
+    * ``llm`` - fallback triggers, adopted verdicts and the adoption rate; a
+      trigger that was thrown away because Gemini was not confident counts as
+      ``discarded``.
+    * ``overrides`` - how often a supervisor overrode the AI, i.e. the live
+      error signal; those rows become labelled training samples.
+    * ``elapsed_ms`` - average / min / max decision latency.
+    * ``low_confidence`` - predictions below the confidence floor.
+    """
+    if start and end and start > end:
+        raise HTTPException(status_code=400, detail="start must be earlier than end")
+
+    if project_id is not None:
+        exists = db.query(Project.project_id).filter(Project.project_id == project_id).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        return build_decision_stats(
+            db,
+            project_id=project_id,
+            start=start,
+            end=end,
+            stage=stage,
+            top_n=top_n,
+            low_confidence_threshold=low_confidence_threshold,
+        )
+    except SQLAlchemyError:
+        # Table absent (old deployment that has not migrated yet): answer with an
+        # all-zero payload instead of a 500 so the UI still renders.
+        db.rollback()
+        return empty_stats(project_id=project_id, start=start, end=end, stage=stage,
+                           low_confidence_threshold=low_confidence_threshold)
