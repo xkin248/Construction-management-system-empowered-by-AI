@@ -59,6 +59,12 @@ def test_analyze_task_writes_trade_resolution_log(db, project, no_gemini, monkey
 
 
 def test_analyze_task_logs_skip_for_vague_text(db, project, no_gemini, monkeypatch):
+    # Same reason as the test above: this asserts the fallback/skip wiring, so the
+    # supervised classifier must be out of the way - its probabilities come from the
+    # shipped artefact (and change whenever that artefact is retrained), which is not
+    # what this test is about. The classifier path has its own coverage in
+    # tests/test_trade_keywords.py.
+    monkeypatch.setattr(ai_service, "_TRADE_CLASSIFIER", False)
     monkeypatch.setattr(ai_service, "_semantic_trade_scores", lambda text: {})
     monkeypatch.setattr(ai_service, "_detect_trade_groups", lambda text: set())
 

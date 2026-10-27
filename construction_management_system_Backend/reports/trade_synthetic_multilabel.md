@@ -1,6 +1,6 @@
 # 合成数据 + 多标签改造：归因评测（valid seed 31337，单次读取）
 
-日期：2026-10-27　评测脚本：`scripts/eval_synthetic_multilabel.py`
+日期：2026-10-27　评测脚本：`scripts/eval_synthetic_multilabel.py`　产物核验：`scripts/verify_production_artifact.py`
 
 ## 1. 结论与完整链条（上轮基线 → 本轮各变体）
 
@@ -132,3 +132,39 @@ n=83，区间宽度约 ±11 pt，因此 3～5 pt 的差异在本样本量下不�
 - 不因为这条发现回调阈值：dev 网格已经在 [0.15, 0.2, 0.25, 0.3, 0.35] 上搜过并选定 0.35，为了在 valid 的 2 行上多拿分而把阈值压到 0.2 以下，等于拿 valid 调参、破坏单次读取约定。要让多标签真正生效，正确路径是在 dev 池上增加双标签样本或对次标签单独做概率校准，而不是在 valid 上掰阈值。
 - 归纳：多标签改造在 83 行、2 个双标签行的 valid 上**既不能证实也不能证伪**；报告里所有多标签数字都应按「OvR 概率排序下的主标签表现」来读。
 
+## 9. 收尾：生产 artefact 已切换为 F
+
+`data/trade_classifier.joblib` 已按 F 重训落盘。上一版 artefact 是 `label_mode="multi"`（对应 D/E），本次改为 `"single"`；多标签代码路径（OvR + threshold/margin + 共现守卫）**原样保留**，只是不再作为生产默认，需要时改 `PRODUCTION_LABEL_MODE` 一行并重跑 `scripts/build_trade_matcher.py` 即可切回。
+
+**训练配方与 F 完全一致**：`train_classifier(df, synthetic=True, label_mode="single", c_value=4.0)`，即数据集 + 合成语料、dev 网格选定的 C=4.0、复合标题规则链开启。C 值不再走单标签分支里硬编码的 `CLASSIFIER_C=50`，而是由 `c_value` 传入，评测与生产共用同一条代码路径，避免「报告里的 F」和「线上跑的 F」各自一份实现。
+
+**artefact meta 已记录完整配方**（`scripts/verify_production_artifact.py` 逐项断言）：
+
+| meta 字段 | 值 | 说明 |
+| --- | --- | --- |
+| `label_mode` | `single` | 多类 argmax，不含 OvR 决策层 |
+| `C` | `4.0` | dev 网格选定值（非旧登记值 50） |
+| `synthetic` | `True` | 训练是否含合成语料 |
+| `synthetic_rows` | `3074` | 合成行数 |
+| `samples` / 类别数 | 4591 / 16 | 数据集 + 合成 |
+| `scikit-learn` / `numpy` | 1.5.2 / 1.26.4 | 与 `requirements.txt` 一致 |
+
+**与 D/E 的差异**：
+
+| 维度 | D / E（上一版 artefact） | F（当前生产） |
+| --- | --- | --- |
+| 标签方案 | One-vs-Rest 多标签 | 多类 argmax 单标签 |
+| 决策层 | threshold 0.35 + margin 0.25 + 共现守卫 | 无，取概率最大者 |
+| 覆盖率门限 | 生效（覆盖 < 0.34 且无关键词即跳过） | 不生效，仅由跳过概率 0.25 决定 |
+| valid Top-1 | 92.8 % / 94.0 % | 96.4 % [89.9, 98.8] |
+| 规则链 | D 关、E 开 | 开 |
+| `multi-pred` 行数 | 0 | 0（结构上不可能 > 1） |
+
+**在 valid 上核验 artefact 本身**（单次读取口径不变，未回退调参）：
+
+- 按 F 配方在 `valid_train` 上重建（合成语料中由 valid 标题生成的 496 行已剔除）→ Top-1 96.4 %、集合完全正确 94.0 %，与第 1 节表中 F 完全一致，说明报告数字仍由当前代码可复现。
+- 直接加载落盘的 artefact 在 valid 上 → Top-1 100 %、集合完全正确 97.6 %。**这个数字不是泛化估计**：生产 artefact 按设计用全量语料训练（报告数字报出后不再留出），valid 行自身及其改写都在训练集内，因此只能当作「产物与配方一致」的连通性检查，不能写进对外口径。
+- 两份模型在 valid 上的主标签一致 80/83，仅 3 行不同（`aluminum pool installer`、`cart pusher`、`underground bolting machine operator`），都是生产版见过原文的样本，符合预期。
+- 判定链探针：`install kitchen cabinets and wardrobes` → `carpenter`（分类器，prob 0.82）；`qwerty zzz plok` → 空集、`source=skip`（prob 0.23 < 0.25）；`test` → `electrical`（prob 0.38，覆盖率 0.00 但**未被**覆盖率门限拦下，证明该门限确实只在 multi 路径生效）。valid 中唯一低于覆盖率门限的行 `lawn mower`（0.33）也仍由分类器给出 `laborer`（prob 0.95），即第 7 节那个 3.6 pt 的回归已修复。
+- `pytest` 全绿（85 passed）。唯一需要改动的是 `tests/test_ai_decision_log.py::test_analyze_task_logs_skip_for_vague_text`：该用例断言的是「无任何信号时记 skip 日志」，此前隐含依赖 multi 路径的覆盖率门限把 `test` 拦下；切换单标签后分类器对 `test` 给出 0.38，用例自身与分类器行为耦合。已同该文件另一个用例一样把 `_TRADE_CLASSIFIER` 置为 `False`，让跳过路径可确定地复现，而不是为了迁就用例去改阈值或模型。
+- `data/trade_matcher.joblib`（TF-IDF 语义侧）同样用全量数据集重建，与分类器口径一致；两者的配方都写在 `scripts/build_trade_matcher.py` 顶部，重跑一条命令即可复现。

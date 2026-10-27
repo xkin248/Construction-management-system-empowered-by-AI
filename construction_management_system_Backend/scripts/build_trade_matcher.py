@@ -179,8 +179,26 @@ def train_matcher(profiles):
 CLASSIFIER_SEED_REPEAT = 3      # seed keywords appended per class in training
 CLASSIFIER_WORD_FEATURES = 12000
 CLASSIFIER_CHAR_FEATURES = 18000
-CLASSIFIER_C = 50.0             # tuned in grouped CV on the dev pool (5-fold)
+CLASSIFIER_C = 50.0             # registered config of the previous round (variant V0)
 CLASSIFIER_PATH = DATA / "trade_classifier.joblib"
+
+# ---------------------------------------------------------------------------
+# Production configuration (variant "F single_synth_rules")
+# ---------------------------------------------------------------------------
+# The attribution run on the clean valid split (seed 31337) scored six candidates
+# in one pass; the shipped one is F: multiclass argmax, dataset + synthetic
+# corpus, dev-searched C, compound-title rules on. It reached top-1 96.4 %
+# (strict 96.3 %) against 92.8 % for the previous registration (V0) and 94.0 %
+# for the multi-label candidate E.
+#
+# The multi-label path (One-vs-Rest + threshold/margin + co-occurrence guard) is
+# kept intact because the code, the dev sweep and the eval script still use it,
+# but it is *not* what production ships: on valid it never emitted a single
+# second label (multi-pred rows = 0), so it bought no accuracy and cost 2.4 pt
+# top-1 against F. Switching it back on is a one-line change here plus a rebuild.
+PRODUCTION_LABEL_MODE = "single"
+PRODUCTION_C = 4.0              # dev grid (seed 42), identical to the eval variant
+PRODUCTION_SYNTHETIC = True
 
 # Synthetic task corpus (``scripts/synth_trade_tasks.py``). Only the quality
 # filtered rows are used; the generator caches raw API answers separately.
@@ -391,10 +409,14 @@ def train_classifier(df: pd.DataFrame = None, synthetic: bool = False,
         seed_rows=stats.get("seed_rows"),
         synthetic_rows=stats.get("synthetic_rows", 0),
         synthetic_corpus=SYNTH_TASKS_PATH.name if synthetic else None,
+        synthetic=bool(synthetic),
         label_mode=label_mode,
         dataset_rows=stats.get("dataset_rows"),
         trained_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
     )
+    # ``c_value`` lets the evaluation and the production build reproduce one exact
+    # variant; ``None`` keeps the registered default so older callers are unaffected.
+    c_single = float(c_value if c_value is not None else CLASSIFIER_C)
 
     if label_mode == "multi":
         from sklearn.multiclass import OneVsRestClassifier
@@ -433,7 +455,7 @@ def train_classifier(df: pd.DataFrame = None, synthetic: bool = False,
 
     model = Pipeline([
         ("features", features),
-        ("clf", LogisticRegression(C=CLASSIFIER_C, max_iter=3000)),
+        ("clf", LogisticRegression(C=c_single, max_iter=3000)),
     ])
     model.fit(texts, labels)
     return {
@@ -444,7 +466,7 @@ def train_classifier(df: pd.DataFrame = None, synthetic: bool = False,
         "decision": {"threshold": float(threshold), "margin": float(margin)},
         "meta": build_meta(
             algorithm="tfidf(word 1-2 + char_wb 3-5) + LogisticRegression",
-            C=CLASSIFIER_C, **meta_extra,
+            C=c_single, **meta_extra,
         ),
     }
 
@@ -471,15 +493,22 @@ def main():
     print("saved:", DATA / "trade_matcher.joblib")
 
     df = pd.read_parquet(DATA / "job_categorization.parquet")
-    # Production artefact: every legitimate sample is used, including the
-    # synthetic corpus and the rows generated from the evaluation titles (nothing
-    # is held out once the numbers have been reported).
-    bundle = train_classifier(df, synthetic=True, label_mode="multi")
+    # Production artefact = variant "F single_synth_rules": single-label argmax,
+    # dataset + synthetic corpus, dev-searched C, compound-title rules on (the
+    # rules live in app.ai_service._STRUCTURED_RULES, which defaults to True).
+    # Every legitimate sample is used, including the rows generated from the
+    # evaluation titles (nothing is held out once the numbers have been reported).
+    bundle = train_classifier(
+        df,
+        synthetic=PRODUCTION_SYNTHETIC,
+        label_mode=PRODUCTION_LABEL_MODE,
+        c_value=PRODUCTION_C,
+    )
     saved = save_classifier(bundle)
     size_mb = saved.stat().st_size / 1048576
     print(f"saved: {saved} ({size_mb:.2f} MB, {bundle['meta']['samples']} training samples, "
           f"{len(bundle['classes'])} classes, label_mode={bundle['label_mode']}, "
-          f"synthetic={bundle['meta']['synthetic_rows']})")
+          f"C={bundle['meta']['C']}, synthetic={bundle['meta']['synthetic_rows']})")
     print("decision rule:", bundle["decision"])
 
 if __name__ == "__main__":
