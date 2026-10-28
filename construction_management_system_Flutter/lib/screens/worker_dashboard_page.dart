@@ -570,7 +570,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: AppRadius.rMd,
+        borderRadius: AppRadius.rLg,
         boxShadow: [BoxShadow(color: AppColors.green.withValues(alpha: 0.18), blurRadius: 18, offset: Offset(0, 6))],
       ),
       child: Row(
@@ -719,7 +719,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         const SizedBox(height: 8),
         if (_hoursToday > 0)
           Text('${AppStrings.t('worker.hoursToday')}: ${_hoursToday.toStringAsFixed(1)}h',
-              style: GoogleFonts.inter(fontSize: 14, color: AppColors.accent, fontWeight: FontWeight.w700)),
+              style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.accent, fontWeight: FontWeight.w700)),
         const SizedBox(height: 16),
 
         Row(children: [
@@ -735,7 +735,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.bgCard,
+            color: AppColors.bgMain,
             borderRadius: AppRadius.rMd,
             border: Border.all(color: AppColors.border),
           ),
@@ -796,7 +796,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         const SizedBox(height: 12),
         Text(
           'Device: $_deviceType • $_deviceInfo',
-          style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
+          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
         ),
       ]),
     );
@@ -827,7 +827,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             const Spacer(),
             if (_lastUpdated.isNotEmpty)
               Text(_lastUpdated.substring(11, 16),
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
             IconButton(
               icon: Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
               tooltip: 'Refresh tasks',

@@ -322,7 +322,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     return SwitchListTile(
       contentPadding: EdgeInsets.zero,
       title: Text(label,
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
       value: value,
       activeThumbColor: AppColors.accent,
       onChanged: onChanged,
@@ -451,11 +451,24 @@ class _NotificationsPageState extends State<NotificationsPage>
         return Scaffold(
           backgroundColor: AppColors.bgMain,
           appBar: AppBar(
+            backgroundColor: AppColors.bgCard,
+            elevation: 0,
+            scrolledUnderElevation: 0.5,
+            surfaceTintColor: AppColors.transparent,
+            shape: Border(bottom: BorderSide(color: AppColors.border)),
+            centerTitle: false,
             title: _titleRow(),
             actions: _headerActions(),
             bottom: _tabBar(tabs),
           ),
-          body: content,
+          body: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints:
+                  const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+              child: content,
+            ),
+          ),
         );
       }),
     );
@@ -727,16 +740,7 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _sectionCard({required Widget child, EdgeInsetsGeometry margin = EdgeInsets.zero}) {
-    return Container(
-      margin: margin,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: child,
-    );
+    return sectionCard(margin: margin, padding: const EdgeInsets.all(16), child: child);
   }
 
   Widget _statusPill(String text) {
@@ -745,7 +749,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: AppRadius.rMd),
       child: Text(text[0].toUpperCase() + text.substring(1),
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.2)),
     );
   }
 
@@ -757,7 +761,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: AppRadius.rMd),
       child: Text(resolved ? 'Resolved' : 'Open',
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color, letterSpacing: 0.2)),
     );
   }
 
@@ -889,7 +893,7 @@ class _NotificationsPageState extends State<NotificationsPage>
         }
       },
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
           color: unread ? AppColors.bgCard : AppColors.bgMain,
           borderRadius: AppRadius.rMd,

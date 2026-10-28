@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
@@ -64,9 +64,11 @@ class _WorkersPageState extends State<WorkersPage> {
   @override
   Widget build(BuildContext c) {
     return Scaffold(
+      backgroundColor: AppColors.bgMain,
       floatingActionButton: FloatingActionButton.extended(
           heroTag: const ValueKey('fab_workers'),
           onPressed: _openAddWorker,
+          backgroundColor: AppColors.accent,
           icon: const Icon(Icons.add),
           label: Text(AppStrings.t('workers.addWorker'))),
       body: Align(
@@ -76,20 +78,58 @@ class _WorkersPageState extends State<WorkersPage> {
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
+              // Summary strip — derived from the already-loaded list (no API change)
+              if (!ld && workers.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(children: [
+                    Expanded(
+                      child: statCard(
+                        label: AppStrings.t('workers.title'),
+                        value: '${workers.length}',
+                        icon: Icons.groups_2_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: statCard(
+                        label: AppStrings.t('dash.present'),
+                        value:
+                            '${workers.where((w) => w['today_status'] == 'present').length}',
+                        icon: Icons.how_to_reg_outlined,
+                        iconColor: AppColors.green,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: statCard(
+                        label: AppStrings.t('dash.absent'),
+                        value:
+                            '${workers.where((w) => w['today_status'] == 'absent').length}',
+                        icon: Icons.person_off_outlined,
+                        iconColor: AppColors.red,
+                      ),
+                    ),
+                  ]),
+                ),
               // Search bar
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: TextField(
-                  onChanged: (v) => setState(() => _searchQuery = v),
-                  decoration: InputDecoration(
-                    hintText: AppStrings.t('workers.searchHint'),
-                    hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
-                    prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-                    filled: true, fillColor: AppColors.bgCard,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                    border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: SizedBox(
+                  height: 44,
+                  child: TextField(
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: AppStrings.t('workers.searchHint'),
+                      hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
+                      prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+                      filled: true, fillColor: AppColors.bgCard,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                      border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+                    ),
                   ),
                 ),
               ),
@@ -126,7 +166,7 @@ class _WorkersPageState extends State<WorkersPage> {
                               crossAxisCount: 2,
                               mainAxisSpacing: AppSpacing.sm,
                               crossAxisSpacing: AppSpacing.sm,
-                              childAspectRatio: 1.6,
+                              mainAxisExtent: 152,
                             ),
                             itemCount: _filtered.length,
                             itemBuilder: (ctx, i) => _workerCard(_filtered[i], inGrid: true),
@@ -239,3 +279,4 @@ class _WorkersPageState extends State<WorkersPage> {
     }
   }
 }
+

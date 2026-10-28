@@ -298,7 +298,9 @@ class _NarrowLayout extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         surfaceTintColor: AppColors.transparent,
+        shape: Border(bottom: BorderSide(color: AppColors.border)),
         centerTitle: false,
         title: Row(children: [
           Container(
@@ -429,7 +431,7 @@ class _BottomNavBtn extends StatelessWidget {
               _navT(item.label),
               maxLines: 1,
               style: GoogleFonts.inter(
-                fontSize: 13,
+                fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: selected ? AppColors.accent : AppColors.textMuted,
               ),
@@ -494,7 +496,7 @@ class _SidebarContent extends StatelessWidget {
                   Text('BuildSmart',
                       style: GoogleFonts.inter(color: AppColors.accentInk, fontWeight: FontWeight.w800, fontSize: 15)),
                   Text('AI Construction System',
-                      style: GoogleFonts.inter(color: AppColors.textSidebarMuted, fontSize: 14)),
+                      style: GoogleFonts.inter(color: AppColors.textSidebarMuted, fontSize: 11.5)),
                 ]),
               ),
             ]),
@@ -530,7 +532,7 @@ class _SidebarContent extends StatelessWidget {
                           color: AppColors.onAccent, fontWeight: FontWeight.w700, fontSize: 14)),
                   Text(role.replaceAll('_', ' '),
                       style: GoogleFonts.inter(
-                          color: AppColors.textSidebarMuted, fontSize: 14)),
+                          color: AppColors.textSidebarMuted, fontSize: 12)),
                 ]),
               ),
               IconButton(
@@ -550,9 +552,9 @@ class _SidebarContent extends StatelessWidget {
         child: Text(s,
             style: GoogleFonts.inter(
                 color: AppColors.textSidebarMuted,
-                fontSize: 14,
+                fontSize: 10.5,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 0.8)),
+                letterSpacing: 1.0)),
       );
 }
 
@@ -636,14 +638,14 @@ class _TopBar extends StatelessWidget {
         Expanded(
           child: Text(_navT(title),
               style: GoogleFonts.inter(
-                  fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         ),
         SizedBox(
           width: 220, height: 38,
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search projects, workers...',
-              hintStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted),
+              hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
               prefixIcon: Icon(Icons.search_rounded, size: 18, color: AppColors.textMuted),
               filled: true,
               fillColor: AppColors.bgMain,
@@ -709,6 +711,7 @@ class _ProjectChipState extends State<_ProjectChip> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
+          color: AppColors.bgMain,
           border: Border.all(color: AppColors.border),
           borderRadius: AppRadius.rSm,
         ),
@@ -716,7 +719,7 @@ class _ProjectChipState extends State<_ProjectChip> {
           Icon(Icons.location_on_rounded, size: 14, color: AppColors.accent),
           const SizedBox(width: 4),
           Text(widget.currentProject.isEmpty ? 'All Projects' : widget.currentProject,
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           const SizedBox(width: 4),
           Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
         ]),

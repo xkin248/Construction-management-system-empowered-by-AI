@@ -238,7 +238,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   crossAxisCount: 2,
                                   mainAxisSpacing: AppSpacing.md,
                                   crossAxisSpacing: AppSpacing.md,
-                                  childAspectRatio: 1.45,
+                                  mainAxisExtent: 210,
                                 ),
                                 itemCount: projects.length,
                                 itemBuilder: (ctx, i) => _projectCard(projects[i], inGrid: true),
@@ -272,7 +272,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.zero,
       child: InkWell(
-        borderRadius: AppRadius.rMd,
+        borderRadius: AppRadius.rLg,
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: p['project_id']))),
         child: Padding(
@@ -294,7 +294,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
-                        borderRadius: AppRadius.rMd,
+                        borderRadius: AppRadius.rSm,
                       ),
                       child: Icon(Icons.check_circle_rounded,
                           size: 14, color: AppColors.green),
@@ -309,7 +309,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
                       color: AppColors.bgMain,
-                      borderRadius: AppRadius.rMd,
+                      borderRadius: AppRadius.rSm,
                     ),
                     child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
                   ),
@@ -916,9 +916,12 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         surfaceTintColor: AppColors.transparent,
+        shape: Border(bottom: BorderSide(color: AppColors.border)),
+        centerTitle: false,
         title: Text(p['project_name'] ?? 'Project',
-            style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         actions: [
           TextButton.icon(
             onPressed: () {

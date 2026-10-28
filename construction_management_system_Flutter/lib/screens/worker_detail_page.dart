@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
@@ -58,9 +58,20 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
   Widget build(BuildContext context) {
     final name = (w?['name'] as String?) ?? 'Worker';
     return Scaffold(
+      backgroundColor: AppColors.bgMain,
       appBar: AppBar(
+        backgroundColor: AppColors.bgCard,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: AppColors.transparent,
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
         title: Text(name,
-            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800)),
+            style: GoogleFonts.inter(
+                fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: AppColors.border),
+        ),
       ),
       body: Align(
         alignment: Alignment.topCenter,
@@ -106,6 +117,35 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
                           statusPill((w?['today_status'] as String?) ?? 'absent'),
                         ]),
                       ),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(
+                          child: statCard(
+                            label: 'Hours today',
+                            value: w?['hours_today'] == null
+                                ? '-'
+                                : '${w?['hours_today']}',
+                            sub: 'hours',
+                            icon: Icons.timer_outlined,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: statCard(
+                            label: 'Safety training',
+                            value: (w?['has_safety_training'] == true)
+                                ? 'Done'
+                                : 'Pending',
+                            sub: (w?['has_safety_training'] == true)
+                                ? 'certified'
+                                : 'not recorded',
+                            icon: Icons.health_and_safety_outlined,
+                            iconColor: (w?['has_safety_training'] == true)
+                                ? AppColors.green
+                                : AppColors.yellow,
+                          ),
+                        ),
+                      ]),
                       const SizedBox(height: 12),
                       _section('Today', [
                         _row(Icons.login_rounded, 'Check-in',

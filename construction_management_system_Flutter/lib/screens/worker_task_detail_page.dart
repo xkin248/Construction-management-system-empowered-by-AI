@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
@@ -231,7 +232,14 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppStrings.t('tasks.taskDetails')),
+        backgroundColor: AppColors.bgCard,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        surfaceTintColor: AppColors.transparent,
+        shape: Border(bottom: BorderSide(color: AppColors.border)),
+        centerTitle: false,
+        title: Text(AppStrings.t('tasks.taskDetails'),
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
         actions: [
           IconButton(
             tooltip: 'Refresh',
@@ -253,7 +261,13 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                     ),
                   ),
                 )
-              : RefreshIndicator(onRefresh: _load, child: _buildBody()),
+              : Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+                    child: RefreshIndicator(onRefresh: _load, child: _buildBody()),
+                  ),
+                ),
     );
   }
 
@@ -274,7 +288,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             : AppColors.yellow;
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
         sectionCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -421,13 +435,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 
   Widget _buildActions() {
     if (_status == 'completed') {
-      return Container(
+      return sectionCard(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.greenLight,
-          borderRadius: AppRadius.rMd,
-          border: Border.all(color: AppColors.green.withValues(alpha: 0.35)),
-        ),
         child: Row(children: [
           Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
           const SizedBox(width: 10),

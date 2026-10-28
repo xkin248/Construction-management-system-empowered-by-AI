@@ -259,7 +259,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                             ])),
                                             const SizedBox(width: 12),
                                             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                              _label(AppStrings.t('worker.register.confirm')),
+                                              _label(AppStrings.t('worker.register.confirmPassword')),
                                               const SizedBox(height: 8),
                                               _pwdField(
                                                 controller: _pwd2,
@@ -348,7 +348,7 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
                                                 height: 20, width: 20,
                                                 child: CircularProgressIndicator(color: AppColors.accentInk, strokeWidth: 2.2))
                                             : Text(AppStrings.t('worker.register.submit'),
-                                                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
+                                                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800)),
                                       ),
                                     ),
                                   ],
@@ -472,7 +472,8 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
       hintStyle: GoogleFonts.inter(fontSize: 14, color: AppColors.darkTextMuted),
       filled: true,
       fillColor: AppColors.darkBg,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      isDense: true,
       border:        OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: const BorderSide(color: AppColors.darkBorder)),
       enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: const BorderSide(color: AppColors.darkBorder)),
       focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.green, width: 1.5)),
@@ -480,5 +481,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
   }
 
   Widget _label(String s) => Text(s,
-      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSidebar));
+      style: GoogleFonts.inter(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+          color: AppColors.darkTextMuted));
 }

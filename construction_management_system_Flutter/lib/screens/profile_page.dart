@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
@@ -61,24 +62,23 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         surfaceTintColor: AppColors.transparent,
+        shape: Border(bottom: BorderSide(color: AppColors.border)),
+        centerTitle: false,
         title: Text(AppStrings.t('profile.title'),
-            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
       ),
       body: ld
           ? const Center(child: CircularProgressIndicator())
-          : ListView(padding: const EdgeInsets.all(16), children: [
+          : Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+                child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
               sectionCard(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 28, 16, 24),
                 child: Column(children: [
-                  Container(
-                    width: 46, height: 3.5,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: AppRadius.rPill,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
                   initialsAvatar(user?['full_name'] ?? '?', radius: 38),
                   const SizedBox(height: 16),
                   Text(user?['full_name'] ?? '-',
@@ -96,21 +96,25 @@ class _ProfilePageState extends State<ProfilePage> {
                 child: Column(children: [
                   ListTile(
                     leading: Icon(Icons.phone_outlined, color: AppColors.textSecondary),
-                    title: Text(AppStrings.t('profile.phone')),
-                    trailing: Text(user?['phone'] ?? '-', style: TextStyle(color: AppColors.textMuted)),
+                    title: Text(AppStrings.t('profile.phone'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    trailing: Text(user?['phone'] ?? '-',
+                        style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: AppColors.border),
                   ListTile(
                     leading: Icon(Icons.badge_outlined, color: AppColors.textSecondary),
-                    title: Text(AppStrings.t('profile.role')),
+                    title: Text(AppStrings.t('profile.role'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     trailing: Text((user?['role'] ?? '-').toString().replaceAll('_', ' '),
-                        style: TextStyle(color: AppColors.textMuted)),
+                        style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                   ),
-                  const Divider(height: 1, indent: 56),
+                  Divider(height: 1, indent: 56, color: AppColors.border),
                   ListTile(
                     leading: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
-                    title: Text(AppStrings.t('profile.appSettings')),
-                    trailing: const Icon(Icons.chevron_right, size: 18),
+                    title: Text(AppStrings.t('profile.appSettings'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    trailing: Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
                     onTap: () => toast('Use the Settings section from the menu'),
                   ),
                 ]),
@@ -122,7 +126,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 label: Text(AppStrings.t('profile.logout'), style: TextStyle(color: AppColors.red)),
                 style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.redLight), minimumSize: Size.fromHeight(46)),
               ),
-            ]),
+                ]),
+              ),
+            ),
     );
   }
 }

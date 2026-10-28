@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
@@ -23,7 +23,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 }
 
-// ══════════════════════ Team Attendance Tab ══════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• Team Attendance Tab â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 class _TeamAttendanceTab extends StatefulWidget {
   const _TeamAttendanceTab();
 
@@ -215,18 +215,16 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   }
 
   Widget _statMini(String label, String value, {String? sub, Color? valueColor}) {
-    return Container(
+    return sectionCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
-        if (sub != null) Text(sub, style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+        Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Text(value, style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, height: 1.1, color: valueColor ?? AppColors.textPrimary)),
+        if (sub != null) ...[
+          const SizedBox(height: 2),
+          Text(sub, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+        ],
       ]),
     );
   }
@@ -237,13 +235,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     final latePct = total > 0 ? (late / total * 100).toInt() : 0;
     final absentPct = total > 0 ? (absent / total * 100).toInt() : 20;
 
-    return Container(
+    return sectionCard(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text("Today's Attendance Rate — All Projects",
             style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
@@ -305,6 +298,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   Widget _filterDropdown(List<String> items, String value, ValueChanged<String?> onChanged) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 48,
+      width: 172,
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: AppRadius.rMd,
@@ -313,6 +308,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       child: DropdownButton<String>(
         value: value,
         underline: const SizedBox(),
+        isExpanded: true,
         style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
         items: items.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
         onChanged: onChanged,
@@ -323,15 +319,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   // ── Phone-friendly worker cards (replaces 7-column table) ──
   Widget _buildWorkerTable(List filtered) {
     if (filtered.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: AppRadius.rMd,
-          border: Border.all(color: AppColors.border),
-        ),
+      return sectionCard(
+        padding: const EdgeInsets.symmetric(vertical: 28),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
             width: 64, height: 64,
@@ -360,7 +349,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           crossAxisCount: 2,
           mainAxisSpacing: AppSpacing.sm,
           crossAxisSpacing: AppSpacing.sm,
-          childAspectRatio: 1.6,
+          mainAxisExtent: 158,
         ),
         itemCount: filtered.length,
         itemBuilder: (_, i) => _WorkerAttCard(worker: filtered[i], inGrid: true),
@@ -392,14 +381,9 @@ class _WorkerAttCard extends StatelessWidget {
     final checkOut = _fmtTime(worker['check_out_time'] as String?);
     final hours = worker['hours_today'];
 
-    return Container(
+    return sectionCard(
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Row 1: avatar + name + status pill
         Row(children: [
@@ -437,16 +421,16 @@ class _WorkerAttCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.accentLight,
-                borderRadius: AppRadius.rMd,
+                borderRadius: AppRadius.rSm,
               ),
               child: Text('${hours}h',
-                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.accent)),
+                  style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.accent)),
             ),
           const SizedBox(width: 8),
           Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.textMuted),
             const SizedBox(width: 4),
-            Text('GPS', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+            Text('GPS', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
           ]),
         ]),
       ]),
@@ -490,15 +474,15 @@ class _ProjectGeofenceCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: AppRadius.rMd),
-            child: Text(AppStrings.t('att.active'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
+            child: Text(AppStrings.t('att.active'), style: GoogleFonts.inter(fontSize: 12, color: AppColors.green, fontWeight: FontWeight.w700)),
           ),
         ]),
         const SizedBox(height: 8),
         Text(name, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary), maxLines: 2, overflow: TextOverflow.ellipsis),
-        Text(_shortLoc(location), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text(_shortLoc(location), style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
         const SizedBox(height: 8),
         Text('$workerCount workers tracked', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
-        Text('Radius: ${radius}m', style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+        Text('Radius: ${radius}m', style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -508,3 +492,4 @@ class _ProjectGeofenceCard extends StatelessWidget {
     return parts.length >= 2 ? '${parts[parts.length - 2].trim()}, ${parts.last.trim()}' : loc;
   }
 }
+
