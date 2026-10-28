@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, Boolean, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, Boolean, ForeignKey, Index, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -290,6 +290,11 @@ class TaskProgressLog(Base):
     or progress changes. ``from_status`` equals ``to_status`` for pure progress
     updates (the note explains what changed); both are set for status
     transitions.
+
+    The ``changed_by_*`` / ``reason`` / ``action`` columns turn the same row into
+    an audit record for privileged moves (currently ``reopen``): who performed
+    it, what the move was, and why. Plain progress/status updates leave them
+    empty, so the timeline stays readable.
     """
     __tablename__ = "task_progress_logs"
     log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -297,6 +302,15 @@ class TaskProgressLog(Base):
     from_status = Column(String(50), nullable=True)
     to_status = Column(String(50), nullable=True)
     note = Column(Text, nullable=True)
+    # What produced this entry: "status", "progress" or "reopen".
+    action = Column(String(30), nullable=True)
+    # Actor of a privileged move (supervisor). Nullable: automatic entries have
+    # no actor, and the name is denormalised so the audit line survives a
+    # supervisor account being deleted later.
+    changed_by_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    changed_by_name = Column(String(255), nullable=True)
+    # Free-text justification supplied by the actor (mandatory for reopen).
+    reason = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     task = relationship("Task", back_populates="progress_logs")
 
@@ -336,6 +350,16 @@ class AIDecisionLog(Base):
     never block the assignment pipeline.
     """
     __tablename__ = "ai_decision_log"
+    # Composite index backing the analytics queries of the stats endpoint and the
+    # report CLI, which all filter by project and slice by time, then group by
+    # stage. Declared on the model so fresh databases get it from create_all;
+    # db_migrate.ensure_ai_decision_log_indexes adds it to existing databases.
+    __table_args__ = (
+        Index(
+            "ix_ai_decision_log_project_created_stage",
+            "project_id", "created_at", "stage",
+        ),
+    )
     log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     stage = Column(String(30), nullable=False, server_default="trade_resolution")
     task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=True, index=True)

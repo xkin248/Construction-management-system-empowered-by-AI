@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
+from urllib.parse import quote
 import os
 
 from app.database import get_db
@@ -11,6 +12,7 @@ from app.file_service import (
     save_upload_file, create_thumbnail, delete_file,
     UPLOAD_DIR, THUMBNAIL_DIR
 )
+from app.file_tokens import clamp_ttl, create_download_token, decode_download_token
 from app.routers.auth import cu
 
 router = APIRouter(tags=["📁 File Management"])
@@ -89,6 +91,70 @@ def download_file(
     if not os.path.exists(file.file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
+    return FileResponse(
+        path=file.file_path,
+        filename=file.original_name,
+        media_type=file.mime_type
+    )
+
+
+def _get_downloadable_file(db: Session, file_id: int) -> DBFile:
+    """Fetch a file row that also exists on disk, or raise 404."""
+    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    if not os.path.exists(file.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    return file
+
+
+@router.get("/files/{file_id}/download-link")
+def create_file_download_link(
+    file_id: int,
+    request: Request,
+    ttl: int = Query(default=300, ge=30, le=3600),
+    db: Session = Depends(get_db),
+    current_user: Supervisor = Depends(cu)
+):
+    """Return a short-lived, file-scoped URL the client can fetch without headers.
+
+    Chosen over "attach the Authorization header on every platform" because the
+    two broken call sites live outside Dio: Flutter Web download navigation and
+    ``Image.network`` previews. Both can only carry a URL, so the credential has
+    to be in the URL itself. The token is scoped to one file and expires in
+    ``ttl`` seconds (default 5 minutes), which keeps the exposure window small.
+
+    Auth is the same ``cu`` dependency as ``/download``: minting a link grants
+    exactly the access the caller already had, so no privilege is widened.
+    """
+    file = _get_downloadable_file(db, file_id)
+    token = create_download_token(file.file_id, ttl)
+    path = f"/api/files/download?token={quote(token)}"
+    # Absolute URL derived from the request so the client does not have to guess
+    # the host (and so a Render deployment behind a proxy still yields https).
+    return {
+        "file_id": file.file_id,
+        "filename": file.original_name,
+        "mime_type": file.mime_type,
+        "download_url": str(request.base_url).rstrip("/") + path,
+        "path": path,
+        "expires_in": clamp_ttl(ttl),
+    }
+
+
+@router.get("/files/download")
+def download_file_with_token(
+    token: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Serve a file for a valid signed link (no Authorization header needed).
+
+    This is the only unauthenticated read path in the router: authorisation is
+    delegated to the signed token, which encodes a single ``file_id`` and a
+    short expiry, so it cannot be widened into a general-purpose credential.
+    """
+    file_id = decode_download_token(token)
+    file = _get_downloadable_file(db, file_id)
     return FileResponse(
         path=file.file_path,
         filename=file.original_name,

@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -12,7 +12,7 @@ from app.schemas import (
     AIMatchResult, TaskOut, TaskProgressLogOut,
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
 )
-from app.routers.auth import require_worker, require_any_authorized
+from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
 
 router = APIRouter(tags=["🤖 Tasks & AI Assignment"])
 
@@ -23,17 +23,39 @@ STATUS_TO_PROGRESS = {
 }
 
 # Allowed task status transitions (state machine whitelist). Only adjacent
-# moves are permitted; jumping pending->completed or reverting
-# completed->pending is rejected with a 400 so task history stays honest.
+# forward moves are permitted; jumping pending->completed is rejected with a 400
+# so task history stays honest.
+#
+# The completed -> in_progress / pending edges are listed here as the single
+# source of truth, but they are *reopen-only*: the generic update endpoint still
+# rejects them (see _validate_status_transition), and only the supervisor-only
+# reopen endpoint may use them, together with an audit entry. Keeping one map
+# means the front-end status picker can render every legal edge from the same
+# definition the API validates against.
 TASK_STATUS_TRANSITIONS = {
     "pending": {"in_progress"},
     "in_progress": {"completed", "pending"},
-    "completed": set(),
+    "completed": {"in_progress", "pending"},
 }
 
+# Edges that may only be traversed through POST /tasks/{id}/reopen.
+REOPEN_ONLY_TRANSITIONS = {
+    ("completed", "in_progress"),
+    ("completed", "pending"),
+}
 
-def _validate_status_transition(old_status: str, new_status: str) -> None:
-    """Raise 400 when new_status is not a legal move from old_status."""
+# Statuses a reopen may land on (a completed task never reopens straight back to
+# completed).
+REOPEN_TARGET_STATUSES = ("in_progress", "pending")
+
+
+def _validate_status_transition(old_status: str, new_status: str, allow_reopen: bool = False) -> None:
+    """Raise 400 when new_status is not a legal move from old_status.
+
+    ``allow_reopen`` is only set by the privileged reopen endpoint; everywhere
+    else a completed task stays closed, so the historical forward-only contract
+    of PUT /tasks/{id} is preserved.
+    """
     allowed = TASK_STATUS_TRANSITIONS.get(old_status, set())
     if new_status not in allowed:
         raise HTTPException(
@@ -41,6 +63,13 @@ def _validate_status_transition(old_status: str, new_status: str) -> None:
             f"Invalid task status transition: {old_status} -> {new_status}. "
             "Allowed transitions: pending -> in_progress, in_progress -> completed, "
             "in_progress -> pending.",
+        )
+    if not allow_reopen and (old_status, new_status) in REOPEN_ONLY_TRANSITIONS:
+        raise HTTPException(
+            400,
+            f"Invalid task status transition: {old_status} -> {new_status}. "
+            "A completed task can only be reopened through the reopen endpoint "
+            "(supervisor only, reason required).",
         )
 
 
@@ -379,6 +408,7 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
                 from_status=old_status,
                 to_status=task.status or new_status,
                 note=log_note,
+                action="status" if status_changed else "progress",
             ))
 
         if status_changed:
@@ -430,6 +460,95 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
     db.refresh(task)
     task = db.query(Task).options(*_task_load_options()).get(task.task_id)
     return _serialize_task(task)
+
+
+@router.post("/tasks/{task_id}/reopen")
+def reopen_task(
+    task_id: int,
+    payload: Dict[str, Any] = Body(default={}),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_site_supervisor),
+):
+    """Reopen a completed task (supervisor only) and record an audit entry.
+
+    Why a dedicated endpoint instead of widening PUT /tasks/{id}: a reopen is a
+    privileged, backward transition, so it must (a) require a supervisor,
+    (b) demand a written reason and (c) leave an auditable trace. Folding it into
+    the generic update would let any caller quietly undo a completion.
+
+    Audit row fields: changed_by_id / changed_by_name (who), created_at (when),
+    from_status -> to_status (what), reason (why), action="reopen".
+    """
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+
+    reason = str(payload.get("reason") or "").strip()
+    if not reason:
+        raise HTTPException(400, "reason is required when reopening a task")
+
+    # Default target: back to in_progress, which keeps the task on the board
+    # without pretending the finished work never happened. Parsed strictly (no
+    # _normalize_status defaulting) so a typo fails loudly instead of silently
+    # landing on "pending".
+    raw_target = payload.get("status") or "in_progress"
+    target_status = str(raw_target).strip().lower().replace(" ", "_")
+    if target_status not in REOPEN_TARGET_STATUSES:
+        raise HTTPException(
+            400,
+            "A reopen must target 'in_progress' or 'pending', "
+            f"got '{raw_target}'",
+        )
+
+    old_status = task.status or "pending"
+    if old_status != "completed":
+        raise HTTPException(
+            400,
+            f"Only a completed task can be reopened (current status: {old_status})",
+        )
+    # Reuse the shared state machine so the reopen edges stay declared in exactly
+    # one place (allow_reopen opts into the completed -> * edges).
+    _validate_status_transition(old_status, target_status, allow_reopen=True)
+
+    task.status = target_status
+    # Reopened work is no longer finished: clear the completion timestamp and
+    # pull progress back out of the 100% bucket. in_progress keeps whatever
+    # partial progress was recorded, or starts at 50 when it is still 0/100.
+    task.completed_at = None
+    if target_status == "pending":
+        task.progress = 0
+    elif not task.progress or task.progress >= 100:
+        # in_progress with no usable partial progress: park it at 50% so the
+        # board does not show a live task at 0% or still at 100%.
+        task.progress = 50
+
+    db.add(TaskProgressLog(
+        task_id=task.task_id,
+        from_status=old_status,
+        to_status=target_status,
+        note=reason,
+        action="reopen",
+        changed_by_id=current_user.id,
+        changed_by_name=current_user.name,
+        reason=reason,
+    ))
+
+    db.flush()  # persist the change before the recalc queries read the task set
+    _recalc_project_progress(db, task.project_id)
+    _recalc_project_status(db, task.project_id)
+    db.commit()
+    db.refresh(task)
+
+    return {
+        "status": "ok",
+        "task_id": task.task_id,
+        "from_status": old_status,
+        "to_status": target_status,
+        "progress": task.progress,
+        "reopened_by": current_user.name,
+        "reopened_by_id": current_user.id,
+        "reason": reason,
+    }
 
 
 @router.get("/tasks/{task_id}/logs", response_model=List[TaskProgressLogOut])

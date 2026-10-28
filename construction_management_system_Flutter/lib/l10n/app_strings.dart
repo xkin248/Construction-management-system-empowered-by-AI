@@ -158,6 +158,25 @@ class AppStrings {
     'tasks.completionNoteLabel': ['Completion note', 'Nota penyiapan'],
     'tasks.completionNoteHint': ['Describe what was completed...', 'Terangkan apa yang telah disiapkan...'],
     'tasks.completionNoteRequired': ['Completion note is required', 'Nota penyiapan diperlukan'],
+    'tasks.reopen': ['Reopen', 'Buka semula'],
+    'tasks.reopenTitle': ['Reopen this task?', 'Buka semula tugasan ini?'],
+    'tasks.reopenBody': [
+      'The task will move back to active work and the reason is recorded in the task timeline.',
+      'Tugasan akan kembali aktif dan sebabnya direkodkan dalam sejarah tugasan.'
+    ],
+    'tasks.reopenReasonLabel': ['Reason', 'Sebab'],
+    'tasks.reopenReasonHint': [
+      'e.g. Sign-off rejected, rework needed',
+      'cth. Kelulusan ditolak, kerja perlu diulang'
+    ],
+    'tasks.reopenReasonRequired': ['A reason is required to reopen', 'Sebab diperlukan untuk buka semula'],
+    'tasks.reopenTargetLabel': ['Move back to', 'Kembali ke'],
+    'tasks.reopenDone': ['Task reopened', 'Tugasan dibuka semula'],
+    'tasks.reopenFailed': ['Failed to reopen task', 'Gagal membuka semula tugasan'],
+    'tasks.reopenSupervisorOnly': [
+      'Only a supervisor can reopen a task',
+      'Hanya penyelia boleh membuka semula tugasan'
+    ],
     'tasks.noChange': ['No change', 'Tiada perubahan'],
 
     // ============ Attendance ============

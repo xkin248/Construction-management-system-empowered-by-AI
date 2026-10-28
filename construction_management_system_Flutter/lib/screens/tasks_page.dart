@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
@@ -480,6 +481,124 @@ class _TaskCardState extends State<_TaskCard> {
     }
   }
 
+  /// Reopen a completed task through the dedicated supervisor endpoint.
+  ///
+  /// `completed` is forward-only for [ApiService.updateTask] (the backend
+  /// rejects the backward edge on PUT so a stray edit cannot undo a sign-off),
+  /// therefore a mistaken completion needs this explicit, audited path: the
+  /// dialog collects the mandatory reason that lands in the task timeline.
+  Future<void> _reopenTask() async {
+    final reasonCtrl = TextEditingController();
+    var target = 'in_progress';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(AppStrings.t('tasks.reopenTitle')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(AppStrings.t('tasks.reopenBody'),
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: AppColors.textSecondary)),
+              const SizedBox(height: 12),
+              Text(AppStrings.t('tasks.reopenTargetLabel'),
+                  style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+              const SizedBox(height: 6),
+              Row(children: [
+                for (final opt in const ['in_progress', 'pending']) ...[
+                  Expanded(
+                    child: SizedBox(
+                      height: 34,
+                      child: ElevatedButton(
+                        onPressed: () => setDialogState(() => target = opt),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: target == opt
+                              ? AppColors.blue
+                              : AppColors.border,
+                          foregroundColor: target == opt
+                              ? AppColors.onAccent
+                              : AppColors.textMuted,
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: AppRadius.rMd),
+                        ),
+                        child: Text(
+                          opt == 'in_progress'
+                              ? AppStrings.t('tasks.inProgress')
+                              : AppStrings.t('tasks.pending'),
+                          style: GoogleFonts.inter(
+                              fontSize: 13, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (opt == 'in_progress') const SizedBox(width: 8),
+                ],
+              ]),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonCtrl,
+                autofocus: true,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: AppStrings.t('tasks.reopenReasonLabel'),
+                  hintText: AppStrings.t('tasks.reopenReasonHint'),
+                  border: OutlineInputBorder(borderRadius: AppRadius.rMd),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(AppStrings.t('common.cancel')),
+            ),
+            TextButton(
+              onPressed: () {
+                if (reasonCtrl.text.trim().isEmpty) {
+                  toast(AppStrings.t('tasks.reopenReasonRequired'));
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              style: TextButton.styleFrom(foregroundColor: AppColors.yellow),
+              child: Text(AppStrings.t('common.confirm')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      final resp = await ApiService().reopenTask(
+        widget.task['task_id'],
+        reasonCtrl.text.trim(),
+        targetStatus: target,
+      );
+      final newStatus = resp['to_status'] as String? ?? target;
+      setState(() => _status = newStatus);
+      widget.task['status'] = newStatus;
+      if (resp['progress'] != null) widget.task['progress'] = resp['progress'];
+      widget.onChanged?.call();
+      TaskStatusNotifier.notify();
+      toast(AppStrings.t('tasks.reopenDone'));
+    } on DioException catch (e) {
+      // 403 = not a supervisor; the backend is the authority here, so surface
+      // the reason instead of a generic failure.
+      toast(e.response?.statusCode == 403
+          ? AppStrings.t('tasks.reopenSupervisorOnly')
+          : AppStrings.t('tasks.reopenFailed'));
+    } catch (e) {
+      toast(AppStrings.t('tasks.reopenFailed'));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final priority = widget.task['priority'] as String? ?? 'medium';
@@ -634,13 +753,35 @@ class _TaskCardState extends State<_TaskCard> {
         ),
         const SizedBox(height: 12),
         // ── Status quick-toggle (does not navigate) ──
-        Row(children: [
-          _statusBtn(AppStrings.t('tasks.pending'), 'pending'),
-          const SizedBox(width: 8),
-          _statusBtn(AppStrings.t('tasks.inProgress'), 'in_progress'),
-          const SizedBox(width: 8),
-          _statusBtn(AppStrings.t('tasks.completed'), 'completed'),
-        ]),
+        // A completed task is forward-only for the normal status buttons, so
+        // offering them would just produce a rejected request. Swap the row for
+        // the audited reopen action instead.
+        if (isCompleted)
+          SizedBox(
+            height: 32,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _reopenTask,
+              icon: const Icon(Icons.undo_rounded, size: 18),
+              label: Text(AppStrings.t('tasks.reopen'),
+                  style: GoogleFonts.inter(
+                      fontSize: 13, fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.yellowLight,
+                foregroundColor: AppColors.textPrimary,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+              ),
+            ),
+          )
+        else
+          Row(children: [
+            _statusBtn(AppStrings.t('tasks.pending'), 'pending'),
+            const SizedBox(width: 8),
+            _statusBtn(AppStrings.t('tasks.inProgress'), 'in_progress'),
+            const SizedBox(width: 8),
+            _statusBtn(AppStrings.t('tasks.completed'), 'completed'),
+          ]),
       ]),
     );
   }

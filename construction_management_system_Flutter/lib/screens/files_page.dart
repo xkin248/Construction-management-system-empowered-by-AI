@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'dart:io';
+﻿import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
@@ -11,6 +10,7 @@ import '../services/app_settings.dart';
 import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../models/file.dart';
+import '../utils/download_saver.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -337,19 +337,12 @@ class _FilesPageState extends State<FilesPage> {
             if (file.isImage) ...[
               ClipRRect(
                 borderRadius: AppRadius.rMd,
-                child: Image.network(
-                  ApiService().downloadUrl(file.fileId),
+                child: _SignedFileImage(
+                  fileId: file.fileId,
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  loadingBuilder: (c, child, prog) => prog == null
-                      ? child
-                      : Container(
-                          height: 220,
-                          color: AppColors.bgMain,
-                          child: const Center(child: CircularProgressIndicator()),
-                        ),
-                  errorBuilder: (_, __, ___) => Container(
+                  errorWidget: Container(
                     height: 220,
                     color: AppColors.bgMain,
                     child: Center(
@@ -370,10 +363,7 @@ class _FilesPageState extends State<FilesPage> {
             SizedBox(
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  final url = ApiService().downloadUrl(file.fileId);
-                  _launchDownload(url, file.originalName);
-                },
+                onPressed: () => _downloadFile(file),
                 icon: const Icon(Icons.download_rounded, size: 20),
                 label: Text(AppStrings.t('files.downloadOpen')),
                 style: ElevatedButton.styleFrom(
@@ -409,25 +399,25 @@ class _FilesPageState extends State<FilesPage> {
         ]),
       );
 
-  void _launchDownload(String url, String fileName) async {
+  /// Download via a short-lived signed link, then hand the file to the OS.
+  ///
+  /// The old path downloaded the bare `/files/{id}/download` URL with a second,
+  /// unauthenticated `Dio()` instance, so the request carried no Bearer token
+  /// and the backend answered 401. Asking the API for a signed link first fixes
+  /// that and also works on Web, where the browser owns the download.
+  Future<void> _downloadFile(FileItem file) async {
     try {
-      final dir = Directory('${Directory.systemTemp.path}/buildsmart');
-      if (!dir.existsSync()) dir.createSync(recursive: true);
-      final savePath = '${dir.path}/$fileName';
-      await Dio().download(url, savePath);
-      if (Platform.isWindows) {
-        await Process.run('start', [savePath], runInShell: true);
-      } else if (Platform.isMacOS) {
-        await Process.run('open', [savePath]);
-      } else if (Platform.isLinux) {
-        await Process.run('xdg-open', [savePath]);
-      } else {
-        toast('Saved to: $savePath');
+      final url = await ApiService().fetchDownloadLink(file.fileId);
+      final savePath =
+          await downloadToTemp(url, file.originalName, extensionHint: null);
+      if (savePath.isEmpty) {
+        // Web: the browser handled the download, nothing to open locally.
         return;
       }
-      toast('Opened: $fileName');
+      final opened = await openDownloadedFile(savePath);
+      toast(opened ? 'Opened: ${file.originalName}' : 'Saved to: $savePath');
     } catch (e) {
-      toast('Could not open file: $e');
+      toast('Could not download file: $e');
     }
   }
 
@@ -446,7 +436,7 @@ class _FilesPageState extends State<FilesPage> {
         ),
       ),
       body: Column(children: [
-        // ── Project dropdown ──
+        // â”€â”€ Project dropdown â”€â”€
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(children: [
@@ -502,7 +492,7 @@ class _FilesPageState extends State<FilesPage> {
               ),
             ),
             const SizedBox(width: 12),
-            // ── Grid/List toggle ──
+            // â”€â”€ Grid/List toggle â”€â”€
             SizedBox(
               width: 48,
               height: 48,
@@ -524,7 +514,7 @@ class _FilesPageState extends State<FilesPage> {
             ),
           ]),
         ),
-        // ── Category filter chips ──
+        // â”€â”€ Category filter chips â”€â”€
         SizedBox(
           height: 48,
           child: ListView.separated(
@@ -579,7 +569,7 @@ class _FilesPageState extends State<FilesPage> {
           ),
         ),
         const SizedBox(height: 8),
-        // ── File list / grid ──
+        // â”€â”€ File list / grid â”€â”€
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
@@ -655,7 +645,7 @@ class _FilesPageState extends State<FilesPage> {
         ),
       );
 
-  // ── Grid card ──
+  // â”€â”€ Grid card â”€â”€
   Widget _fileCard(FileItem file) {
     return GestureDetector(
       onTap: () => _openPreview(file),
@@ -675,13 +665,12 @@ class _FilesPageState extends State<FilesPage> {
                   child: file.isImage && file.thumbnailPath != null
                       ? ClipRRect(
                           borderRadius: AppRadius.rMd,
-                          child: Image.network(
-                            ApiService().downloadUrl(file.fileId),
+                          child: _SignedFileImage(
+                            fileId: file.fileId,
                             fit: BoxFit.cover,
                             width: double.infinity,
                             height: double.infinity,
-                            errorBuilder: (_, __, ___) =>
-                                _fileIcon(file),
+                            errorWidget: _fileIcon(file),
                           ),
                         )
                       : _fileIcon(file),
@@ -710,7 +699,7 @@ class _FilesPageState extends State<FilesPage> {
     );
   }
 
-  // ── List tile ──
+  // â”€â”€ List tile â”€â”€
   Widget _fileListTile(FileItem file) {
     return GestureDetector(
       onTap: () => _openPreview(file),
@@ -814,5 +803,75 @@ class _FilesPageState extends State<FilesPage> {
       default:
         return AppColors.accentLight;
     }
+  }
+}
+
+/// Renders a server-side image through a short-lived signed URL.
+///
+/// `Image.network` can only carry a URL, and the raw `/files/{id}/download`
+/// endpoint requires an `Authorization` header, so every preview used to fail
+/// with 401 and fall back to the broken-image icon. The link is minted once per
+/// file (ApiService caches it until just before expiry) and then loaded like any
+/// other remote image, so previews also work on Web where headers are impossible.
+class _SignedFileImage extends StatefulWidget {
+  const _SignedFileImage({
+    required this.fileId,
+    required this.errorWidget,
+    this.fit = BoxFit.cover,
+    this.width,
+    this.height,
+  });
+
+  final int fileId;
+  final Widget errorWidget;
+  final BoxFit fit;
+  final double? width;
+  final double? height;
+
+  @override
+  State<_SignedFileImage> createState() => _SignedFileImageState();
+}
+
+class _SignedFileImageState extends State<_SignedFileImage> {
+  late Future<String> _urlFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _urlFuture = ApiService().fetchDownloadLink(widget.fileId);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SignedFileImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.fileId != widget.fileId) {
+      _urlFuture = ApiService().fetchDownloadLink(widget.fileId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: _urlFuture,
+      builder: (context, snapshot) {
+        final url = snapshot.data;
+        if (url == null || url.isEmpty) {
+          if (snapshot.hasError) return widget.errorWidget;
+          return Container(
+            width: widget.width,
+            height: widget.height,
+            color: AppColors.bgMain,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        return Image.network(
+          url,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+          errorBuilder: (_, __, ___) => widget.errorWidget,
+        );
+      },
+    );
   }
 }

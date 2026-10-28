@@ -1,3 +1,14 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: 9f3d7249bacac4923999ceda47b8083c_651fe669d22311f18460525400393706
+    ReservedCode1: lnRsB1c6AxeRAI73FxPUL5UZH7tJsbXulYkEULd/mFzhBuvb1fSHthVCcYo60jpPEAW6UAOiwmcO9WxoPzowAMuPaL8MoumKRTmRllH7+A0NYBARZpQuzvlmkAIB41PuZXbajkL8Vx5nelv6jyOGOZ/Qjn9t61M1gZSeL0nhwfwwXvWBx++jmuCPBO8=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: 9f3d7249bacac4923999ceda47b8083c_651fe669d22311f18460525400393706
+    ReservedCode2: lnRsB1c6AxeRAI73FxPUL5UZH7tJsbXulYkEULd/mFzhBuvb1fSHthVCcYo60jpPEAW6UAOiwmcO9WxoPzowAMuPaL8MoumKRTmRllH7+A0NYBARZpQuzvlmkAIB41PuZXbajkL8Vx5nelv6jyOGOZ/Qjn9t61M1gZSeL0nhwfwwXvWBx++jmuCPBO8=
+---
+
 # AI 决策日志统计报表
 
 - 生成时间：2026-10-28 00:24:16
@@ -85,3 +96,4 @@
 3. **错误率观测**：改派率是线上最真实的人工纠错信号，可替代离线指标做回归监控。
 4. **训练数据回流**：导出的改派样本可直接作为标注数据回灌训练集，下一轮重训即覆盖这些盲区。
 5. **性能基线**：平均耗时作为接口 SLA 的参照。
+*（内容由AI生成，仅供参考）*

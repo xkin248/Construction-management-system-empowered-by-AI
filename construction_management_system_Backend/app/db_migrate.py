@@ -251,3 +251,82 @@ def ensure_ai_decision_log_table(engine) -> bool:
         return True
     table.create(bind=engine, checkfirst=True)
     return True
+
+
+# Composite index behind the decision-log analytics (project filter + time
+# window + stage grouping). Mirrors models.AIDecisionLog.__table_args__.
+_AI_DECISION_LOG_INDEX = {
+    "name": "ix_ai_decision_log_project_created_stage",
+    "columns": ("project_id", "created_at", "stage"),
+}
+
+
+def ensure_ai_decision_log_indexes(engine) -> list:
+    """Add the composite (project_id, created_at, stage) index if it is missing.
+
+    ``create_all`` only creates indexes for tables it creates itself, so a
+    pre-existing ``ai_decision_log`` table never receives new model indexes.
+    This helper closes that gap. It is idempotent twice over: the inspector check
+    skips the DDL when the index already exists, and the statement itself uses
+    ``CREATE INDEX IF NOT EXISTS`` (supported by SQLite and PostgreSQL) so a
+    concurrent or repeated startup cannot fail either.
+
+    Returns the list of index names created by this call (empty when the index
+    was already there), which keeps the call safe to run on every boot.
+    """
+    created = []
+    inspector = inspect(engine)
+    if "ai_decision_log" not in set(inspector.get_table_names()):
+        return created
+
+    name = _AI_DECISION_LOG_INDEX["name"]
+    existing = {idx.get("name") for idx in inspector.get_indexes("ai_decision_log")}
+    if name in existing:
+        return created
+
+    columns = ", ".join(_AI_DECISION_LOG_INDEX["columns"])
+    with engine.begin() as conn:
+        conn.execute(
+            text("CREATE INDEX IF NOT EXISTS %s ON ai_decision_log (%s)" % (name, columns))
+        )
+    created.append(name)
+    return created
+
+
+# Audit columns added to task_progress_logs over time so a privileged status
+# move (reopen) records who did it and why.
+_TASK_PROGRESS_LOG_AUDIT_COLUMNS = {
+    "action": "VARCHAR(30)",
+    "changed_by_id": "INTEGER",
+    "changed_by_name": "VARCHAR(255)",
+    "reason": "TEXT",
+}
+
+
+def ensure_task_progress_log_audit_columns(engine) -> list:
+    """Add the reopen audit columns to task_progress_logs on old databases.
+
+    All four columns are nullable, so existing timeline rows need no backfill and
+    each ALTER is independent. Returns the list of added columns.
+    """
+    added = []
+    inspector = inspect(engine)
+    if "task_progress_logs" not in set(inspector.get_table_names()):
+        return added
+
+    existing = {c["name"] for c in inspector.get_columns("task_progress_logs")}
+    missing = {
+        col: ddl
+        for col, ddl in _TASK_PROGRESS_LOG_AUDIT_COLUMNS.items()
+        if col not in existing
+    }
+    if not missing:
+        return added
+
+    with engine.begin() as conn:
+        for col, ddl in missing.items():
+            conn.execute(
+                text("ALTER TABLE task_progress_logs ADD COLUMN %s %s" % (col, ddl))
+            )
+            added.append(f"task_progress_logs.{col}")
+    return added

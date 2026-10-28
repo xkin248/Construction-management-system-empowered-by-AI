@@ -173,6 +173,12 @@ class TaskProgressLogOut(BaseModel):
     from_status: Optional[str] = None
     to_status: Optional[str] = None
     note: Optional[str] = None
+    # Audit fields: set for privileged moves (reopen), empty for automatic
+    # status/progress entries.
+    action: Optional[str] = None
+    changed_by_id: Optional[int] = None
+    changed_by_name: Optional[str] = None
+    reason: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 class AIMatchResult(BaseModel):

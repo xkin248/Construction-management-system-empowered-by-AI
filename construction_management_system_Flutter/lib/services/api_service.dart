@@ -316,6 +316,18 @@ class ApiService {
   Future<List> getTaskLogs(int taskId) async =>
       (await dio.get('/tasks/$taskId/logs')).data as List;
 
+  /// Reopen a completed task (supervisor only).
+  ///
+  /// Deliberately not routed through [updateTask]: the backend rejects backward
+  /// transitions on PUT, and a reopen is privileged and must carry a written
+  /// reason so the audit trail can explain why a finished task went back on the
+  /// board. [targetStatus] is 'in_progress' (default) or 'pending'.
+  Future<Map> reopenTask(int taskId, String reason,
+          {String targetStatus = 'in_progress'}) async =>
+      Map.from((await dio.post('/tasks/$taskId/reopen',
+              data: {'status': targetStatus, 'reason': reason}))
+          .data);
+
   Future<Map> aiAutoAssign(int? projectId,
           {List<int>? taskIds, bool dryRun = false, bool sameProjectOnly = false}) async =>
       Map.from((await dio.post('/ai/tasks/auto-assign', data: {
@@ -423,7 +435,43 @@ class ApiService {
     await dio.delete('/files/$fileId');
   }
 
+  /// Authenticated download URL. Only usable by clients that can attach the
+  /// `Authorization` header (Dio on mobile/desktop). Web navigation and
+  /// `Image.network` must use [fetchDownloadLink] instead, the bare URL here
+  /// is rejected with 401 by the backend.
   String downloadUrl(int fileId) => '$baseUrl/api/files/$fileId/download';
+
+  /// Cache of signed links: a link is valid for `ttlSeconds`, we reuse it until
+  /// 60s before expiry so a grid of previews triggers one request per file
+  /// instead of one per rebuild.
+  final Map<int, _CachedDownloadLink> _downloadLinkCache = {};
+
+  /// Ask the backend for a short-lived, self-authenticating download URL.
+  ///
+  /// This is the fix for the download 401: the returned URL embeds a signed,
+  /// file-scoped token, so a plain `GET` without headers succeeds — which is all
+  /// Flutter Web navigation and `Image.network` can do. Minting the link itself
+  /// still requires the normal Bearer token (sent by [dio]).
+  Future<String> fetchDownloadLink(int fileId, {int ttlSeconds = 300}) async {
+    final cached = _downloadLinkCache[fileId];
+    if (cached != null && cached.isFresh) return cached.url;
+
+    final resp = await dio.get('/files/$fileId/download-link',
+        queryParameters: {'ttl': ttlSeconds});
+    final data = Map<String, dynamic>.from(resp.data as Map);
+    final url = (data['download_url'] ?? data['path'])?.toString();
+    if (url == null || url.isEmpty) {
+      throw StateError('Backend did not return a download link');
+    }
+    _downloadLinkCache[fileId] = _CachedDownloadLink(
+      url,
+      DateTime.now().add(Duration(seconds: ttlSeconds > 90 ? ttlSeconds - 60 : 30)),
+    );
+    return url;
+  }
+
+  /// Drop a cached link, e.g. after the file was replaced or deleted.
+  void invalidateDownloadLink(int fileId) => _downloadLinkCache.remove(fileId);
 
   // ───────── Notifications ─────────
   Future<List> getNotifications() async =>
@@ -445,4 +493,14 @@ class ApiService {
 
   Future<void> updateNotificationSettings(Map data) async =>
       await dio.put('/notifications/settings', data: data);
+}
+
+/// A signed download URL plus the moment it stops being reusable.
+class _CachedDownloadLink {
+  _CachedDownloadLink(this.url, this.expiresAt);
+
+  final String url;
+  final DateTime expiresAt;
+
+  bool get isFresh => expiresAt.isAfter(DateTime.now());
 }
