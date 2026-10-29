@@ -1,0 +1,6 @@
+# Test / dev-only dependencies (not installed in production).
+# Production installs requirements.txt only.
+-r requirements.txt
+
+pytest==9.1.1
+httpx==0.28.1

@@ -79,6 +79,31 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def _start_background_sweeper():
+    """Kick off the time-driven notification sweeps (task overdue / daily
+    report reminder). Disable with ENABLE_NOTIFY_SCHEDULER=0."""
+    try:
+        from app.scheduler import start_scheduler
+
+        start_scheduler()
+    except Exception as exc:  # never block boot on the sweeper
+        logger.error(
+            "notification scheduler failed to start: %s",
+            f"{type(exc).__name__}: {exc}".splitlines()[0],
+        )
+
+
+@app.on_event("shutdown")
+def _stop_background_sweeper():
+    try:
+        from app.scheduler import stop_scheduler
+
+        stop_scheduler()
+    except Exception:
+        pass
+
 # ✅ Mount backend static HTML → accessible at /html/index.html
 _STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static_html")
 os.makedirs(_STATIC, exist_ok=True)

@@ -20,6 +20,30 @@ router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
 
 OUT_OF_FENCE_LIMIT = 2
 
+
+def _notify_supervisor_attendance_alert(
+    db: Session, attendance: AttendanceLog, message: str
+) -> None:
+    """Best-effort attendance alert to the project's supervisor.
+
+    Never raises: an unattended notification must not fail a check-in or a
+    heartbeat, whose own transaction has already been committed by the caller.
+    """
+    try:
+        from app.notification_service import notify_attendance_alert
+
+        project = db.query(Project).get(attendance.project_id)
+        if not project or not project.supervisor_id:
+            return
+        worker = db.query(Worker).get(attendance.worker_id)
+        worker_name = worker.name if worker else f"Worker #{attendance.worker_id}"
+        notify_attendance_alert(
+            db, project.supervisor_id, worker_name, message,
+            worker_id=attendance.worker_id,
+        )
+    except Exception:
+        db.rollback()
+
 # Timezone used for all worker-facing attendance output & window checks.
 # Storage stays UTC (datetime.utcnow()); output is converted to local time.
 KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
@@ -211,6 +235,9 @@ def heartbeat(d: HeartbeatReq, db: Session = Depends(get_db)):
         a.status = "left_early"
         db.commit()
         db.refresh(a)
+        _notify_supervisor_attendance_alert(
+            db, a, "left the site geofence repeatedly and was auto checked out"
+        )
         raise HTTPException(410, "Left the site geofence too many times in a row, check-in auto-cancelled")
 
     db.commit()
@@ -360,6 +387,9 @@ def worker_self_check_in(
     db.refresh(a)
 
     if not verified:
+        _notify_supervisor_attendance_alert(
+            db, a, "attempted to check in outside the site geofence"
+        )
         raise HTTPException(
             400,
             f"Check-in failed: outside the site geofence "

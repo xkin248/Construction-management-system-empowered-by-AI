@@ -43,7 +43,32 @@ def report(
     if officers:
         officers.sort(key=lambda o: _dist(p.center_lat,p.center_lng,gps_lat,gps_lng))
         issue.handled_by = officers[0].worker_id
-    db.commit(); db.refresh(issue); return issue
+    db.commit(); db.refresh(issue)
+
+    # Best-effort fan-out: supervisor feed (safety incidents only) + the
+    # auto-assigned safety officer's own inbox.
+    try:
+        from app.models import WorkerNotification
+        from app.notification_service import notify_safety_incident
+
+        if is_safe and p.supervisor_id:
+            notify_safety_incident(
+                db, p.supervisor_id, issue.title, p.project_name, issue.issue_id
+            )
+        if issue.handled_by:
+            db.add(WorkerNotification(
+                worker_id=issue.handled_by,
+                title=f"Safety incident assigned: {INCIDENT[incident_type]}",
+                content=f"{issue.title} on project {p.project_name}",
+                related_entity_type="issue",
+                related_entity_id=issue.issue_id,
+            ))
+            db.commit()
+    except Exception:
+        db.rollback()
+
+    db.refresh(issue)
+    return issue
 
 @router.post("/safety/resolve/{iid}", response_model=IssueOut)
 def resolve(iid: int, worker_id: int, note: str, db: Session = Depends(get_db)):

@@ -1,5 +1,6 @@
 fastapi==0.115.0
 uvicorn==0.32.0
+websockets==17.0.1
 sqlalchemy==2.0.36
 pydantic==2.9.2
 pydantic-settings==2.6.1

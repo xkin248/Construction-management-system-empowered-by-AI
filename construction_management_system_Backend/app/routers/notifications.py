@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
@@ -15,6 +16,16 @@ from app.notification_service import get_or_create_settings, get_or_create_worke
 router = APIRouter(tags=["🔔 Notifications"])
 
 active_connections: Dict[int, List[WebSocket]] = {}
+
+# Event loop captured by the first websocket handshake, so synchronous callers
+# (notification_service) can schedule pushes onto it with
+# ``asyncio.run_coroutine_threadsafe``.
+_main_loop: Optional[Any] = None
+
+
+def get_event_loop_ref():
+    """Return the captured loop (None until the first socket connects)."""
+    return _main_loop
 
 
 # ───────────── FCM device token registration ─────────────
@@ -258,7 +269,10 @@ async def websocket_endpoint(
     db: Session = Depends(get_db)
 ):
     await websocket.accept()
-    
+
+    global _main_loop
+    _main_loop = asyncio.get_running_loop()
+
     from app.routers.auth import get_current_user_ws
     try:
         current_user = await get_current_user_ws(token, db)
