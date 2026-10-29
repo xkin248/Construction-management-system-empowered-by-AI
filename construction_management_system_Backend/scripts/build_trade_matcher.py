@@ -10,6 +10,7 @@ Expanded seed keywords fix the 16 failing cases found in eval:
   - roofing: membrane/waterproof/bitumen
   - tiling: grout/backsplash/ceramic
 """
+import hashlib
 import json
 import platform
 import re
@@ -73,6 +74,16 @@ SEED_KEYWORDS = {
 }
 
 # category -> canonical trade mapping from job_categorization.parquet
+#
+# One category must map to one trade. An earlier revision mapped the three floor
+# categories (Floor Layers / Floor Sanders / Carpet Installers) to both
+# ``flooring`` and ``tiling``, and ``Insulation Workers, Floor, Ceiling, and Wall``
+# to both ``insulation`` and ``drywall``. Nothing in the taxonomy legitimately
+# does two trades - those were map bugs, and they manufactured 25 rows of
+# "double labelled" data (18 x flooring+tiling, 7 x drywall+insulation) that the
+# multi-label experiments were then evaluated against. Rows per trade after the
+# fix: tiling 25 -> 7, drywall 30 -> 23, everything else unchanged, and the
+# training corpus now has zero multi-label rows.
 CATEGORY_MAP = {
     "carpenter": ["Cabinetmakers and Bench Carpenters", "Carpenters", "Woodworkers, All Other", "Furniture Finishers", "Model Makers, Wood"],
     "electrical": ["Electricians", "Electrical Power-Line Installers and Repairers", "Electrical and Electronics Installers and Repairers", "Electrical and Electronics Repairers", "Audio and Video Equipment Installers and Repairers", "Security and Fire Alarm Systems Installers", "Telecommunications Equipment Installers and Repairers", "Electrical and Electronic Equipment Assemblers", "Electric Motor, Power Tool, and Related Repairers", "Electrical and Electronics Drafters", "Electrical Engineers"],
@@ -82,8 +93,8 @@ CATEGORY_MAP = {
     "welding": ["Welders, Cutters, Solderers, and Brazers", "Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders", "Structural Iron and Steel Workers", "Sheet Metal Workers", "Boilermakers"],
     "hvac": ["Heating, Air Conditioning, and Refrigeration Mechanics and Installers", "Boiler Operators and Tenders, Low Pressure", "Stationary Engineers and Boiler Operators"],
     "roofing": ["Roofers", "Waterproofing and Related Workers", "Roof Bolters, Mining"],
-    "tiling": ["Tile and Stone Setters", "Floor Layers, Except Carpet, Wood, and Hard Tiles", "Floor Sanders and Finishers", "Carpet Installers"],
-    "drywall": ["Drywall and Ceiling Tile Installers", "Tapers", "Insulation Workers, Floor, Ceiling, and Wall", "Plasterers and Stucco Masons"],
+    "tiling": ["Tile and Stone Setters"],
+    "drywall": ["Drywall and Ceiling Tile Installers", "Tapers", "Plasterers and Stucco Masons"],
     "glazing": ["Glaziers", "Automotive Glass Installers and Repairers"],
     "flooring": ["Floor Layers, Except Carpet, Wood, and Hard Tiles", "Carpet Installers", "Floor Sanders and Finishers", "Hardwood Floor Installers"],
     "equipment": ["Excavating and Loading Machine and Dragline Operators, Surface Mining", "Crane and Tower Operators", "Operating Engineers and Other Construction Equipment Operators", "Pile Driver Operators", "Dredge Operators", "Loading Machine Operators, Underground Mining", "Hoist and Winch Operators", "Industrial Truck and Tractor Operators", "Material Moving Workers, All Other", "Conveyor Operators and Tenders", "Heavy and Tractor-Trailer Truck Drivers"],
@@ -212,10 +223,13 @@ SYNTH_TASKS_PATH = DATA / "synthetic_trade_tasks.jsonl"
 #
 # Why the co-occurrence guard: a bare threshold/margin rule happily promotes a
 # random runner-up ("automobile detailer" -> laborer + painting), which costs
-# more exact-set matches than the dual-label rows it wins. The dataset itself
-# says which trades genuinely overlap (Carpet Installers / Floor Layers / Floor
-# Sanders are mapped to both flooring and tiling), so the guard restricts extra
-# labels to those pairs.
+# more exact-set matches than the dual-label rows it wins. The guard therefore
+# only lets a second label grow on pairs the training taxonomy actually
+# supports - and after the CATEGORY_MAP fix the parquet taxonomy supports none:
+# every pair it used to offer (flooring+tiling, drywall+insulation) was a map
+# bug, not worker co-occurrence. So multi-label supervision now has no positive
+# evidence at all; the guard stays in place for the day hand-annotated
+# co-occurring tasks arrive (see reports/trade_label_expansion_plan.md, B3).
 MULTI_THRESHOLD = 0.35
 MULTI_MARGIN = 0.25
 MULTI_PAIR_SUPPORT = 5
@@ -476,6 +490,42 @@ def save_classifier(bundle: dict, path: Path = None) -> Path:
     path = Path(path) if path else CLASSIFIER_PATH
     joblib.dump(bundle, path, compress=3)
     return path
+
+
+def sha256_of(path: Path) -> str:
+    """SHA-256 of a file, streamed so a 3 MB joblib stays cheap to fingerprint."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def artifact_fingerprint(path: Path = None) -> dict:
+    """Identify the shipped classifier by content, not by filename.
+
+    Evaluation reports and their per-row prediction CSVs are named after this
+    fingerprint, so a CSV can always be traced back to the exact artefact that
+    produced it. Without it, ``reports/trade_matcher_test_predictions.csv`` was a
+    mutable name that survived every retrain - the numbers in the markdown and the
+    rows in the CSV could (and once did) come from different models.
+    """
+    path = Path(path) if path else CLASSIFIER_PATH
+    if not path.exists():
+        return {"path": str(path), "sha256": None, "short": "missing", "size": 0}
+    digest = sha256_of(path)
+    return {
+        "path": str(path),
+        "sha256": digest,
+        "short": digest[:12],
+        "size": path.stat().st_size,
+    }
+
+
+def predictions_path(stem: str, directory: Path = None) -> Path:
+    """``<stem>_<artefact hash>.csv`` inside ``reports/`` (or ``directory``)."""
+    directory = Path(directory) if directory else (Path(__file__).resolve().parent.parent / "reports")
+    return directory / f"{stem}_{artifact_fingerprint()['short']}.csv"
 
 
 def main():
