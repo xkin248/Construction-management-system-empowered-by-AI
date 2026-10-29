@@ -1,3 +1,14 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: 9f3d7249bacac4923999ceda47b8083c_e1f1c903d38a11f18d9e525400393706
+    ReservedCode1: CNRQeS5lyLeWCR90Bc15scKO/xSITY6zSn+Bt7JMi+CsBPYK+7uzxns+MLeEcGix/m8drjhF6o87xPGcgSL3M765M3uJrzXZO2kUZ8bnKS1DnOwr59GHgHe5PtiLU/XHqOpX/wSnmC5m6onOBbCs4nDbKnkx265hed6fEVtBmqYRGGBwuyElfewh7pI=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: 9f3d7249bacac4923999ceda47b8083c_e1f1c903d38a11f18d9e525400393706
+    ReservedCode2: CNRQeS5lyLeWCR90Bc15scKO/xSITY6zSn+Bt7JMi+CsBPYK+7uzxns+MLeEcGix/m8drjhF6o87xPGcgSL3M765M3uJrzXZO2kUZ8bnKS1DnOwr59GHgHe5PtiLU/XHqOpX/wSnmC5m6onOBbCs4nDbKnkx265hed6fEVtBmqYRGGBwuyElfewh7pI=
+---
+
 # 线上回流基线（2026-10-29 实测）
 
 > 目的：把 `reports/trade_label_expansion_plan.md` §3.4 第 1 项"线上回流核验"从假设变成数字。
@@ -47,3 +58,4 @@
 - §3.4 前置项 1（线上核验）**已完成**，数字即本文。
 - §3.4 前置项 6（建表）**无需执行**，线上已就绪，改为"确认写入路径是否会产出日志"。
 - `prediction_history` 2 行、`tasks` 4 行意味着当前没有任何可用于"冻结集首开 620 行"的存量，§5 的样本量结论继续成立：需要新标 620 行才能拿到 ±6pp 级别的区间。
+*（内容由AI生成，仅供参考）*
