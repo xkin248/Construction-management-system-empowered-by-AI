@@ -14,7 +14,7 @@ AIGC:
 > 生成日期：2026-10-29
 > 适用代码基线：`main` @ a4aac8c；artifact `data/trade_classifier.joblib`（built_at 2026-10-27 19:48，sklearn 1.5.2 / python 3.12.3）
 > 复核原则：本文件出现的每个数字均标注来源文件或计算方式，见附录 A。上一版（2026-10-28）中 test top-1 77.1%、"tiling→flooring 10 例"、"painting↔drywall 混淆"等结论与仓库实测不符，已全部作废重算。
-> **v3 执行记录（2026-10-29）**：3.4 节前置项 2–4 已完成、1 仍缺 Supabase 权限。artifact 已按修正后的 `CATEGORY_MAP` 重建（sha256 `f12ab8d0abb8…`），§1.3/§1.4 数字随之下调口径；同时修掉一处评测器缺陷（`eval_trade_test.py` / `eval_holdout.py` 会静默复用出厂 classifier，而该分类器的训练集含被评样本，导致报告出过 100% 的假成绩）。逐项见新增 §0。
+> **v3 执行记录（2026-10-29）**：§3.4 四项前置全部落地——线上回流核验（`reports/online_backflow_baseline.md`）、`CATEGORY_MAP` 修正、artifact 归档、评测产物绑定哈希。artifact 已按修正后的 `CATEGORY_MAP` 重建（sha256 `f12ab8d0abb8…`），§1.3/§1.4 数字随之下调口径；同时修掉一处评测器缺陷（`eval_trade_test.py` / `eval_holdout.py` 会静默复用出厂 classifier，而该分类器的训练集含被评样本，导致报告出过 100% 的假成绩）。逐项见新增 §0。
 
 ---
 
@@ -59,8 +59,8 @@ AIGC:
 
 ### 0.4 仍然开着的
 
-1. **线上回流核验**（§3.4 第 1 项）：本地 SQLite `tasks/workers/prediction_history` 均为 0 行且无 `ai_decision_log` 表，需要 Supabase 侧执行 `count(*)`，待权限到位后补 `reports/online_backflow_baseline.md`。
-2. **`ai_decision_log` 建表**：迁移只覆盖 Postgres 路径，线上建表 + 索引（`decision_id`、`created_at`、`trade`）尚未执行。
+1. ~~线上回流核验~~ **已完成**：`reports/online_backflow_baseline.md` 记录了 Supabase 实查结果——`tasks` 4 行（其中仅 2 行有 `trade`）、`workers` 6 行、`prediction_history` 2 行、`ai_decision_log` **0 行**。可用训练文本 ≈ 0，线上不会自己长出数据。
+2. ~~`ai_decision_log` 建表~~ **不需要做**：线上表与索引均已存在（`log_id / task_id / was_overridden / (project_id, created_at, stage)`）。剩下的疑点是"创建任务的分支不写决策日志"，属产品口径确认，不是建表。
 3. §4–§6 的标注规范、样本量、验收门槛均未变动，仍按 v2 执行。
 
 ## 1. 现有标注集与评测基线
@@ -117,7 +117,9 @@ AIGC:
 
 本地 SQLite 快照 `construction_management.db`：`tasks` 0、`workers` 0、`prediction_history` 0 行，且**无 `ai_decision_log` 表**（该表只在 Postgres 迁移路径创建）。
 
-因此事实只能是：**本地库无任何业务标注；生产 Supabase 的回流规模尚未核验**。扩充不能假设"线上数据会自然积累"，必须按人工标注 + 受控合成推进；同时把线上核验列为开工前置（3.4 节）。
+生产 Supabase 已于 2026-10-29 实查（见 `reports/online_backflow_baseline.md`）：`tasks` 4、`workers` 6、`prediction_history` 2、`ai_decision_log` 0；`tasks` 里只有 2 行带 `trade`（`plumbing` / `electrical`，均为冒烟文本）。
+
+因此事实是：**本地与线上都没有可用于训练的业务标注，线上回流规模约等于 0**。扩充不能假设"线上数据会自然积累"，必须按人工标注 + 受控合成推进（原前置项已注销，见 §0.4）。
 
 ---
 
@@ -252,7 +254,7 @@ n=83 时即使真实提升存在，也只有约 1/3 概率被检出。要把效�
 
 ### 3.4 开工前置（必须先做，否则本方案无验收基础）
 
-1. **线上回流核验（未完成，待 Supabase 权限）**：在 Supabase 执行 `select count(*) from tasks; select count(*) from workers; select count(*) from ai_decision_log;`，把结果写进 `reports/online_backflow_baseline.md`。若 >0，则 B1–B3 采样优先取自真实文本（价值远高于访谈转写）。
+1. **线上回流核验（已完成 2026-10-29）**：结果见 `reports/online_backflow_baseline.md`（`tasks` 4 / `workers` 6 / `prediction_history` 2 / `ai_decision_log` 0）。结论：可用真实文本 ≈ 0，B1–B3 不依赖线上导出；原"若 >0 则优先取真实文本"的前提不成立（价值远高于访谈转写）。
 2. **`CATEGORY_MAP` 修正（已完成 2026-10-29）**：`tiling` 只留 `Tile and Stone Setters`，`drywall` 去掉 `Insulation Workers`；`tiling` 标题 25 → 7、`drywall` 30 → 23，多标签行归零，dev/test/valid 重跑见 §0.3。
 3. **artifact 归档（已完成）**：v0 三件套存于 `data/archive/trade_models_v0_20261027/`（含 `SHA256SUMS.txt` 与 `README.md`）；新 artifact sha256 `f12ab8d0…` 登记在 `reports/trade_model_baseline.json`。
 4. **评测产物绑定版本（已完成）**：`reports/*_predictions_<sha12>.csv`，报告内联写出同一哈希，见 §0.1 #3。
