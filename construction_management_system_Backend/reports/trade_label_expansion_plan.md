@@ -57,7 +57,20 @@ AIGC:
 
 **读数纪律**：`test` 的 92.8% 与 `valid` 的 95.2% 都是"分类器 + 已读过的集"，只能作为回归守护值，不能当作泛化证明；§2.1 的 Wilson 区间结论不变。
 
-### 0.4 仍然开着的
+### 0.4 线上与仓库已对齐（2026-10-29 19:0x 实测 `/health`）
+
+Render 已随本次推送重建（artifact `built_at 2026-10-29 18:43`，python 3.12.3 / sklearn 1.5.2）：
+
+| 线上读到的字段 | 值 | 与本地 artifact 是否一致 |
+|---|---|---|
+| `trade_classifier.samples` | 4566 | 一致 |
+| `label_mode` / `C` / `synthetic_rows` | single / 4.0 / 3074 | 一致 |
+| `trade_matcher.profiles.tiling` / `drywall` | 7 / 23 | 一致（修正后） |
+| `models_ok` / `degraded` / `version_mismatch` | true / [] / [] | 通过 |
+
+即：线上服务已在跑修正映射后的模型，不存在"仓库修好、线上还是旧版"的错位。
+
+### 0.5 仍然开着的
 
 1. ~~线上回流核验~~ **已完成**：`reports/online_backflow_baseline.md` 记录了 Supabase 实查结果——`tasks` 4 行（其中仅 2 行有 `trade`）、`workers` 6 行、`prediction_history` 2 行、`ai_decision_log` **0 行**。可用训练文本 ≈ 0，线上不会自己长出数据。
 2. ~~`ai_decision_log` 建表~~ **不需要做**：线上表与索引均已存在（`log_id / task_id / was_overridden / (project_id, created_at, stage)`）。剩下的疑点是"创建任务的分支不写决策日志"，属产品口径确认，不是建表。
@@ -111,7 +124,7 @@ AIGC:
 
 ### 1.4 生产模型现状（`joblib.load` 实读 meta）
 
-算法 `tfidf(word 1-2 + char_wb 3-5) + LogisticRegression`；`samples=4566`（v3 重建，修正映射后去重标题 538 × 3 + 975 种子行 + 3,074 合成行，旧值 4591）；`C=4.0`；`label_mode=single`；`classes` 16 个；决策阈值 `threshold=0.35`、`margin=0.25`；训练时间 2026-10-27 19:47。
+算法 `tfidf(word 1-2 + char_wb 3-5) + LogisticRegression`；`samples=4566`（v3 重建；构成 = 517 个去重 (标题, 工种) 对 + 975 种子行 + 3,074 合成行；旧值 4591 的构成是 542 + 975 + 3,074，减少的 25 行正是 `tiling`/`drywall` 的重复对）；`C=4.0`；`label_mode=single`；`classes` 16 个；决策阈值 `threshold=0.35`、`margin=0.25`；训练时间 2026-10-27 19:47。
 
 ### 1.5 线上回流现状（不能沿用旧判断）
 
