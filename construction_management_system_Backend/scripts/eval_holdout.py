@@ -59,8 +59,10 @@ from build_trade_matcher import (  # noqa: E402
     CANONICAL,
     CATEGORY_MAP,
     DATA,
+    artifact_fingerprint,
     build_profiles,
     clean,
+    predictions_path,
     train_matcher,
 )
 
@@ -457,8 +459,10 @@ def render_report(ctx: dict) -> str:
     add(f"python scripts/eval_holdout.py --seed {ctx['seed']} --test-size {ctx['test_size']}")
     add("```")
     add("")
-    add("Per-row predictions for this run are in `reports/holdout_predictions.csv` "
-        "(cleaned text, expected trades, predicted trades, decision source, confidence, scores).")
+    add(f"Per-row predictions for this run are in `{ctx['predictions_name']}` "
+        "(cleaned text, expected trades, predicted trades, decision source, confidence, scores). "
+        f"The filename carries the classifier artefact hash ({ctx['fingerprint']}), so these rows "
+        "cannot be confused with a run from a different model.")
     add("")
     return "\n".join(lines) + "\n"
 
@@ -473,8 +477,9 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42, help="random seed (default 42)")
     parser.add_argument("--report", default="reports/trade_matcher_holdout_eval.md",
                         help="markdown report path (relative to Backend/)")
-    parser.add_argument("--predictions", default="reports/holdout_predictions.csv",
-                        help="per-row predictions CSV path (relative to Backend/)")
+    parser.add_argument("--predictions", default=None,
+                        help="per-row predictions CSV path (relative to Backend/); "
+                             "defaults to reports/holdout_predictions_<artefact hash>.csv")
     parser.add_argument("--no-refresh-production-model", action="store_true",
                         help="do not rewrite data/trade_matcher.joblib even if a full "
                              "retrain differs from the shipped artefact")
@@ -491,6 +496,15 @@ def main() -> int:
     # --- shipped production artefact, loaded before we swap the global -----------------
     shipped_path = DATA / "trade_matcher.joblib"
     shipped = joblib.load(shipped_path)
+
+    # Classifier layer pinned OFF for the whole run. ai_service lazily loads
+    # data/trade_classifier.joblib, which is trained on every labelled row - i.e.
+    # on the very rows this script holds out. Leaving it loaded meant "shipped
+    # model accuracy" was measuring memorisation instead of the matcher swap it
+    # was written to measure. Classifier numbers belong to
+    # scripts/eval_trade_validation.py, which retrains per split.
+    original_classifier = ai._TRADE_CLASSIFIER
+    ai._TRADE_CLASSIFIER = False
 
     # --- leak-free model: trained on the 80% only -------------------------------------
     profiles_train, _, _ = build_profiles(train_df)
@@ -535,6 +549,7 @@ def main() -> int:
         full_preds = predict_rows(test_df)
     finally:
         ai._TRADE_MATCHER = original_matcher
+        ai._TRADE_CLASSIFIER = original_classifier
     agree = sum(
         1 for a, b in zip(prod_preds, full_preds)
         if a["predicted"] == b["predicted"]
@@ -588,7 +603,12 @@ def main() -> int:
         "confusion": conf,
         "failures": failures(honest_preds),
         "prod_status": prod_status,
+        "predictions_name": args.predictions,
+        "fingerprint": artifact_fingerprint()["short"],
     }
+
+    if args.predictions is None:
+        args.predictions = f"reports/{predictions_path('holdout_predictions').name}"
 
     report_path = BACKEND / args.report
     report_path.parent.mkdir(parents=True, exist_ok=True)

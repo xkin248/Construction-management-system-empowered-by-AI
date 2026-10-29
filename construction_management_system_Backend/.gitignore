@@ -12,3 +12,10 @@ __pycache__/
 venv/
 env/
 .vscode/
+
+# local debug residue (ad-hoc shell redirects / pip logs / probe output)
+err.txt
+out.txt
+pip.txt
+pip_err.txt
+probe.txt

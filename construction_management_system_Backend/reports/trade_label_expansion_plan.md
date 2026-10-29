@@ -1,10 +1,67 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: 9f3d7249bacac4923999ceda47b8083c_e92087c0d2f211f196c5525400248c00
+    ReservedCode1: cFJYBF6rTIVlHPdOQL9UONNQiQh4/Uuh///+oKsSxc2TAH+LIb3Gj2qc1G6favRJBr3w9eWtzZMmzhFuoEV9ATlePGocg8fjPme33BxWM9OXmPd+HXIhP+ydHNlBZ20Zw34ZWaX4AEZhDeaEuuhmpeQ0EvLLcOLpncD/Kgnpls4ZRlCAb680INxHlP8=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: 9f3d7249bacac4923999ceda47b8083c_e92087c0d2f211f196c5525400248c00
+    ReservedCode2: cFJYBF6rTIVlHPdOQL9UONNQiQh4/Uuh///+oKsSxc2TAH+LIb3Gj2qc1G6favRJBr3w9eWtzZMmzhFuoEV9ATlePGocg8fjPme33BxWM9OXmPd+HXIhP+ydHNlBZ20Zw34ZWaX4AEZhDeaEuuhmpeQ0EvLLcOLpncD/Kgnpls4ZRlCAb680INxHlP8=
+---
+
 # 标注集扩充评估方案（v2 · 数字全部实测复核版）
 
 > 生成日期：2026-10-29
 > 适用代码基线：`main` @ a4aac8c；artifact `data/trade_classifier.joblib`（built_at 2026-10-27 19:48，sklearn 1.5.2 / python 3.12.3）
 > 复核原则：本文件出现的每个数字均标注来源文件或计算方式，见附录 A。上一版（2026-10-28）中 test top-1 77.1%、"tiling→flooring 10 例"、"painting↔drywall 混淆"等结论与仓库实测不符，已全部作废重算。
+> **v3 执行记录（2026-10-29）**：3.4 节前置项 2–4 已完成、1 仍缺 Supabase 权限。artifact 已按修正后的 `CATEGORY_MAP` 重建（sha256 `f12ab8d0abb8…`），§1.3/§1.4 数字随之下调口径；同时修掉一处评测器缺陷（`eval_trade_test.py` / `eval_holdout.py` 会静默复用出厂 classifier，而该分类器的训练集含被评样本，导致报告出过 100% 的假成绩）。逐项见新增 §0。
 
 ---
+
+## 0. v3 执行记录（2026-10-29，方案前置项的落地结果）
+
+本节不改变 §1–§6 的结论方向，只登记"已经改了哪些代码、数据因此变成什么样"，以及一处必须写进实验记录的评测器缺陷。
+
+### 0.1 修掉的问题
+
+| # | 问题 | 处置 | 证据 |
+|---:|---|---|---|
+| 1 | `CATEGORY_MAP` 把三个地板工种（`Carpet Installers` / `Floor Layers, Except Carpet, Wood, and Hardwood` / `Floor Sanders and Finishers`）同时映射到 `tiling`，制造 25 行"伪双标签"——次标签从不落地，却让 §2.4 的双标签统计失真 | `scripts/build_trade_matcher.py` 中 `tiling` 只保留 `Tile and Stone Setters`；`drywall` 同时去掉 `Insulation Workers` 的越界映射 | `tiling` 标题数 25 → 7，`drywall` 30 → 23，训练集多标签行数归零 |
+| 2 | 旧 artifact 无归档、无哈希 | `data/archive/trade_models_v0_20261027/` 存 v0 三件套 + `SHA256SUMS.txt` + `README.md`（注明其来自 `CATEGORY_MAP` 未修版、含 25 行伪双标签） | `classifier b13dcf7f… / matcher 8785670d… / profiles 750168fc…` |
+| 3 | 评测产物与 artifact 版本脱钩（§1.3 附带发现） | 三个评测脚本的预测 CSV 改为 `*_predictions_<sha12>.csv`；报告内联写出 artifact sha256 与 CSV 文件名 | `reports/trade_matcher_valid_predictions_f12ab8d0abb8.csv` 等 |
+| 4 | `verify_production_artifact.py` 把"应该等于 96.4%/94.0%"硬编码在源码里，模型一换就只能靠人记 | 期望值下沉到 `reports/trade_model_baseline.json`，与 artifact sha256、CSV 哈希一并登记；校验时先比哈希再比数字，`--record` 用于有意重训后重登记 | `reports/trade_model_baseline.json` |
+| 5 | `eval_trade_test.py` / `eval_holdout.py` **静默复用出厂 classifier**（训练集包含 test 行本身） | 两个脚本在评分阶段把 classifier 层显式关闭（`ai._TRADE_CLASSIFIER = False`），报告改为声明"本页只测关键词+质心 matcher" | 见 0.3 前后对比 |
+
+### 0.2 重建后的生产 artifact
+
+| 项 | v2 文档口径 | 现在（`main` 工作区） |
+|---|---|---|
+| `samples` | 4591 | **4566**（`tiling` 少 18 行、`drywall` 少 7 行样本） |
+| `synthetic_rows` | 3074 | 3074（未变） |
+| `classes` / `C` / `label_mode` | 16 / 4.0 / single | 16 / 4.0 / single |
+| 文件大小 | 2.95 MB | 2.82 MB |
+| sha256 | 未登记 | `f12ab8d0abb82afa6b8cea777a836218971bf8cc23ceaff61365136d2222d2cf` |
+
+### 0.3 修正映射 + 关闭泄漏后的实测（`scripts/eval_trade_validation.py`，2026-10-29 重跑）
+
+| 集 | 阶段 | n | 准确率 | 与前一阶段比较（McNemar） |
+|---|---|---:|---:|---|
+| dev | 关键词 matcher（before） | 104 | 100.0% | — |
+| dev | + 分类器（final） | 104 | 96.2% | fixed 0 / broken 4，p=0.125（分类器在 dev 上无增益，属已知饱和） |
+| test | 关键词 matcher（before） | 83 | 79.5%（66/83） | — |
+| test | + 分类器（final） | 83 | **92.8%（77/83）** | fixed 11 / broken 1，p=0.0063 |
+| valid | 关键词 matcher（before） | 83 | 71.1% | — |
+| valid | + 分类器（final） | 83 | **95.2%（79/83）** | fixed 21 / broken 1，p=1.1e-05 |
+
+关键词层单独评测（`scripts/eval_trade_test.py`，泄漏关闭后重跑）：`dev 78.8%（82/104）→ 99.0%（103/104）`、`test 79.5%（66/83）→ 84.3%（70/83）`；McNemar `dev p=5.7e-06`、`test p=0.289`（fixed 6 / broken 2）。
+
+**读数纪律**：`test` 的 92.8% 与 `valid` 的 95.2% 都是"分类器 + 已读过的集"，只能作为回归守护值，不能当作泛化证明；§2.1 的 Wilson 区间结论不变。
+
+### 0.4 仍然开着的
+
+1. **线上回流核验**（§3.4 第 1 项）：本地 SQLite `tasks/workers/prediction_history` 均为 0 行且无 `ai_decision_log` 表，需要 Supabase 侧执行 `count(*)`，待权限到位后补 `reports/online_backflow_baseline.md`。
+2. **`ai_decision_log` 建表**：迁移只覆盖 Postgres 路径，线上建表 + 索引（`decision_id`、`created_at`、`trade`）尚未执行。
+3. §4–§6 的标注规范、样本量、验收门槛均未变动，仍按 v2 执行。
 
 ## 1. 现有标注集与评测基线
 
@@ -43,18 +100,18 @@
 | 评测集 | n | 结果 | 95% CI | 现在还能不能用 |
 |---|---|---|---|---|
 | dev（seed 42） | 104 | 100.0%（104/104） | — | **不能**。关键词表就是照它的失败改的，属训练内评估 |
-| test（seed 2026） | 83 | 80.7%（67/83）<br>调参前 74.7%（62/83） | 71.0–87.8% | **不能**。已用于一次性前后对比，独立性已消耗 |
+| test（seed 2026） | 83 | 84.3%（70/83）<br>调参前 79.5%（66/83） | 75.0–90.6% | **不能**。已用于一次性前后对比，独立性已消耗 |
 | valid（seed 31337，F 配置） | 83 | 96.4%（80/83） | 89.9–98.8% | **不能**。F 配置正是从该集选出的，属事后乐观口径 |
-| valid 同集·V0 基线 | 83 | 92.8%（77/83） | 85.1–96.6% | 同上，仅作口径参照 |
+| valid 同集·V0 基线 | 83 | 92.8%（77/83） | 85.1–96.6% | 同上，仅作口径参照（v3 重测：关键词层 71.1% → 全链 95.2%） |
 | holdout（seed 42，80/20） | 104 | 100.0%（104/104） | — | **不能**。与 dev 同一批样本，模型已见过全部标题 |
 
 **结论**：仓库内四套评测集全部已被读取或用于决策，任何新"提升"都无法在其中取得无偏证明。这是本次扩充的第一动因。
 
-**附带发现（需记入实验记录）**：`reports/trade_matcher_valid_predictions.csv`（写于 10-27 15:49）反映的是 89.2%（74/83）的旧 artifact，而最终 artifact 于 19:48 重建、对应 96.4%。**预测 CSV 与 artifact 版本已脱钩**——同名文件在不同时间指向不同模型，是复现性隐患（见 6.3 纪律第 5 条）。
+**附带发现（需记入实验记录）**：`reports/trade_matcher_valid_predictions.csv`（写于 10-27 15:49）反映的是 89.2%（74/83）的旧 artifact，而最终 artifact 于 19:48 重建、对应 96.4%。**预测 CSV 与 artifact 版本已脱钩**——该问题已在 v3 修复（CSV 文件名带 artifact 短哈希，§0.1 #3/#4）：同名文件在不同时间指向不同模型，是复现性隐患（见 6.3 纪律第 5 条）。
 
 ### 1.4 生产模型现状（`joblib.load` 实读 meta）
 
-算法 `tfidf(word 1-2 + char_wb 3-5) + LogisticRegression`；`samples=4591` = 542 去重标题 × 3 次种子重复 + 975 种子行 + 3,074 合成行；`C=4.0`；`label_mode=single`；`classes` 16 个；决策阈值 `threshold=0.35`、`margin=0.25`；训练时间 2026-10-27 19:47。
+算法 `tfidf(word 1-2 + char_wb 3-5) + LogisticRegression`；`samples=4566`（v3 重建，修正映射后去重标题 538 × 3 + 975 种子行 + 3,074 合成行，旧值 4591）；`C=4.0`；`label_mode=single`；`classes` 16 个；决策阈值 `threshold=0.35`、`margin=0.25`；训练时间 2026-10-27 19:47。
 
 ### 1.5 线上回流现状（不能沿用旧判断）
 
@@ -70,7 +127,7 @@
 
 | 观测（test） | n | 观测值 | Wilson 95% CI | 区间半宽 |
 |---|---|---|---|---|
-| 整体 top-1 | 83 | 80.7% | 71.0–87.8% | ±8.4pp |
+| 整体 top-1 | 83 | 84.3% | 75.0–90.6% | ±7.8pp |
 | drywall 召回 | 5 | 20.0% | 3.6–62.4% | ±29.4pp |
 | painting 召回 | 4 | 25.0% | 4.6–69.9% | ±32.6pp |
 | glazing / hvac / roofing 召回 | 1 | 100% | 20.7–100% | ±39.7pp |
@@ -195,10 +252,10 @@ n=83 时即使真实提升存在，也只有约 1/3 概率被检出。要把效�
 
 ### 3.4 开工前置（必须先做，否则本方案无验收基础）
 
-1. **线上回流核验**：在 Supabase 执行 `select count(*) from tasks; select count(*) from workers; select count(*) from ai_decision_log;`，把结果写进 `reports/online_backflow_baseline.md`。若 >0，则 B1–B3 采样优先取自真实文本（价值远高于访谈转写）。
-2. **`CATEGORY_MAP` 修正**：移除 `Carpet Installers` / `Floor Layers…` / `Floor Sanders…` 对 `tiling` 的映射，重跑 dev/test 确认无回归（预计 12 行双标签降为单标签）。
-3. **artifact 归档**：`data/trade_classifier.joblib` → `data/archive/trade_classifier_v0_single.joblib`，记录 SHA256。
-4. **评测产物绑定版本**：`reports/*_predictions.csv` 文件名追加 artifact 短哈希（见 1.3 节脱钩问题）。
+1. **线上回流核验（未完成，待 Supabase 权限）**：在 Supabase 执行 `select count(*) from tasks; select count(*) from workers; select count(*) from ai_decision_log;`，把结果写进 `reports/online_backflow_baseline.md`。若 >0，则 B1–B3 采样优先取自真实文本（价值远高于访谈转写）。
+2. **`CATEGORY_MAP` 修正（已完成 2026-10-29）**：`tiling` 只留 `Tile and Stone Setters`，`drywall` 去掉 `Insulation Workers`；`tiling` 标题 25 → 7、`drywall` 30 → 23，多标签行归零，dev/test/valid 重跑见 §0.3。
+3. **artifact 归档（已完成）**：v0 三件套存于 `data/archive/trade_models_v0_20261027/`（含 `SHA256SUMS.txt` 与 `README.md`）；新 artifact sha256 `f12ab8d0…` 登记在 `reports/trade_model_baseline.json`。
+4. **评测产物绑定版本（已完成）**：`reports/*_predictions_<sha12>.csv`，报告内联写出同一哈希，见 §0.1 #3。
 
 ---
 
@@ -454,3 +511,4 @@ artifact 单独一个 commit，便于 revert。
 | 合成类分布 | equipment 512 / glazing 92 | 同上 `per_trade_kept` |
 | Wilson 表 / 效力曲线 | 见 5.1 / 2.2 | 本文件当次计算（p=0.9、4,000 次模拟） |
 | 本地 DB 计数 | tasks/workers/prediction_history = 0；无 ai_decision_log 表 | `sqlite3 construction_management.db` 实查 |
+*（内容由AI生成，仅供参考）*

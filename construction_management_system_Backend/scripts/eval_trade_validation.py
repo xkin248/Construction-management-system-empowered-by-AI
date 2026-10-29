@@ -63,6 +63,7 @@ from scripts.build_trade_matcher import (  # noqa: E402
     CANONICAL,
     CLASSIFIER_PATH,
     DATA,
+    artifact_fingerprint,
     build_profiles,
     save_classifier,
     train_classifier,
@@ -315,7 +316,8 @@ def main() -> int:
 
     REPORTS.mkdir(exist_ok=True)
     write_predictions(runs["valid_before"], runs["valid_clf"], runs["valid_final"],
-                      REPORTS / "trade_matcher_valid_predictions.csv")
+                      REPORTS / f"trade_matcher_valid_predictions_"
+                                f"{artifact_fingerprint()['short']}.csv")
 
     vb, vc, vf = m["valid_before"], m["valid_clf"], m["valid_final"]
     lo_c, hi_c = wilson_interval(vc["accuracy"], vc["n"])
@@ -531,9 +533,18 @@ def main() -> int:
     size = ""
     if CLASSIFIER_PATH.exists():
         size = f"{CLASSIFIER_PATH.stat().st_size / 1048576:.2f} MB"
+    fingerprint = artifact_fingerprint()
     add("| item | value |")
     add("| --- | --- |")
     add(f"| classifier artefact | `data/trade_classifier.joblib` ({size}, joblib `compress=3`) |")
+    add(f"| artefact sha256 | `{fingerprint['sha256']}` |")
+    add(f"| per-row predictions | `reports/trade_matcher_valid_predictions_{fingerprint['short']}.csv` "
+        "(before / classifier / final columns, one row per valid task) |")
+    add("")
+    add("The sha256 above is the binding between this page and the model that produced it: "
+        "the prediction CSV in `reports/` carries the same 12-char prefix, so a number can "
+        "always be traced to the exact joblib. Re-running any evaluation after a retrain "
+        "writes a new CSV instead of overwriting the old one.")
     add("| features | word 1–2 g (≤ 12 k) + char_wb 3–5 g (≤ 18 k), float32 |")
     add("| new dependencies | **none** - scikit-learn / numpy were already required by the profile "
         "matcher |")
