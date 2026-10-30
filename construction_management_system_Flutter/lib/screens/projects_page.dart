@@ -15,6 +15,7 @@ import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../widgets/task_form.dart';
+import '../widgets/guided_empty_state.dart';
 import 'tasks_page.dart' show TaskDetailPage;
 
 // ─────────────────────────────────────────────
@@ -198,30 +199,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
                     onRefresh: _load,
                     child: projects.isEmpty
                         ? ListView(children: [
-                            Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Center(
-                                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                                  Container(
-                                    width: 76, height: 76,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.accent.withValues(alpha: 0.08),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(Icons.account_tree_outlined, size: 34, color: AppColors.textMuted),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(AppStrings.t('proj.noProjects'),
-                                      style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
-                                  const SizedBox(height: 16),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _openProjectForm(),
-                                    icon: const Icon(Icons.add, size: 18),
-                                    label: Text(AppStrings.t('proj.newProject')),
-                                  ),
-                                ]),
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.62,
+                              child: GuidedEmptyState(
+                                icon: Icons.account_tree_outlined,
+                                title: AppStrings.t('empty.projects.title'),
+                                description: AppStrings.t('empty.projects.desc'),
+                                primaryLabel: AppStrings.t('empty.projects.action'),
+                                onPrimary: () => _openProjectForm(),
                               ),
-                            )
+                            ),
                           ])
                         : LayoutBuilder(
                             builder: (ctx, constraints) {

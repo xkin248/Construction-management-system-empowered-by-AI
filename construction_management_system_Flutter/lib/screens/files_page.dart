@@ -11,6 +11,7 @@ import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../models/file.dart';
 import '../utils/download_saver.dart';
+import '../widgets/guided_empty_state.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -585,36 +586,13 @@ class _FilesPageState extends State<FilesPage> {
   }
 
   Widget _emptyState() => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: AppColors.accentLight,
-                  borderRadius: AppRadius.rMd,
-                ),
-                child: Icon(Icons.folder_open_rounded,
-                    size: 34, color: AppColors.accent),
-              ),
-              const SizedBox(height: 16),
-              Text(AppStrings.t('files.noFiles'),
-                  style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
-              const SizedBox(height: 8),
-              Text(
-                'Tap + to upload construction files,\ndrawings, photos, or reports.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                    fontSize: 13, color: AppColors.textMuted),
-              ),
-            ],
-          ),
+        child: GuidedEmptyState(
+          icon: Icons.folder_open_rounded,
+          title: AppStrings.t('empty.files.title'),
+          description: AppStrings.t('empty.files.desc'),
+          primaryLabel: AppStrings.t('empty.files.action'),
+          primaryIcon: Icons.upload_file_rounded,
+          onPrimary: _openUpload,
         ),
       );
 

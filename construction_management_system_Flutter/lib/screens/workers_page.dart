@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/add_worker_sheet.dart';
+import '../widgets/guided_empty_state.dart';
 import 'worker_detail_page.dart';
 
 class WorkersPage extends StatefulWidget {
@@ -137,18 +138,21 @@ class _WorkersPageState extends State<WorkersPage> {
                 child: ld
                 ? const Center(child: CircularProgressIndicator())
                 : _filtered.isEmpty
-                    ? _emptyState(
-                        icon: _searchQuery.isEmpty ? Icons.group_off_rounded : Icons.search_off_rounded,
-                        label: _searchQuery.isEmpty
-                            ? AppStrings.t('workers.noWorkers')
-                            : AppStrings.t('workers.noWorkersFound'),
-                        action: _searchQuery.isEmpty
-                            ? OutlinedButton.icon(
-                                onPressed: _openAddWorker,
-                                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                                label: Text(AppStrings.t('workers.addWorker')))
-                            : null,
-                      )
+                    ? (_searchQuery.isEmpty
+                        ? GuidedEmptyState(
+                            icon: Icons.group_off_rounded,
+                            title: AppStrings.t('empty.workers.title'),
+                            description: AppStrings.t('empty.workers.desc'),
+                            primaryLabel: AppStrings.t('empty.workers.action'),
+                            primaryIcon: Icons.person_add_alt_1_rounded,
+                            onPrimary: _openAddWorker,
+                          )
+                        : FilteredEmptyState(
+                            title: AppStrings.t('workers.noWorkersFound'),
+                            description: AppStrings.t('empty.workers.noMatchDesc'),
+                            clearLabel: AppStrings.t('empty.clearSearch'),
+                            onClear: () => setState(() => _searchQuery = ''),
+                          ))
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: LayoutBuilder(builder: (ctx, constraints) {
@@ -179,31 +183,6 @@ class _WorkersPageState extends State<WorkersPage> {
         ),
       ),
     );         // Scaffold
-  }
-
-  Widget _emptyState({required IconData icon, required String label, Widget? action}) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 76, height: 76,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 34, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 16),
-          Text(label, textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
-          if (action != null) ...[
-            const SizedBox(height: 16),
-            action,
-          ],
-        ]),
-      ),
-    );
   }
 
   Widget _workerCard(Map w, {bool inGrid = false}) {

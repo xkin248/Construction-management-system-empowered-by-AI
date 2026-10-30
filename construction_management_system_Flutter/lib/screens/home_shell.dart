@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
@@ -14,10 +14,11 @@ import 'files_page.dart';
 import 'notifications_page.dart';
 import 'profile_page.dart';
 import '../services/app_settings.dart';
+import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
 import 'worker_home_shell.dart';
 
-// ──────────────── Nav model ────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Nav model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _NavItem {
   final String label;
   final IconData icon;
@@ -26,12 +27,12 @@ class _NavItem {
       : activeIcon = active ?? icon;
 }
 
-/// Translate navigation labels (English / 中文 / Bahasa Melayu).
+/// Translate navigation labels (English / ä¸­æ–‡ / Bahasa Melayu).
 String _navT(String en) {
   const zh = {
-    'Dashboard': '仪表盘', 'Projects': '项目', 'Tasks': '任务', 'Attendance': '考勤',
-    'Workers': '工人', 'Files': '文件', 'Notifications': '通知', 'More': '更多',
-    'My Dashboard': '我的仪表盘', 'My Attendance': '我的考勤', 'Profile': '个人资料',
+    'Dashboard': 'ä»ªè¡¨ç›˜', 'Projects': 'é¡¹ç›®', 'Tasks': 'ä»»åŠ¡', 'Attendance': 'è€ƒå‹¤',
+    'Workers': 'å·¥äºº', 'Files': 'æ–‡ä»¶', 'Notifications': 'é€šçŸ¥', 'More': 'æ›´å¤š',
+    'My Dashboard': 'æˆ‘çš„ä»ªè¡¨ç›˜', 'My Attendance': 'æˆ‘çš„è€ƒå‹¤', 'Profile': 'ä¸ªäººèµ„æ–™',
   };
   const ms = {
     'Dashboard': 'Papan Pemuka', 'Projects': 'Projek', 'Tasks': 'Tugas', 'Attendance': 'Kehadiran',
@@ -41,12 +42,15 @@ String _navT(String en) {
   return AppSettings.t(en, zh[en], ms[en]);
 }
 
+/// Bottom navigation is capped at 5 destinations for first-time users:
+/// 4 core pages + a "More" sheet that groups every secondary entry
+/// (Files / Attendance / Notifications / Profile). Nothing is unreachable.
 const _bottomNavItems = [
   _NavItem('Dashboard', Icons.grid_view_outlined, Icons.grid_view_rounded),
   _NavItem('Projects', Icons.apartment_outlined, Icons.apartment_rounded),
   _NavItem('Tasks', Icons.check_circle_outline_rounded, Icons.check_circle_rounded),
   _NavItem('Workers', Icons.badge_outlined, Icons.badge_rounded),
-  _NavItem('Files', Icons.folder_outlined, Icons.folder_rounded),
+  _NavItem('More', Icons.widgets_outlined, Icons.widgets_rounded),
 ];
 
 const _mainMenu = [
@@ -71,6 +75,26 @@ final _pages = <Widget>[
 ];
 
 final _titles = _mainMenu.map((e) => e.label).toList();
+
+/// Sidebar grouping: 4 core pages on top, everything else under "More tools".
+/// Page indices in [_mainMenu] are unchanged so navigation stays wired.
+const _coreMenuIdx = [0, 1, 2, 4]; // Dashboard / Projects / Tasks / Workers
+const _extraMenuIdx = [5, 3, 6]; // Files / Attendance / Notifications
+
+/// One-line explanation shown under each navigation label (new-user guidance).
+String? _navHint(String label) {
+  const keys = {
+    'Dashboard': 'nav.hint.dashboard',
+    'Projects': 'nav.hint.projects',
+    'Tasks': 'nav.hint.tasks',
+    'Workers': 'nav.hint.workers',
+    'Attendance': 'nav.hint.attendance',
+    'Files': 'nav.hint.files',
+    'Notifications': 'nav.hint.notifications',
+  };
+  final k = keys[label];
+  return k == null ? null : AppStrings.t(k);
+}
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -205,7 +229,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-// ──────────────── Wide (Sidebar) Layout ────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Wide (Sidebar) Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _WideLayout extends StatelessWidget {
   final Widget pages;
   final int idx;
@@ -250,7 +274,7 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-// ──────────────── Narrow (Bottom Nav) Layout ─────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Narrow (Bottom Nav) Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _NarrowLayout extends StatelessWidget {
   final Widget pages;
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -274,17 +298,94 @@ class _NarrowLayout extends StatelessWidget {
     required this.onProjectChanged,
   });
 
-  // Map bottom nav index → page index
-  int _bottomToPageIdx(int bottomIdx) {
-    const map = [0, 1, 2, 4, 5]; // Dashboard, Projects, Tasks, Workers, Files
-    return map[bottomIdx];
-  }
+  /// Bottom nav index â†’ page index for the 4 core tabs.
+  /// Index 4 is the "More" sheet and never maps to a page.
+  static const _bottomPages = [0, 1, 2, 4];
 
   int _pageToBottomIdx(int pageIdx) {
     if (pageIdx <= 2) return pageIdx; // Dashboard(0) / Projects(1) / Tasks(2)
-    if (pageIdx == 4) return 3;       // Workers → bottom nav index 3
-    if (pageIdx == 5) return 4;       // Files → bottom nav index 4
-    return -1; // Attendance(3) / Notifications(6) are not in the bottom nav (kept in wide sidebar / More menu)
+    if (pageIdx == 4) return 3;       // Workers â†’ bottom nav index 3
+    // Files(5) / Attendance(3) are opened from "More", so that tab stays lit.
+    return 4;
+  }
+
+  /// "More" sheet â€” groups every secondary entry so the bottom bar stays at 5.
+  void _openMoreSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.transparent,
+      builder: (sheetCtx) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(color: AppColors.border, borderRadius: AppRadius.rPill),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(AppStrings.t('nav.moreTitle'),
+                        style: GoogleFonts.inter(
+                            fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                    const SizedBox(height: 2),
+                    Text(AppStrings.t('nav.moreSub'),
+                        style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                  ]),
+                ),
+              ]),
+            ),
+            _MoreTile(
+              icon: Icons.folder_outlined,
+              label: _navT('Files'),
+              hint: AppStrings.t('nav.hint.files'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                onNav(5);
+              },
+            ),
+            _MoreTile(
+              icon: Icons.calendar_month_rounded,
+              label: _navT('Attendance'),
+              hint: AppStrings.t('nav.hint.attendance'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                onNav(3);
+              },
+            ),
+            _MoreTile(
+              icon: Icons.notifications_outlined,
+              label: _navT('Notifications'),
+              hint: AppStrings.t('nav.hint.notifications'),
+              showBadge: true,
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
+              },
+            ),
+            _MoreTile(
+              icon: Icons.person_outline_rounded,
+              label: _navT('Profile'),
+              hint: AppStrings.t('nav.hint.profile'),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
+              },
+            ),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      ),
+    );
   }
 
   @override
@@ -374,7 +475,9 @@ class _NarrowLayout extends StatelessWidget {
                     child: _BottomNavBtn(
                       item: item,
                       selected: isSelected,
-                      onTap: () => onNav(_bottomToPageIdx(i)),
+                      onTap: () => i == _bottomPages.length
+                          ? _openMoreSheet(context)
+                          : onNav(_bottomPages[i]),
                     ),
                   );
                 }),
@@ -387,7 +490,7 @@ class _NarrowLayout extends StatelessWidget {
   }
 }
 
-// ──────────────── Bottom Nav Button ──────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Bottom Nav Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _BottomNavBtn extends StatelessWidget {
   final _NavItem item;
   final bool selected;
@@ -444,7 +547,7 @@ class _BottomNavBtn extends StatelessWidget {
   }
 }
 
-// ──────────────── Sidebar (permanent) ────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Sidebar (permanent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _Sidebar extends StatelessWidget {
   final int idx;
   final Map<String, dynamic> user;
@@ -506,12 +609,20 @@ class _SidebarContent extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children: [
-                _sectionLabel('MAIN MENU'),
-                ..._mainMenu.asMap().entries.map((e) => _NavTile(
-                      item: e.value,
-                      selected: e.key == idx,
-                      onTap: () => onNav(e.key),
-                      showNotificationBadge: e.value.label == 'Notifications',
+                _sectionLabel(AppStrings.t('nav.groupMain')),
+                ..._coreMenuIdx.map((i) => _NavTile(
+                      item: _mainMenu[i],
+                      selected: i == idx,
+                      hint: _navHint(_mainMenu[i].label),
+                      onTap: () => onNav(i),
+                    )),
+                _sectionLabel(AppStrings.t('nav.groupMore')),
+                ..._extraMenuIdx.map((i) => _NavTile(
+                      item: _mainMenu[i],
+                      selected: i == idx,
+                      hint: _navHint(_mainMenu[i].label),
+                      onTap: () => onNav(i),
+                      showNotificationBadge: _mainMenu[i].label == 'Notifications',
                     )),
               ],
             ),
@@ -564,11 +675,15 @@ class _NavTile extends StatelessWidget {
   final VoidCallback onTap;
   final bool showNotificationBadge;
 
+  /// Optional one-line explanation for first-time users.
+  final String? hint;
+
   const _NavTile({
     required this.item,
     required this.selected,
     required this.onTap,
     this.showNotificationBadge = false,
+    this.hint,
   });
 
   @override
@@ -588,11 +703,22 @@ class _NavTile extends StatelessWidget {
               Icon(item.icon, size: 18, color: selected ? AppColors.onAccent : AppColors.textSidebar),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(_navT(item.label),
-                    style: GoogleFonts.inter(
-                        color: selected ? AppColors.onAccent : AppColors.textSidebar,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(_navT(item.label),
+                      style: GoogleFonts.inter(
+                          color: selected ? AppColors.onAccent : AppColors.textSidebar,
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600)),
+                  if (hint != null)
+                    Text(hint!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            color: selected
+                                ? AppColors.onAccent.withValues(alpha: 0.7)
+                                : AppColors.textSidebarMuted,
+                            fontSize: 11)),
+                ]),
               ),
               if (showNotificationBadge)
                 Container(
@@ -608,7 +734,7 @@ class _NavTile extends StatelessWidget {
   }
 }
 
-// ──────────────── Top Bar ────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Top Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _TopBar extends StatelessWidget {
   final String title;
   final String currentProject;
@@ -723,6 +849,73 @@ class _ProjectChipState extends State<_ProjectChip> {
           const SizedBox(width: 4),
           Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.textMuted),
         ]),
+      ),
+    );
+  }
+}
+
+// ──────────────── "More" sheet row ────────────────
+class _MoreTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String hint;
+  final VoidCallback onTap;
+  final bool showBadge;
+
+  const _MoreTile({
+    required this.icon,
+    required this.label,
+    required this.hint,
+    required this.onTap,
+    this.showBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: Material(
+        color: AppColors.transparent,
+        borderRadius: AppRadius.rSm,
+        child: InkWell(
+          borderRadius: AppRadius.rSm,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Row(children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.accentLight,
+                  borderRadius: AppRadius.rSm,
+                ),
+                child: Icon(icon, size: 19, color: AppColors.accent),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label,
+                      style: GoogleFonts.inter(
+                          fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                  const SizedBox(height: 2),
+                  Text(hint,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+                ]),
+              ),
+              if (showBadge)
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 6),
+                  decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle),
+                ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+            ]),
+          ),
+        ),
       ),
     );
   }

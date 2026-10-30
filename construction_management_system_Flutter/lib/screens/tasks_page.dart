@@ -10,6 +10,7 @@ import '../services/task_status_notifier.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
+import '../widgets/guided_empty_state.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -147,27 +148,23 @@ class _TasksPageState extends State<TasksPage> {
                 child: ld
                     ? const Center(child: CircularProgressIndicator())
                     : _filtered.isEmpty
-                        ? Center(
-                            child: Column(mainAxisSize: MainAxisSize.min, children: [
-                              Container(
-                                width: 76, height: 76,
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.08),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.task_alt_rounded, size: 34, color: AppColors.textMuted),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(AppStrings.t('tasks.noTasks'),
-                                  style: GoogleFonts.inter(fontSize: 15, color: AppColors.textMuted)),
-                              const SizedBox(height: 16),
-                              OutlinedButton.icon(
-                                onPressed: _openNewTask,
-                                icon: const Icon(Icons.add, size: 18),
-                                label: Text(AppStrings.t('tasks.newTask')),
-                              ),
-                            ]),
-                          )
+                        ? ((_searchQuery.isEmpty && _statusFilter == 'All')
+                            ? GuidedEmptyState(
+                                icon: Icons.task_alt_rounded,
+                                title: AppStrings.t('empty.tasks.title'),
+                                description: AppStrings.t('empty.tasks.desc'),
+                                primaryLabel: AppStrings.t('empty.tasks.action'),
+                                onPrimary: _openNewTask,
+                              )
+                            : FilteredEmptyState(
+                                title: AppStrings.t('empty.tasks.noMatch'),
+                                description: AppStrings.t('empty.tasks.noMatchDesc'),
+                                clearLabel: AppStrings.t('empty.clearFilters'),
+                                onClear: () => setState(() {
+                                  _searchQuery = '';
+                                  _statusFilter = 'All';
+                                }),
+                              ))
                         : RefreshIndicator(
                             onRefresh: _load,
                             child: LayoutBuilder(builder: (ctx, constraints) {

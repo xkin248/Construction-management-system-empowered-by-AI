@@ -1,4 +1,4 @@
-import '../services/app_settings.dart';
+﻿import '../services/app_settings.dart';
 
 /// Centralised English / Bahasa Melayu string dictionary.
 ///
@@ -377,9 +377,172 @@ class AppStrings {
     'tasks.deleteSuccess': ['Task deleted', 'Tugasan dipadam'],
     'tasks.deleteFailed': ['Failed to delete task', 'Gagal memadam tugasan'],
     'tasks.autoAssignSameProject': ['Only match workers in this project', 'Hanya padankan pekerja dalam projek ini'],
+
+    // ============ Navigation (beginner-friendly regroup) ============
+    'nav.more': ['More', 'Lagi'],
+    'nav.groupMain': ['CORE', 'TERAS'],
+    'nav.groupMore': ['MORE TOOLS', 'ALAT LAIN'],
+    'nav.moreTitle': ['More tools', 'Alat lain'],
+    'nav.moreSub': ['Attendance, files and notifications in one place',
+        'Kehadiran, fail dan notifikasi di satu tempat'],
+    'nav.hint.dashboard': ['Your key numbers at a glance', 'Angka utama anda sekilas pandang'],
+    'nav.hint.projects': ['Track site projects', 'Pantau projek tapak'],
+    'nav.hint.tasks': ['Assign and follow up work', 'Tugaskan dan pantau kerja'],
+    'nav.hint.workers': ['Manage site workers', 'Urus pekerja tapak'],
+    'nav.hint.attendance': ['Daily check-in records', 'Rekod daftar masuk harian'],
+    'nav.hint.files': ['Drawings, photos and reports', 'Lukisan, foto dan laporan'],
+    'nav.hint.notifications': ['Alerts and updates', 'Makluman dan kemas kini'],
+    'nav.hint.profile': ['Your account settings', 'Tetapan akaun anda'],
+
+    // ============ Dashboard welcome / quick actions ============
+    'dash.welcomeBack': ['Welcome back', 'Selamat kembali'],
+    'dash.welcomeGuest': ['Welcome', 'Selamat datang'],
+    'dash.welcomeHint': [
+      'Your site at a glance. Pick a shortcut to get started.',
+      'Ringkasan tapak anda. Pilih pintasan untuk mula.'
+    ],
+    'dash.goodMorning': ['Good morning', 'Selamat pagi'],
+    'dash.goodAfternoon': ['Good afternoon', 'Selamat tengah hari'],
+    'dash.goodEvening': ['Good evening', 'Selamat petang'],
+    'dash.quickActions': ['Quick actions', 'Tindakan pantas'],
+    'dash.actionAttendance': ['Attendance', 'Kehadiran'],
+    'dash.actionNewTask': ['New task', 'Tugasan baharu'],
+    'dash.actionNewWorker': ['Add worker', 'Tambah pekerja'],
+    'dash.actionNotifications': ['Notifications', 'Notifikasi'],
+    'dash.actionFiles': ['Files', 'Fail'],
+    'dash.insightsTitle': ['More insights', 'Lebih banyak analisis'],
+    'dash.insightsSub': ['Charts, project trend and upcoming deadlines',
+        'Carta, trend projek dan tarikh akhir'],
+    'dash.aiPredictionTitle': ['AI progress prediction', 'Ramalan kemajuan AI'],
+    'dash.aiPredictionSub': ['Optional — runs only when you tap Update',
+        'Pilihan — berjalan hanya bila anda tekan Kemas kini'],
+    'dash.tapToExpand': ['Tap to expand', 'Tekan untuk buka'],
+    'dash.openIssues': ['Open issues', 'Isu terbuka'],
+    'dash.tasksTitle': ['Active tasks', 'Tugasan aktif'],
+    'dash.productivityTitle': ['Overall productivity', 'Produktiviti keseluruhan'],
+
+    // ============ Guided empty states ============
+    'empty.projects.title': ['No projects yet', 'Belum ada projek'],
+    'empty.projects.desc': [
+      'Projects group your tasks, workers and files. Create your first project to get started.',
+      'Projek mengumpulkan tugasan, pekerja dan fail anda. Cipta projek pertama untuk mula.'
+    ],
+    'empty.projects.action': ['Create first project', 'Cipta projek pertama'],
+    'empty.tasks.title': ['No tasks yet', 'Belum ada tugasan'],
+    'empty.tasks.desc': [
+      'No tasks yet. Create a task and assign it to your site workers.',
+      'Tiada tugasan lagi. Cipta tugasan dan berikan kepada pekerja tapak anda.'
+    ],
+    'empty.tasks.action': ['Create first task', 'Cipta tugasan pertama'],
+    'empty.tasks.noMatch': ['No tasks match your filters', 'Tiada tugasan sepadan dengan penapis'],
+    'empty.tasks.noMatchDesc': [
+      'Try another keyword, or clear the filters to see everything again.',
+      'Cuba kata kunci lain, atau kosongkan penapis untuk lihat semula semua.'
+    ],
+    'empty.clearFilters': ['Clear filters', 'Kosongkan penapis'],
+    'empty.workers.title': ['No workers yet', 'Belum ada pekerja'],
+    'empty.workers.desc': [
+      'Add your site workers so you can assign tasks and track attendance.',
+      'Tambah pekerja tapak supaya anda boleh berikan tugasan dan pantau kehadiran.'
+    ],
+    'empty.workers.action': ['Add first worker', 'Tambah pekerja pertama'],
+    'empty.workers.noMatchDesc': [
+      'Check the spelling, or clear the search to see every worker.',
+      'Semak ejaan, atau kosongkan carian untuk lihat semua pekerja.'
+    ],
+    'empty.clearSearch': ['Clear search', 'Kosongkan carian'],
+    'empty.files.title': ['No files yet', 'Belum ada fail'],
+    'empty.files.desc': [
+      'Upload drawings, site photos or reports to keep everything in one place.',
+      'Muat naik lukisan, foto tapak atau laporan supaya semuanya di satu tempat.'
+    ],
+    'empty.files.action': ['Upload a file', 'Muat naik fail'],
   };
 
-  /// Look up a string by key for the current language.
+  /// Chinese copy for the redesigned surfaces.
+  ///
+  /// The two-column [_dict] keeps EN/BM (existing requirement); Chinese is kept
+  /// in a parallel map so untranslated keys fall back to English instead of
+  /// blocking the build. Any new key added for the beginner-friendly UI must be
+  /// added here as well.
+  static const Map<String, String> _zh = {
+    // Navigation
+    'nav.more': '更多',
+    'nav.groupMain': '核心功能',
+    'nav.groupMore': '更多工具',
+    'nav.moreTitle': '更多工具',
+    'nav.moreSub': '考勤、文件与通知都收在这里',
+    'nav.hint.dashboard': '一眼看清关键数据',
+    'nav.hint.projects': '管理工地项目',
+    'nav.hint.tasks': '分配并跟进任务',
+    'nav.hint.workers': '管理现场工人',
+    'nav.hint.attendance': '每日签到记录',
+    'nav.hint.files': '图纸、照片与报告',
+    'nav.hint.notifications': '提醒与更新',
+    'nav.hint.profile': '账号设置',
+    // Dashboard
+    'dash.welcomeBack': '欢迎回来',
+    'dash.welcomeGuest': '欢迎',
+    'dash.welcomeHint': '这里是你工地的概览，选一个快捷入口开始吧。',
+    'dash.goodMorning': '早上好',
+    'dash.goodAfternoon': '下午好',
+    'dash.goodEvening': '晚上好',
+    'dash.quickActions': '快捷操作',
+    'dash.actionAttendance': '考勤',
+    'dash.actionNewTask': '新建任务',
+    'dash.actionNewWorker': '添加工人',
+    'dash.actionNotifications': '通知',
+    'dash.actionFiles': '文件',
+    'dash.insightsTitle': '更多洞察',
+    'dash.insightsSub': '图表、项目趋势与即将到期',
+    'dash.aiPredictionTitle': 'AI 进度预测',
+    'dash.aiPredictionSub': '可选功能 —— 只有点击「更新」才会调用',
+    'dash.tapToExpand': '点击展开',
+    'dash.openIssues': '未解决问题',
+    'dash.tasksTitle': '进行中任务',
+    'dash.productivityTitle': '整体生产率',
+    'dash.todayAttendanceRate': '今日出勤率',
+    'dash.quickCheckin': '快速签到',
+    'dash.quickCheckIn': '快速签到',
+    'dash.onSite': '在岗',
+    'dash.noDueProjects': '暂无即将到期的项目',
+    'dash.weeklyAttendance': '每周出勤',
+    'dash.allProjectsCombined': '全部项目汇总',
+    'dash.taskDistribution': '任务分布',
+    'dash.allActiveProjects': '全部进行中项目',
+    'dash.title': '仪表盘',
+    // Empty states
+    'empty.projects.title': '还没有项目',
+    'empty.projects.desc': '项目会把任务、工人和文件归到一起。先建一个项目就能开始。',
+    'empty.projects.action': '创建第一个项目',
+    'empty.tasks.title': '还没有任务',
+    'empty.tasks.desc': '还没有任务。建一个任务并分配给现场工人即可。',
+    'empty.tasks.action': '创建第一个任务',
+    'empty.tasks.noMatch': '没有符合筛选条件的任务',
+    'empty.tasks.noMatchDesc': '换个关键词，或清空筛选看看全部任务。',
+    'empty.clearFilters': '清空筛选',
+    'empty.workers.title': '还没有工人',
+    'empty.workers.desc': '添加工人后即可分配任务并跟踪考勤。',
+    'empty.workers.action': '添加第一个工人',
+    'empty.workers.noMatchDesc': '检查一下拼写，或清空搜索查看全部工人。',
+    'empty.clearSearch': '清空搜索',
+    'empty.files.title': '还没有文件',
+    'empty.files.desc': '上传图纸、现场照片或报告，所有资料集中在一处。',
+    'empty.files.action': '上传文件',
+    // Common list-page labels used on the redesigned screens
+    'proj.noProjects': '还没有项目',
+    'proj.newProject': '新建项目',
+    'tasks.noTasks': '还没有任务',
+    'tasks.newTask': '新建任务',
+    'workers.noWorkers': '还没有工人',
+    'workers.noWorkersFound': '没有找到工人',
+    'workers.addWorker': '添加工人',
+    'files.noFiles': '还没有文件',
+    'common.retry': '重试',
+    'common.loading': '加载中…',
+  };
+
+  /// Look up a string by key for the current language (en / zh / ms).
   /// Falls back to English when the key or translation is missing.
   static String t(String key) {
     final v = _dict[key];
@@ -388,8 +551,7 @@ class AppStrings {
       case 'ms':
         return v.length > 1 ? v[1] : v[0];
       case 'zh':
-        // Chinese is not part of the EN/BM requirement; fall back to English.
-        return v[0];
+        return _zh[key] ?? v[0];
       default:
         return v[0];
     }

@@ -12,7 +12,10 @@ import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../widgets/charts.dart';
+import '../widgets/add_worker_sheet.dart';
+import '../widgets/task_form.dart';
 import 'attendance_geo_helper.dart';
+import 'notifications_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -34,6 +37,9 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _supLoading = false;
   bool _supCheckedIn = false;
   String _supMsg = AppStrings.t('dash.checkinHint');
+
+  // Signed-in user profile (only used for the personalised welcome line).
+  Map _me = {};
 
   // AI Progress Prediction — manual trigger only (never on refresh, to save tokens).
   int? _predProjectId;
@@ -58,6 +64,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadSupervisorAttendance() async {
     try {
       final me = await ApiService().me();
+      if (mounted) setState(() => _me = me);
       final t = (me['user_type'] ?? '').toString().toLowerCase();
       final r = (me['role'] ?? '').toString().toLowerCase();
       final isSup = t.contains('supervisor') || r.contains('supervisor');
@@ -243,7 +250,8 @@ class _DashboardPageState extends State<DashboardPage> {
     final totalWorkers = kpi['total_workers'] ?? 0;
     final activeTasks = kpi['pending_tasks'] ?? 0;
     final productivity = kpi['productivity'] ?? 76;
-    final alerts = kpi['open_issues'] ?? 0;
+    // open_issues is surfaced in the insights section rather than the hero KPI.
+    final openIssues = kpi['open_issues'] ?? 0;
     final present = (attSummary['present'] ?? 0) as int;
     final late = (attSummary['late'] ?? 0) as int;
     final absent = (attSummary['absent'] ?? 0) as int;
@@ -313,59 +321,272 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             const SizedBox(height: 16),
           ],
-          // ── Supervisor Quick Check-in ──
+          // ── 1. Welcome greeting (who you are + what this page does) ──
+          _welcomeHeader(),
+          const SizedBox(height: 16),
+
+          // ── 2. Core KPI — three numbers only ──
+          RepaintBoundary(
+            child: _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct)),
+          const SizedBox(height: 16),
+
+          // ── 3. Quick actions — the 3 things a new user does most ──
+          _quickActionsCard(),
+          const SizedBox(height: 16),
+
+          // ── Supervisor quick check-in (a one-tap action, stays on top) ──
           if (_isSupervisor) ...[
             RepaintBoundary(child: _buildQuickCheckInCard()),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
           ],
 
-          // ── KPI Cards Row ──
-          RepaintBoundary(
-            child: _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct)),
-          const SizedBox(height: 24),
-
-          // ── Charts Row ──
-          LayoutBuilder(builder: (ctx, cs) {
-            final isWide = cs.maxWidth > 600;
-            if (isWide) {
-              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Expanded(flex: 3, child: RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels))),
-                const SizedBox(width: 16),
-                SizedBox(width: 240, child: RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0))),
-              ]);
-            }
-            return Column(children: [
-              RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels)),
+          // ── 4. Charts / trends — collapsed, opened on demand ──
+          _collapsibleSection(
+            icon: Icons.insights_rounded,
+            title: AppStrings.t('dash.insightsTitle'),
+            subtitle: AppStrings.t('dash.insightsSub'),
+            children: [
+              // Secondary number moved out of the hero KPI row.
+              Row(children: [
+                Icon(Icons.warning_amber_rounded, size: 15, color: AppColors.red),
+                const SizedBox(width: 8),
+                Text(
+                  '${AppStrings.t('dash.openIssues')}: $openIssues',
+                  style: GoogleFonts.inter(
+                      fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                ),
+              ]),
               const SizedBox(height: 16),
-              RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
-            ]);
-          }),
-          const SizedBox(height: 24),
+              LayoutBuilder(builder: (ctx, cs) {
+                final isWide = cs.maxWidth > 600;
+                if (isWide) {
+                  return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(flex: 3, child: RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels))),
+                    const SizedBox(width: 16),
+                    SizedBox(width: 240, child: RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0))),
+                  ]);
+                }
+                return Column(children: [
+                  RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels)),
+                  const SizedBox(height: 16),
+                  RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
+                ]);
+              }),
+              const SizedBox(height: 20),
+              _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
+              const SizedBox(height: 12),
+              if (projects.isEmpty)
+                _emptyBox(AppStrings.t('proj.noProjects'), icon: Icons.folder_open_outlined)
+              else
+                ...projects.take(4).map((p) => _projectProductivityRow(p)),
+              const SizedBox(height: 20),
+              _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
+              const SizedBox(height: 12),
+              if (upcoming.isEmpty)
+                _emptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
+              else
+                ...upcoming.map((p) => _upcomingProjectCard(p)),
+            ],
+          ),
 
-          // ── AI Progress Prediction (manual trigger, mobile friendly) ──
-          RepaintBoundary(child: _buildPredictionSection()),
-          const SizedBox(height: 24),
-
-          // ── Productivity by Project ──
-          _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
-          const SizedBox(height: 12),
-          if (projects.isEmpty)
-            _emptyBox(AppStrings.t('proj.noProjects'), icon: Icons.folder_open_outlined)
-          else
-            ...projects.take(4).map((p) => _projectProductivityRow(p)),
-          const SizedBox(height: 24),
-
-          // ── Upcoming Due Projects ──
-          _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
-          const SizedBox(height: 12),
-          if (upcoming.isEmpty)
-            _emptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
-          else
-            ...upcoming.map((p) => _upcomingProjectCard(p)),
+          // ── 5. AI prediction — collapsed by default, manual trigger ──
+          _collapsibleSection(
+            icon: Icons.auto_awesome_rounded,
+            title: AppStrings.t('dash.aiPredictionTitle'),
+            subtitle: AppStrings.t('dash.aiPredictionSub'),
+            children: [RepaintBoundary(child: _predictionBody())],
+          ),
         ],
       ),
     );
       },
+    );
+  }
+
+  // ── Welcome header (first thing a new user sees) ──
+  Widget _welcomeHeader() {
+    final name = (_me['full_name'] ?? _me['name'] ?? '').toString().trim();
+    final hour = DateTime.now().hour;
+    final greetKey = hour < 12
+        ? 'dash.goodMorning'
+        : hour < 18
+            ? 'dash.goodAfternoon'
+            : 'dash.goodEvening';
+    final greeting = name.isEmpty
+        ? AppStrings.t(greetKey)
+        : '${AppStrings.t(greetKey)}, ${name.split(' ').first}';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Row(children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
+          child: Icon(Icons.waving_hand_rounded, size: 22, color: AppColors.accent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              greeting,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                  fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              AppStrings.t('dash.welcomeHint'),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  // ── Quick actions: the three most common first steps ──
+  Widget _quickActionsCard() {
+    final actions = [
+      (Icons.add_task_rounded, AppStrings.t('dash.actionNewTask'), _quickNewTask),
+      (Icons.person_add_alt_1_rounded, AppStrings.t('dash.actionAddWorker'), _quickAddWorker),
+      (Icons.notifications_active_outlined, AppStrings.t('dash.actionNotifications'), _quickNotifications),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader(AppStrings.t('dash.quickActions')),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(
+              child: _quickActionTile(
+                icon: actions[i].$1,
+                label: actions[i].$2,
+                onTap: actions[i].$3,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ]);
+  }
+
+  Widget _quickActionTile({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: AppColors.bgCard,
+      borderRadius: AppRadius.rMd,
+      child: InkWell(
+        borderRadius: AppRadius.rMd,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.rMd,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rSm),
+              child: Icon(icon, size: 19, color: AppColors.accent),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _quickNewTask() async {
+    if (projects.isEmpty) {
+      toast('Create a project first');
+      return;
+    }
+    final firstId = projects.first['project_id'];
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (_) => TaskForm(
+        initialProjectId: firstId is int ? firstId : int.tryParse('$firstId'),
+      ),
+    );
+    if (created == true) _load(forceRefresh: true);
+  }
+
+  void _quickAddWorker() {
+    showAddWorkerSheet(context, onAdded: () => _load(forceRefresh: true));
+  }
+
+  void _quickNotifications() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage()));
+  }
+
+  /// Collapsible card: keeps secondary content one tap away instead of
+  /// pushing the first screen down. Collapsed by default.
+  Widget _collapsibleSection({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        // Hide the default ExpansionTile divider lines.
+        data: Theme.of(context).copyWith(dividerColor: AppColors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          iconColor: AppColors.accent,
+          collapsedIconColor: AppColors.textMuted,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rSm),
+            child: Icon(icon, size: 18, color: AppColors.accent),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.inter(
+                fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          ),
+          subtitle: Text(
+            subtitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted),
+          ),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      ),
     );
   }
 
@@ -422,7 +643,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   // ── KPI row builder ──
-  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, alerts, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct) {
+  /// Three headline numbers only — a first-time user should grasp the site
+  /// status without scrolling. Secondary counts live in the insights section.
+  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct) {
     return LayoutBuilder(builder: (ctx, cs) {
       final isWide = cs.maxWidth > 600;
       final cards = [
@@ -454,16 +677,6 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.trending_up_rounded,
           iconColor: AppColors.green,
           valueColor: AppColors.green,
-        ),
-        _kpiCard(
-          label: 'Alerts',
-          value: '$alerts',
-          // Use real count — avoids '2 attendance • 1 safety' static hardcoding.
-          sub: alerts == 0
-              ? 'No open issues'
-              : alerts == 1 ? '1 open issue' : '$alerts open issues',
-          icon: Icons.warning_amber_rounded,
-          iconColor: AppColors.red,
         ),
       ];
 
@@ -499,17 +712,6 @@ class _DashboardPageState extends State<DashboardPage> {
           icon: Icons.trending_up_rounded,
           iconColor: AppColors.green,
           valueColor: AppColors.green,
-        ),
-        const SizedBox(height: 12),
-        _compactMetricCard(
-          label: 'Alerts',
-          value: '$alerts',
-          sub: alerts == 0
-              ? 'No open issues'
-              : (alerts == 1 ? '1 open issue' : '$alerts open issues'),
-          icon: Icons.warning_amber_rounded,
-          iconColor: AppColors.red,
-          valueColor: alerts > 0 ? AppColors.red : null,
         ),
       ]);
     });
@@ -1000,48 +1202,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget _buildPredictionSection() {
+  /// Body of the AI prediction card. The card chrome / title lives in the
+  /// collapsible section so the dashboard first screen stays short.
+  Widget _predictionBody() {
     final showResult = !_predLoading &&
         _predProjectId != null &&
         _prediction != null &&
         _predictionPid == _predProjectId;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.purpleLight,
-              borderRadius: AppRadius.rSm,
-            ),
-            child: Icon(Icons.auto_awesome_rounded,
-                size: 18, color: AppColors.purple),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AI Progress Prediction',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary)),
-              Text('Manual — calls the AI only when you tap Update (auto-refresh disabled, saves tokens)',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
-            ]),
-          ),
-        ]),
-        const SizedBox(height: 16),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Project picker + Update button (single-col on <480px) ──
         LayoutBuilder(builder: (ctx, cs) {
           final wide = cs.maxWidth >= 480;
@@ -1130,8 +1298,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'Select a project and tap Update to see AI completion estimates.',
             style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted),
           ),
-      ]),
-    );
+    ]);
   }
 
   Widget _predictionResultBlock(Map pred) {
