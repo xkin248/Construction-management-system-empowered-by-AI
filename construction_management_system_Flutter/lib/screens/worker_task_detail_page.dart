@@ -7,6 +7,7 @@ import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/a11y.dart';
 
 /// Worker-facing task detail page.
 ///
@@ -296,7 +297,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                         fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               ),
               const SizedBox(width: 8),
-              statusPill(_status),
+              semanticStatus(statusPill(_status), _status),
             ]),
             const SizedBox(height: 8),
             Wrap(spacing: 6, runSpacing: 6, children: [

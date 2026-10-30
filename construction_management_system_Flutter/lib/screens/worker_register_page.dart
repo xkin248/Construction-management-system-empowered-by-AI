@@ -441,6 +441,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
             size: 18,
             color: AppColors.darkTextMuted,
           ),
+          tooltip: obscure
+              ? AppStrings.t('login.showPassword')
+              : AppStrings.t('login.hidePassword'),
           onPressed: onToggle,
         ),
       ),

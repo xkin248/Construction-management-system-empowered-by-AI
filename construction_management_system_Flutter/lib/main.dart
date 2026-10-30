@@ -8,19 +8,21 @@ import 'services/token_storage.dart';
 import 'screens/login_page.dart';
 import 'services/app_settings.dart';
 import 'services/gps_notification_service.dart';
+import 'theme/text_scale.dart';
+import 'package:flutter/foundation.dart';
 
 void main() {
   runZonedGuarded(() {
     WidgetsFlutterBinding.ensureInitialized();
     FlutterError.onError = (FlutterErrorDetails details) {
-      debugPrint('[FlutterError] ${details.exceptionAsString()}');
-      debugPrint('[FlutterError] ${details.stack}');
+      if (kDebugMode) debugPrint('[FlutterError] ${details.exceptionAsString()}');
+      if (kDebugMode) debugPrint('[FlutterError] ${details.stack}');
       // Don't crash — log silently
     };
     runApp(const MyApp());
   }, (error, stack) {
-    debugPrint('[ZoneError] $error');
-    debugPrint('[ZoneStack] $stack');
+    if (kDebugMode) debugPrint('[ZoneError] $error');
+    if (kDebugMode) debugPrint('[ZoneStack] $stack');
     // Show error app so user can see what went wrong
     runApp(ErrorApp(error: error.toString()));
   });
@@ -175,6 +177,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           : AppSettings.themeMode.value == 'light'
               ? ThemeMode.light
               : ThemeMode.system,
+      // System font scaling is clamped for the whole app: dense site rows
+      // must not clip their labels when the OS font size is pushed way up.
+      builder: (context, child) =>
+          AppTextScaler(child: child ?? const SizedBox.shrink()),
       // Root pages listen to AppColors.darkMode themselves and rebuild in
       // place, so the Navigator subtree must NOT be keyed here (that would
       // reset the route stack on every theme flip).
@@ -206,7 +212,7 @@ class _SplashGateState extends State<SplashGate> {
     try {
       await TokenStorage.clearAuth();
     } catch (e, st) {
-      debugPrint('[Boot] clearAuth failed: $e\n$st');
+      if (kDebugMode) debugPrint('[Boot] clearAuth failed: $e\n$st');
     }
 
     // ── 2. Initialise the API client — UNCONDITIONAL ────────────────────────
@@ -223,7 +229,7 @@ class _SplashGateState extends State<SplashGate> {
         },
       );
     } catch (e, st) {
-      debugPrint('[Boot] ApiService.init failed: $e\n$st');
+      if (kDebugMode) debugPrint('[Boot] ApiService.init failed: $e\n$st');
     }
 
     // ── 3. FCM push setup ───────────────────────────────────────────────────
@@ -232,7 +238,7 @@ class _SplashGateState extends State<SplashGate> {
     try {
       await FcmService.setup();
     } catch (e, st) {
-      debugPrint('[Boot] FcmService.setup failed: $e\n$st');
+      if (kDebugMode) debugPrint('[Boot] FcmService.setup failed: $e\n$st');
     }
 
     if (!mounted) return;

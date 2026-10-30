@@ -17,6 +17,7 @@ import '../widgets/failure_state.dart';
 import '../widgets/app_scrollbar.dart';
 import '../widgets/file_tiles.dart';
 import '../widgets/signed_file_image.dart';
+import '../widgets/a11y.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -512,7 +513,9 @@ class _FilesPageState extends State<FilesPage> {
               child: Material(
                 color: AppColors.bgCard,
                 borderRadius: AppRadius.rMd,
-                child: InkWell(
+                child: semanticTapTarget(
+                  label: AppStrings.t('files.gridMode'),
+                  child: InkWell(
                   borderRadius: AppRadius.rMd,
                   onTap: () => setState(() => _gridMode = !_gridMode),
                   child: Icon(
@@ -522,7 +525,7 @@ class _FilesPageState extends State<FilesPage> {
                     color: AppColors.textSecondary,
                     size: 22,
                   ),
-                ),
+                )),
               ),
             ),
           ]),
@@ -538,7 +541,10 @@ class _FilesPageState extends State<FilesPage> {
             itemBuilder: (ctx, i) {
               final cat = _categories[i];
               final selected = _selectedCategory == cat['value'];
-              return GestureDetector(
+              return semanticTapTarget(
+                label: (cat['label'] ?? cat['value']).toString(),
+                selected: selected,
+                child: GestureDetector(
                 onTap: () {
                   setState(() => _selectedCategory = cat['value']!);
                   _load();
@@ -576,7 +582,7 @@ class _FilesPageState extends State<FilesPage> {
                       ),
                     ),
                   ]),
-                ),
+                )),
               );
             },
           ),

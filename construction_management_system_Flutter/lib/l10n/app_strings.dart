@@ -88,6 +88,8 @@ class AppStrings {
     'login.username': ['Username', 'Nama pengguna'],
     'login.email': ['Email', 'E-mel'],
     'login.password': ['Password', 'Kata laluan'],
+    'login.showPassword': ['Show password', 'Tunjuk kata laluan'],
+    'login.hidePassword': ['Hide password', 'Sembunyi kata laluan'],
     'login.signIn': ['Sign in', 'Log masuk'],
     'login.signingIn': ['Signing in...', 'Sedang log masuk...'],
     'login.workerCode': ['Worker code', 'Kod pekerja'],
@@ -550,6 +552,9 @@ class AppStrings {
   /// blocking the build. Any new key added for the beginner-friendly UI must be
   /// added here as well.
   static const Map<String, String> _zh = {
+    // Login / register
+    'login.showPassword': '显示密码',
+    'login.hidePassword': '隐藏密码',
     // Navigation
     'nav.more': '更多',
     'nav.groupMain': '核心功能',

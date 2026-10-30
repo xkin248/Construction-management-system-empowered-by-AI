@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import 'api_service.dart';
+import 'package:flutter/foundation.dart';
 
 /// FCM push notification service (frontend).
 ///
@@ -46,9 +47,9 @@ class FcmService {
       });
 
       _ready = true;
-      debugPrint('[FCM] setup complete');
+      if (kDebugMode) debugPrint('[FCM] setup complete');
     } catch (e) {
-      debugPrint('[FCM] setup skipped: $e');
+      if (kDebugMode) debugPrint('[FCM] setup skipped: $e');
     }
   }
 
@@ -78,7 +79,7 @@ class FcmService {
         token: token,
       );
     } catch (e) {
-      debugPrint('[FCM] registerToken skipped: $e');
+      if (kDebugMode) debugPrint('[FCM] registerToken skipped: $e');
     }
   }
 }

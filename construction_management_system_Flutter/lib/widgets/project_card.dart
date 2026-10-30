@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../utils/date_helper.dart';
+import 'a11y.dart';
 
 /// A single project card, extracted out of [ProjectsPage] so the lazy list can
 /// rebuild only the affected card instead of the whole page's builder closure.
@@ -37,7 +38,9 @@ class ProjectCard extends StatelessWidget {
     return sectionCard(
       margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: EdgeInsets.zero,
-      child: InkWell(
+      child: semanticTapTarget(
+        label: '${p['project_name'] ?? '-'}, $status',
+        child: InkWell(
         borderRadius: AppRadius.rLg,
         onTap: onOpen,
         child: Padding(
@@ -50,10 +53,12 @@ class ProjectCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis),
               ),
               Row(mainAxisSize: MainAxisSize.min, children: [
-                statusPill(status),
+                semanticStatus(statusPill(status), status),
                 if (status != 'completed' && progress >= 100) ...[
                   const SizedBox(width: 8),
-                  GestureDetector(
+                  semanticTapTarget(
+                    label: 'Mark project complete',
+                    child:                   GestureDetector(
                     onTap: onMarkComplete,
                     child: Container(
                       padding: const EdgeInsets.all(4),
@@ -64,11 +69,13 @@ class ProjectCard extends StatelessWidget {
                       child: Icon(Icons.check_circle_rounded,
                           size: 14, color: AppColors.green),
                     ),
-                  ),
+                  )),
                 ],
                 const SizedBox(width: 8),
                 // Edit button
-                GestureDetector(
+                semanticTapTarget(
+                  label: 'Edit project',
+                  child:                 GestureDetector(
                   onTap: onEdit,
                   child: Container(
                     padding: const EdgeInsets.all(4),
@@ -78,7 +85,7 @@ class ProjectCard extends StatelessWidget {
                     ),
                     child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
                   ),
-                ),
+                )),
               ]),
             ]),
             const SizedBox(height: 4),
@@ -127,7 +134,7 @@ class ProjectCard extends StatelessWidget {
             ]),
           ]),
         ),
-      ),
+      )),
     );
   }
 }

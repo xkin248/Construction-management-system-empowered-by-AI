@@ -241,6 +241,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                         obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                                         size: 19, color: AppColors.darkTextMuted,
                                       ),
+                                      tooltip: obscure
+                                          ? AppStrings.t('login.showPassword')
+                                          : AppStrings.t('login.hidePassword'),
                                       onPressed: () => setState(() => obscure = !obscure),
                                     ),
                                   ),

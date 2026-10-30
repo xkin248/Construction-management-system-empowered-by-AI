@@ -17,6 +17,7 @@ import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
 import 'worker_home_shell.dart';
+import '../widgets/a11y.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ Nav model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _NavItem {
@@ -422,6 +423,7 @@ class _NarrowLayout extends StatelessWidget {
           Stack(children: [
             IconButton(
               icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary),
+              tooltip: _navT('Notifications'),
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
             ),
             Positioned(
@@ -430,7 +432,9 @@ class _NarrowLayout extends StatelessWidget {
                   decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
             ),
           ]),
-          GestureDetector(
+          semanticTapTarget(
+            label: _navT('Profile'),
+            child:           GestureDetector(
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
             child: Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -448,7 +452,7 @@ class _NarrowLayout extends StatelessWidget {
                           child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.accent)),
                     ),
             ),
-          ),
+          )),
         ],
       ),
       body: pages,
@@ -499,7 +503,10 @@ class _BottomNavBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
+    return semanticTapTarget(
+      label: _navT(item.label),
+      selected: selected,
+      child: Tooltip(
       message: _navT(item.label),
       child: InkWell(
       onTap: onTap,
@@ -543,7 +550,7 @@ class _BottomNavBtn extends StatelessWidget {
         ]),
       ),
       ),
-    );
+    ));
   }
 }
 
@@ -688,7 +695,10 @@ class _NavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return semanticTapTarget(
+      label: hint == null ? _navT(item.label) : '${_navT(item.label)}. $hint',
+      selected: selected,
+      child: Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
         color: selected ? AppColors.accent : AppColors.transparent,
@@ -730,7 +740,7 @@ class _NavTile extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -795,6 +805,7 @@ class _TopBar extends StatelessWidget {
         Stack(children: [
           IconButton(
             icon: Icon(Icons.notifications_outlined, color: AppColors.textSecondary, size: 22),
+            tooltip: _navT('Notifications'),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationsPage())),
           ),
           Positioned(
@@ -803,7 +814,9 @@ class _TopBar extends StatelessWidget {
                 decoration: BoxDecoration(color: AppColors.red, shape: BoxShape.circle)),
           ),
         ]),
-        GestureDetector(
+        semanticTapTarget(
+          label: _navT('Profile'),
+          child:         GestureDetector(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage())),
           child: CircleAvatar(
             radius: 17,
@@ -812,7 +825,7 @@ class _TopBar extends StatelessWidget {
                 style: GoogleFonts.inter(
                     color: AppColors.onAccent, fontWeight: FontWeight.w800, fontSize: 13)),
           ),
-        ),
+        )),
       ]),
     );
   }
@@ -832,6 +845,7 @@ class _ProjectChipState extends State<_ProjectChip> {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<String>(
+      tooltip: 'Select project',
       onSelected: widget.onChanged,
       itemBuilder: (_) => _projects.map((p) => PopupMenuItem(value: p, child: Text(p))).toList(),
       child: Container(
@@ -872,7 +886,9 @@ class _MoreTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return semanticTapTarget(
+      label: '$label. $hint',
+      child: Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
       child: Material(
         color: AppColors.transparent,
@@ -917,6 +933,6 @@ class _MoreTile extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/notification.dart';
 import '../theme/app_theme.dart';
+import 'a11y.dart';
 
 /// One row of the notification feed.
 ///
@@ -59,7 +60,10 @@ class NotificationListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final unread = !item.isRead;
     final tint = iconColor(item.notificationType);
-    return GestureDetector(
+    return semanticTapTarget(
+      label: item.title,
+      hint: unread ? 'Unread' : null,
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -144,6 +148,6 @@ class NotificationListTile extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

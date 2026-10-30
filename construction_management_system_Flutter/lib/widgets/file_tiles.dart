@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/file.dart';
 import '../theme/app_theme.dart';
 import 'signed_file_image.dart';
+import 'a11y.dart';
 
 /// Shared visual helpers for file tiles (icon / category tint / info chip).
 ///
@@ -92,7 +93,9 @@ class FileGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final icon = Icon(fileTypeIcon(file), size: 32, color: fileTypeColor(file));
-    return GestureDetector(
+    return semanticTapTarget(
+      label: '${file.originalName}, ${file.fileCategory}',
+      child: GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: sectionCard(
@@ -143,7 +146,7 @@ class FileGridCard extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -162,7 +165,9 @@ class FileListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return semanticTapTarget(
+      label: '${file.originalName}, ${file.fileCategory}',
+      child: GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,
       child: sectionCard(
@@ -213,6 +218,6 @@ class FileListTile extends StatelessWidget {
               color: AppColors.textMuted, size: 20),
         ]),
       ),
-    );
+    ));
   }
 }

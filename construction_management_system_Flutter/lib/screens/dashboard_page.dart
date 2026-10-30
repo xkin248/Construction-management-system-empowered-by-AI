@@ -18,6 +18,7 @@ import '../widgets/add_worker_sheet.dart';
 import '../widgets/task_form.dart';
 import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
+import '../widgets/a11y.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -498,7 +499,9 @@ class _DashboardPageState extends State<DashboardPage> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return Material(
+    return semanticTapTarget(
+      label: label,
+      child: Material(
       color: AppColors.bgCard,
       borderRadius: AppRadius.rMd,
       child: InkWell(
@@ -528,7 +531,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           ]),
         ),
-      ),
+      )),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 import '../utils/date_helper.dart';
+import 'a11y.dart';
 
 /// Task card shown to a worker.
 ///
@@ -55,7 +56,9 @@ class WorkerTaskTile extends StatelessWidget {
             ? AppColors.blue
             : AppColors.yellow;
 
-    return Padding(
+    return semanticTapTarget(
+      label: '${task['task_name'] ?? 'Unnamed Task'}, $status, $priority priority',
+      child: Padding(
       padding: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Material(
         color: AppColors.bgCard,
@@ -90,7 +93,7 @@ class WorkerTaskTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  statusPill(status),
+                  semanticStatus(statusPill(status), status),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -177,7 +180,7 @@ class WorkerTaskTile extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _miniTag(IconData icon, String label, Color color) => Container(

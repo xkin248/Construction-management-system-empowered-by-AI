@@ -14,6 +14,7 @@ import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../widgets/app_scrollbar.dart';
+import '../widgets/a11y.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -660,7 +661,9 @@ class _TaskCardState extends State<_TaskCard> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Navigable section (header + progress + worker/due) ──
-        InkWell(
+        semanticTapTarget(
+          label: (widget.task['task_name'] ?? 'Task').toString(),
+          child: InkWell(
           borderRadius: AppRadius.rMd,
           onTap: () async {
             final changed = await Navigator.push<bool>(context,
@@ -758,17 +761,19 @@ class _TaskCardState extends State<_TaskCard> {
                         GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
               const Spacer(),
               // Tap due date to quickly edit
-              GestureDetector(
+              semanticTapTarget(
+                label: 'Edit due date',
+                child: GestureDetector(
                 onTap: _editDueDate,
                 behavior: HitTestBehavior.opaque,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: _dueLabel(),
                 ),
-              ),
+              )),
             ]),
           ]),
-        ),
+        )),
         const SizedBox(height: 12),
         // ── Status quick-toggle (does not navigate) ──
         // A completed task is forward-only for the normal status buttons, so

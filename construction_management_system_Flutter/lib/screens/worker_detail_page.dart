@@ -5,6 +5,7 @@ import '../theme/responsive.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../services/api_service.dart';
+import '../widgets/a11y.dart';
 
 /// Read-only worker profile, opened by tapping a card on the Workers page.
 /// Previously the worker cards had no entry point at all (P1 defect).
@@ -122,7 +123,7 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
                                   ]),
                                 ]),
                           ),
-                          statusPill((w?['today_status'] as String?) ?? 'absent'),
+                          semanticStatus(statusPill((w?['today_status'] as String?) ?? 'absent'), (w?['today_status'] as String?) ?? 'absent'),
                         ]),
                       ),
                       const SizedBox(height: 12),

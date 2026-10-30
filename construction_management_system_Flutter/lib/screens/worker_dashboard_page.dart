@@ -21,6 +21,7 @@ import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
 import 'worker_task_detail_page.dart';
 import 'worker_tasks_page.dart';
+import '../widgets/a11y.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
   /// Lets the shell switch tabs from the dashboard shortcuts (0=Home,
@@ -806,7 +807,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     VoidCallback? onTap,
     bool subtitleIsError = false,
   }) {
-    return Material(
+    return semanticTapTarget(
+      label: title,
+      hint: subtitle,
+      child: Material(
       color: AppColors.bgCard,
       borderRadius: AppRadius.rLg,
       child: InkWell(
@@ -865,14 +869,16 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           ]),
         ),
       ),
-    );
+    ));
   }
 
   Widget _thingAction(String label, VoidCallback onTap) {
     return Material(
       color: AppColors.accentLight,
       borderRadius: AppRadius.rSm,
-      child: InkWell(
+      child: semanticTapTarget(
+        label: label,
+        child: InkWell(
         borderRadius: AppRadius.rSm,
         onTap: onTap,
         child: Padding(
@@ -885,7 +891,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.accent),
           ]),
         ),
-      ),
+      )),
     );
   }
 
@@ -956,7 +962,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         boxShadow: AppShadows.sm,
       ),
       child: Column(children: [
-        InkWell(
+        semanticTapTarget(
+          label: title,
+          hint: expanded ? 'Expanded' : 'Collapsed',
+          child: InkWell(
           borderRadius: AppRadius.rLg,
           onTap: () => setState(() => _expandedSections[title] = !expanded),
           child: Padding(
@@ -986,7 +995,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               ),
             ]),
           ),
-        ),
+        )),
         AnimatedCrossFade(
           firstChild: const SizedBox(width: double.infinity),
           secondChild: Padding(

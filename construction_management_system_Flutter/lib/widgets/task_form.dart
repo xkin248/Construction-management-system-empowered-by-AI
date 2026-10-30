@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/project_cache.dart';
 import '../utils/date_helper.dart';
+import '../l10n/app_strings.dart';
 
 class TaskForm extends StatefulWidget {
   /// Pre-filled task data for edit mode; null for create mode.
@@ -145,6 +146,7 @@ class _TaskFormState extends State<TaskForm> {
                     IconButton(
                       icon: Icon(Icons.close,
                           size: 20, color: AppColors.textMuted),
+                      tooltip: AppStrings.t('common.cancel'),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ]),

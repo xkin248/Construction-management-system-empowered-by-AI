@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import 'a11y.dart';
 
 /// A single worker row/card, extracted out of [WorkersPage] so the lazy list
 /// only rebuilds the card whose data actually changed.
@@ -33,7 +34,9 @@ class WorkerListCard extends StatelessWidget {
     final w = worker;
     // Tapping a card opens the read-only worker profile (P1: cards previously
     // had no entry point at all).
-    return GestureDetector(
+    return semanticTapTarget(
+      label: '${w['name'] ?? '-'}, ${w['today_status'] ?? 'absent'}',
+      child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: sectionCard(
@@ -47,7 +50,7 @@ class WorkerListCard extends StatelessWidget {
                 Expanded(child: Text(w['name'] ?? '-',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14.5),
                     overflow: TextOverflow.ellipsis)),
-                statusPill(w['today_status'] ?? 'absent'),
+                semanticStatus(statusPill(w['today_status'] ?? 'absent'), (w['today_status'] ?? 'absent').toString()),
               ]),
               const SizedBox(height: 4),
               Row(children: [
@@ -87,6 +90,6 @@ class WorkerListCard extends StatelessWidget {
           ),
         ]),
       ),
-    );
+    ));
   }
 }

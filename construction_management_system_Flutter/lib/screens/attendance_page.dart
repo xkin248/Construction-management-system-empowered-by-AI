@@ -11,6 +11,7 @@ import '../l10n/app_strings.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../widgets/app_scrollbar.dart';
+import '../widgets/a11y.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -448,7 +449,7 @@ class _WorkerAttCard extends StatelessWidget {
                   style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
             ]),
           ),
-          statusPill(status),
+          semanticStatus(statusPill(status), status),
         ]),
         const SizedBox(height: 8),
         // Row 2: project

@@ -40,7 +40,11 @@ class ApiService {
     _d!.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,
-      logPrint: (o) => debugPrint('[API] $o'),
+      // Request/response logs only in debug builds — release builds must not
+      // spray payloads (which may carry tokens) into logcat.
+      logPrint: (o) {
+        if (kDebugMode) debugPrint('[API] $o');
+      },
     ));
     _d!.interceptors.add(InterceptorsWrapper(
       onRequest: (o, h) {

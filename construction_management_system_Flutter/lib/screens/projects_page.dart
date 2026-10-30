@@ -21,6 +21,7 @@ import '../widgets/failure_state.dart';
 import '../widgets/app_scrollbar.dart';
 import '../widgets/project_card.dart';
 import 'tasks_page.dart' show TaskDetailPage;
+import '../widgets/a11y.dart';
 
 // ─────────────────────────────────────────────
 //  Fence Map (OpenStreetMap free tiles) — center marker + radius circle
@@ -895,7 +896,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               if ((p['status'] ?? 'planning') != 'completed' &&
                   ((p['progress'] ?? 0) as num).toDouble() >= 100) ...[
                 const SizedBox(width: 8),
-                GestureDetector(
+                semanticTapTarget(
+                  label: 'Mark project complete',
+                  child: GestureDetector(
                   onTap: _markProjectComplete,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -907,7 +910,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                           style: const TextStyle(color: AppColors.onAccent, fontSize: 12, fontWeight: FontWeight.w700)),
                     ]),
                   ),
-                ),
+                )),
               ],
               statusPill(p['status'] ?? 'planning'),
             ]),
@@ -1089,7 +1092,9 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             final priority = t['priority'] ?? 'medium';
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: InkWell(
+              child: semanticTapTarget(
+                label: (t['task_name'] ?? 'Task').toString(),
+                child: InkWell(
                 borderRadius: AppRadius.rMd,
                 onTap: () async {
                   await Navigator.push(
@@ -1149,7 +1154,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     ),
                   ]),
                 ),
-              ),
+              )),
             );
           }),
       ]),
