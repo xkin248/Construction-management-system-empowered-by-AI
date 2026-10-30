@@ -13,6 +13,8 @@ import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../models/notification.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'workers_page.dart';
@@ -43,6 +45,9 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage>
     with WidgetsBindingObserver {
   bool _loading = true;
+  Object? _loadError;
+  Object? _repError;
+  Object? _issError;
   int _unreadCount = 0;
   List<NotificationItem> _items = [];
   NotificationSettings? _settings;
@@ -161,6 +166,7 @@ class _NotificationsPageState extends State<NotificationsPage>
           .toList();
       _unreadCount = results[1] as int;
     } catch (e) {
+      _loadError = e;
       toast('Failed to load notifications: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -482,8 +488,11 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildNotificationsTab() {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_items.isEmpty) return _emptyState();
+    if (_loading) return const SkeletonList(rows: 6);
+    if (_items.isEmpty) {
+      if (_loadError != null) return FailureState(error: _loadError, onRetry: _load);
+      return _emptyState();
+    }
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -495,12 +504,14 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildReportsTab() {
-    if (_repLoading) return const Center(child: CircularProgressIndicator());
+    if (_repLoading) return const SkeletonList(rows: 5);
     return RefreshIndicator(
       onRefresh: _loadReports,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_repError != null)
+            FailureInline(error: _repError, onRetry: _loadReports),
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(AppStrings.t('notif.submitDailyReport'),
@@ -609,7 +620,7 @@ class _NotificationsPageState extends State<NotificationsPage>
   }
 
   Widget _buildIssuesTab() {
-    if (_issLoading) return const Center(child: CircularProgressIndicator());
+    if (_issLoading) return const SkeletonList(rows: 5);
     final activeIssues =
         issues.where((i) => !_isResolvedIssue(i as Map)).toList();
     final resolvedIssues =
@@ -619,6 +630,8 @@ class _NotificationsPageState extends State<NotificationsPage>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_issError != null)
+            FailureInline(error: _issError, onRetry: _loadIssues),
           _sectionCard(
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(AppStrings.t('notif.reportIssue'),
@@ -784,6 +797,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       }
       _repLoaded = true;
     } catch (e) {
+      _repError = e;
       // Only show toast when the user is actually looking at this tab
       if (mounted && (_tabController?.index == (_isWorker ? -1 : 1))) {
         toast('Failed to load reports: $e');
@@ -828,6 +842,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       issues = await ApiService().getIssues();
       _issLoaded = true;
     } catch (e) {
+      _issError = e;
       toast('Failed to load issues: $e');
     } finally {
       if (mounted) setState(() => _issLoading = false);

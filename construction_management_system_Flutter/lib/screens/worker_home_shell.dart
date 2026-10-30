@@ -11,6 +11,8 @@ import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import 'worker_tasks_page.dart';
 
 // ──────────────── Nav model ────────────────
@@ -208,6 +210,7 @@ class _WorkerAttendanceTab extends StatefulWidget {
 
 class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   bool ld = true;
+  Object? _attError;
   Map? attendanceData;
   List history = [];
 
@@ -238,7 +241,9 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
     setState(() => ld = true);
     try {
       attendanceData = await ApiService().workerTodayAttendance();
+      _attError = null;
     } catch (e) {
+      _attError = e;
       toast('Failed to load attendance: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -247,7 +252,10 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
 
   @override
   Widget build(BuildContext c) {
-    if (ld) return const Center(child: CircularProgressIndicator());
+    if (ld) return const SkeletonDetail();
+    if (_attError != null && attendanceData == null) {
+      return FailureState(error: _attError, onRetry: _load);
+    }
     final att = attendanceData;
     final checkedIn = att?['checked_in'] ?? false;
     final checkedOut = att?['checked_out'] ?? false;

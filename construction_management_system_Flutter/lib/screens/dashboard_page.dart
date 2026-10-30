@@ -12,6 +12,8 @@ import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../widgets/charts.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../widgets/task_form.dart';
 import 'attendance_geo_helper.dart';
@@ -240,9 +242,20 @@ class _DashboardPageState extends State<DashboardPage> {
     if (ld) {
       return Container(
         color: AppColors.bgMain,
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2.5),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SkeletonDashboard(
+            padding: EdgeInsets.all(constraints.maxWidth < 600 ? 16 : 24),
+          ),
         ),
+      );
+    }
+
+    // First paint failed for every endpoint: one actionable failure state
+    // (icon + reason + retry) instead of an empty dashboard full of zeros.
+    if (_loadError != null && kpi.isEmpty && projects.isEmpty) {
+      return Container(
+        color: AppColors.bgMain,
+        child: FailureState(error: _loadError, onRetry: () => _load()),
       );
     }
 
@@ -303,7 +316,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _loadError!,
+                    AppStrings.t(failureKindOf(_loadError).descriptionKey),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.red),
@@ -315,7 +328,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     foregroundColor: AppColors.red,
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   ),
-                  child: const Text('Retry'),
+                  child: Text(AppStrings.t('common.retry')),
                 ),
               ]),
             ),

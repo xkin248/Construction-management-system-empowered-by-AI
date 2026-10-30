@@ -8,6 +8,8 @@ import '../services/project_cache.dart';
 import '../widgets/charts.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../l10n/app_strings.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -33,6 +35,7 @@ class _TeamAttendanceTab extends StatefulWidget {
 
 class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   bool ld = true;
+  Object? _loadError;
   Map summary = {};
   List projects = [];
   String _searchQuery = '';
@@ -67,6 +70,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       summary = results[0] as Map;
       projects = results[1] as List;
     } catch (e) {
+      _loadError = e;
       toast('Failed to load attendance: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -75,7 +79,12 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   @override
   Widget build(BuildContext c) {
-    if (ld) return const Center(child: CircularProgressIndicator());
+    if (ld) {
+      return const SkeletonList(rows: 5, showHeader: true, headerStatCount: 4);
+    }
+    if (_loadError != null && summary.isEmpty) {
+      return FailureState(error: _loadError, onRetry: _load);
+    }
 
     final total = (summary['total'] ?? 0) as int;
     final present = (summary['present'] ?? 0) as int;

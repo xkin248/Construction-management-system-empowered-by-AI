@@ -11,6 +11,8 @@ import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -22,6 +24,7 @@ class _TasksPageState extends State<TasksPage> {
   bool ld = true;
   List projects = [];
   List tasks = [];
+  Object? _loadError;
   int? pid;
   String _searchQuery = '';
   String _statusFilter = 'All';
@@ -67,6 +70,7 @@ class _TasksPageState extends State<TasksPage> {
         tasks = await _loadTasks(pid);
       }
     } catch (e) {
+      _loadError = e;
       toast('Failed to load tasks: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -146,8 +150,10 @@ class _TasksPageState extends State<TasksPage> {
               // ── Task List ──
               Expanded(
                 child: ld
-                    ? const Center(child: CircularProgressIndicator())
-                    : _filtered.isEmpty
+                    ? const SkeletonList(rows: 6)
+                    : (_loadError != null && tasks.isEmpty)
+                        ? FailureState(error: _loadError, onRetry: _load)
+                        : _filtered.isEmpty
                         ? ((_searchQuery.isEmpty && _statusFilter == 'All')
                             ? GuidedEmptyState(
                                 icon: Icons.task_alt_rounded,

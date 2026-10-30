@@ -7,6 +7,8 @@ import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import 'worker_detail_page.dart';
 
 class WorkersPage extends StatefulWidget {
@@ -18,6 +20,7 @@ class WorkersPage extends StatefulWidget {
 class _WorkersPageState extends State<WorkersPage> {
   bool ld = true;
   List workers = [];
+  Object? _loadError;
   String _searchQuery = '';
 
   @override
@@ -44,6 +47,7 @@ class _WorkersPageState extends State<WorkersPage> {
     try {
       workers = await ApiService().getWorkers();
     } catch (e) {
+      _loadError = e;
       toast('Failed to load workers: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -136,8 +140,10 @@ class _WorkersPageState extends State<WorkersPage> {
               ),
               Expanded(
                 child: ld
-                ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
+                ? const SkeletonList(rows: 6)
+                : (_loadError != null && workers.isEmpty)
+                    ? FailureState(error: _loadError, onRetry: _load)
+                    : _filtered.isEmpty
                     ? (_searchQuery.isEmpty
                         ? GuidedEmptyState(
                             icon: Icons.group_off_rounded,

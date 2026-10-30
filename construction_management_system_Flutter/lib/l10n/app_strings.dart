@@ -19,6 +19,35 @@ class AppStrings {
     'common.update': ['Update', 'Kemas kini'],
     'common.loading': ['Loading...', 'Memuatkan...'],
     'common.retry': ['Retry', 'Cuba semula'],
+
+    // ============ Load failure states ============
+    // Shown by FailureState / FailureInline (lib/widgets/failure_state.dart).
+    'fail.offline.title': [
+      'No internet connection',
+      'Tiada sambungan internet'
+    ],
+    'fail.offline.desc': [
+      'Check your Wi-Fi or mobile data, then tap retry.',
+      'Semak Wi-Fi atau data mudah alih anda, kemudian ketik cuba semula.'
+    ],
+    'fail.timeout.title': [
+      'The server took too long to respond',
+      'Pelayan mengambil masa terlalu lama untuk membalas'
+    ],
+    'fail.timeout.desc': [
+      'The site network may be slow. Try again in a moment.',
+      'Rangkaian di tapak mungkin perlahan. Cuba lagi sebentar lagi.'
+    ],
+    'fail.server.title': ['Server error', 'Ralat pelayan'],
+    'fail.server.desc': [
+      'The server could not finish this request. Retry, or tell your supervisor if it keeps failing.',
+      'Pelayan tidak dapat menyelesaikan permintaan ini. Cuba lagi, atau beritahu penyelia jika ia berterusan.'
+    ],
+    'fail.unknown.title': ['Could not load', 'Tidak dapat memuatkan'],
+    'fail.unknown.desc': [
+      'Something went wrong while loading this data. Try again.',
+      'Sesuatu tidak kena semasa memuatkan data ini. Cuba lagi.'
+    ],
     'common.success': ['Success', 'Berjaya'],
     'common.failed': ['Failed', 'Gagal'],
     'common.back': ['Back', 'Kembali'],
@@ -594,6 +623,16 @@ class AppStrings {
     'workers.addWorker': '添加工人',
     'files.noFiles': '还没有文件',
     'common.retry': '重试',
+
+    // ============ 加载失败态 ============
+    'fail.offline.title': '网络未连接',
+    'fail.offline.desc': '请检查 Wi-Fi 或移动数据，然后点击重试。',
+    'fail.timeout.title': '服务器响应超时',
+    'fail.timeout.desc': '工地网络可能较慢，请稍后重试。',
+    'fail.server.title': '服务器出错',
+    'fail.server.desc': '服务器未能完成本次请求。可点击重试，若持续失败请联系主管。',
+    'fail.unknown.title': '加载失败',
+    'fail.unknown.desc': '加载数据时出现问题，请重试。',
     'common.loading': '加载中…',
     // Worker shell navigation
     'wnav.dashboard': '首页',

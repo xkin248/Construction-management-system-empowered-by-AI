@@ -5,6 +5,8 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 
 /// Worker-facing task detail page.
 ///
@@ -249,17 +251,12 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const SkeletonDetail()
           : _task == null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _error ?? 'Task not found',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary),
-                    ),
-                  ),
+              ? FailureState(
+                  error: _error,
+                  title: _error == null ? 'Task not found' : null,
+                  onRetry: _load,
                 )
               : Align(
                   alignment: Alignment.topCenter,

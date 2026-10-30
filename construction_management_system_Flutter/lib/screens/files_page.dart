@@ -12,6 +12,8 @@ import '../l10n/app_strings.dart';
 import '../models/file.dart';
 import '../utils/download_saver.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -21,6 +23,7 @@ class FilesPage extends StatefulWidget {
 
 class _FilesPageState extends State<FilesPage> {
   bool _loading = true;
+  Object? _loadError;
   List<FileItem> _files = [];
   List<Map<String, dynamic>> _projects = [];
   int? _selectedProjectId;
@@ -83,6 +86,7 @@ class _FilesPageState extends State<FilesPage> {
           .map((e) => FileItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     } catch (e) {
+      _loadError = e;
       toast('Failed to load files: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -573,8 +577,10 @@ class _FilesPageState extends State<FilesPage> {
         // â”€â”€ File list / grid â”€â”€
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _files.isEmpty
+              ? const SkeletonCardGrid(count: 6)
+              : (_loadError != null && _files.isEmpty)
+                  ? FailureState(error: _loadError, onRetry: _load)
+                  : _files.isEmpty
                   ? _emptyState()
                   : RefreshIndicator(
                       onRefresh: _load,

@@ -7,6 +7,8 @@ import '../services/app_settings.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import '../widgets/worker_task_tile.dart';
 import 'worker_task_detail_page.dart';
 
@@ -111,33 +113,14 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
 
   Widget _body(bool isWide) {
     if (_loading) {
-      return ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          const SizedBox(height: 40),
-          const Center(child: CircularProgressIndicator()),
-          const SizedBox(height: 12),
-          Center(
-            child: Text(AppStrings.t('worker.loadingTaskBoard'),
-                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-          ),
-        ],
-      );
+      return const SkeletonList(rows: 4, padding: EdgeInsets.all(AppSpacing.lg));
     }
 
     if (_failed) {
-      return ListView(
+      return FailureState(
+        error: _error,
+        onRetry: _load,
         padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          GuidedEmptyState(
-            icon: Icons.cloud_off_rounded,
-            title: AppStrings.t('common.retry'),
-            description: _error,
-            primaryLabel: AppStrings.t('common.retry'),
-            primaryIcon: Icons.refresh_rounded,
-            onPrimary: _load,
-          ),
-        ],
       );
     }
 

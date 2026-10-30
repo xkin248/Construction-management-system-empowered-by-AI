@@ -2,6 +2,8 @@
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import '../services/api_service.dart';
 
 /// Read-only worker profile, opened by tapping a card on the Workers page.
@@ -18,6 +20,7 @@ class WorkerDetailPage extends StatefulWidget {
 class _WorkerDetailPageState extends State<WorkerDetailPage> {
   Map? w;
   bool ld = true;
+  Object? _loadError;
 
   @override
   void initState() {
@@ -37,7 +40,10 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => ld = false);
+      setState(() {
+        _loadError = e;
+        ld = false;
+      });
       toast('Failed to load worker: $e');
     }
   }
@@ -79,8 +85,10 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
           constraints:
               const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
           child: ld
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
+              ? const SkeletonDetail()
+              : (_loadError != null && w == null)
+                  ? FailureState(error: _loadError, onRetry: _load)
+                  : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),

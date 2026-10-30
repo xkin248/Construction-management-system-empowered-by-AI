@@ -16,6 +16,8 @@ import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../widgets/task_form.dart';
 import '../widgets/guided_empty_state.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import 'tasks_page.dart' show TaskDetailPage;
 
 // ─────────────────────────────────────────────
@@ -128,6 +130,7 @@ class ProjectsPage extends StatefulWidget {
 class _ProjectsPageState extends State<ProjectsPage> {
   bool ld = true;
   List projects = [];
+  Object? _loadError;
 
   @override
   void initState() {
@@ -153,6 +156,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     try {
       projects = await ProjectCache.get(ApiService(), forceRefresh: forceRefresh);
     } catch (e) {
+      _loadError = e;
       toast('Failed to load projects: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -194,14 +198,19 @@ class _ProjectsPageState extends State<ProjectsPage> {
           child: SizedBox(
             width: double.infinity,
             child: ld
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonList(rows: 5)
                 : RefreshIndicator(
                     onRefresh: _load,
                     child: projects.isEmpty
                         ? ListView(children: [
                             SizedBox(
                               height: MediaQuery.of(context).size.height * 0.62,
-                              child: GuidedEmptyState(
+                              child: _loadError != null
+                                  ? FailureState(
+                                      error: _loadError,
+                                      onRetry: () => _load(forceRefresh: true),
+                                    )
+                                  : GuidedEmptyState(
                                 icon: Icons.account_tree_outlined,
                                 title: AppStrings.t('empty.projects.title'),
                                 description: AppStrings.t('empty.projects.desc'),
@@ -770,6 +779,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool ld = true;
   Map? project;
   List tasks = [];
+  Object? _loadError;
 
   // Attendance time-window settings (same fields/logic as attendance_page)
   bool _settingsLd = true;
@@ -869,6 +879,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       project = all.firstWhere((p) => p['project_id'] == widget.projectId, orElse: () => null);
       tasks = await ApiService().getTasks(widget.projectId);
     } catch (e) {
+      _loadError = e;
       toast('Failed to load project: $e');
     } finally {
       if (mounted) setState(() => ld = false);
@@ -890,8 +901,24 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
   @override
   Widget build(BuildContext c) {
-    if (ld) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: CircularProgressIndicator()));
-    if (project == null) return Scaffold(backgroundColor: AppColors.bgMain, body: Center(child: Text(AppStrings.t('proj.projectNotFound'))));
+    if (ld) {
+      return Scaffold(
+        backgroundColor: AppColors.bgMain,
+        body: const SkeletonDetail(),
+      );
+    }
+    if (project == null) {
+      return Scaffold(
+        backgroundColor: AppColors.bgMain,
+        body: _loadError != null
+            ? FailureState(error: _loadError, onRetry: _load)
+            : FailureState(
+                kind: FailureKind.unknown,
+                title: AppStrings.t('proj.projectNotFound'),
+                onRetry: _load,
+              ),
+      );
+    }
     final p = project!;
     final completed = tasks.where((t) => t['status'] == 'completed').length;
     final radius = (p['fence_radius'] as num?)?.toInt() ?? 5000;

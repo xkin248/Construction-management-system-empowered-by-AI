@@ -14,6 +14,8 @@ import '../services/gps_notification_service.dart';
 import '../utils/date_helper.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/worker_task_tile.dart';
+import '../widgets/loading_skeleton.dart';
+import '../widgets/failure_state.dart';
 import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
 import 'worker_task_detail_page.dart';
@@ -53,6 +55,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String? _workerName;
 
   Map? _taskBoard;
+  Object? _taskBoardError;
   String _lastUpdated = '';
   Timer? _syncTimer;
   bool _syncingNow = false;
@@ -201,12 +204,18 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       if (mounted) {
         setState(() {
           _taskBoard = r;
+          _taskBoardError = null;
           _lastUpdated = r['last_updated']?.toString() ?? '';
           _loadingTasks = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _loadingTasks = false);
+      if (mounted) {
+        setState(() {
+          _taskBoardError = e;
+          _loadingTasks = false;
+        });
+      }
     }
   }
 
@@ -1094,16 +1103,17 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   Widget _buildTaskBoardBody({bool isWide = false}) {
     if (_loadingTasks) {
       return sectionCard(
-        padding: const EdgeInsets.all(24),
-        child: Column(children: [
-          const SizedBox(height: 16),
-          const Center(child: CircularProgressIndicator()),
-          const SizedBox(height: 12),
-          Center(
-              child: Text(AppStrings.t('worker.loadingTaskBoard'),
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
-          const SizedBox(height: 16),
-        ]),
+        padding: const EdgeInsets.all(12),
+        child: const SkeletonSection(lines: 4),
+      );
+    }
+    if (_taskBoardError != null && _taskBoard == null) {
+      return sectionCard(
+        padding: EdgeInsets.zero,
+        child: FailureInline(
+          error: _taskBoardError,
+          onRetry: _loadTaskBoard,
+        ),
       );
     }
     final tasks = (_taskBoard?['tasks'] as List?) ?? [];
