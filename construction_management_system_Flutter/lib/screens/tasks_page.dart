@@ -13,6 +13,7 @@ import '../widgets/task_form.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
 
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key});
@@ -30,6 +31,9 @@ class _TasksPageState extends State<TasksPage> {
   String _statusFilter = 'All';
   String _priorityFilter = 'All';
 
+  /// Drives the always-visible scrollbar of the task list.
+  final ScrollController _scrollCtrl = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +49,7 @@ class _TasksPageState extends State<TasksPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     TaskStatusNotifier.removeListener(_onExternalTaskChange);
@@ -173,34 +178,44 @@ class _TasksPageState extends State<TasksPage> {
                               ))
                         : RefreshIndicator(
                             onRefresh: _load,
-                            child: LayoutBuilder(builder: (ctx, constraints) {
-                              final wide = constraints.maxWidth >= AppBreakpoints.phone;
-                              if (!wide) {
-                                return ListView.builder(
+                            child: AppScrollbar(
+                              controller: _scrollCtrl,
+                              child: LayoutBuilder(builder: (ctx, constraints) {
+                                final wide = constraints.maxWidth >= AppBreakpoints.phone;
+                                // Filter once per build; the lazy lists below
+                                // only build the rows that become visible.
+                                final rows = _filtered;
+                                if (!wide) {
+                                  return ListView.builder(
+                                    controller: _scrollCtrl,
+                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                                    itemCount: rows.length,
+                                    addAutomaticKeepAlives: false,
+                                    itemBuilder: (ctx, i) => _TaskCard(
+                                      task: rows[i],
+                                      onChanged: _load,
+                                    ),
+                                  );
+                                }
+                                return GridView.builder(
+                                  controller: _scrollCtrl,
                                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                  itemCount: _filtered.length,
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisSpacing: AppSpacing.md,
+                                    crossAxisSpacing: AppSpacing.md,
+                                    childAspectRatio: constraints.maxWidth >= 900 ? 1.9 : 1.45,
+                                  ),
+                                  itemCount: rows.length,
+                                  addAutomaticKeepAlives: false,
                                   itemBuilder: (ctx, i) => _TaskCard(
-                                    task: _filtered[i],
+                                    task: rows[i],
                                     onChanged: _load,
+                                    inGrid: true,
                                   ),
                                 );
-                              }
-                              return GridView.builder(
-                                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: AppSpacing.md,
-                                  crossAxisSpacing: AppSpacing.md,
-                                  childAspectRatio: constraints.maxWidth >= 900 ? 1.9 : 1.45,
-                                ),
-                                itemCount: _filtered.length,
-                                itemBuilder: (ctx, i) => _TaskCard(
-                                  task: _filtered[i],
-                                  onChanged: _load,
-                                  inGrid: true,
-                                ),
-                              );
-                            }),
+                              }),
+                            ),
                           ),
               ),
             ]),

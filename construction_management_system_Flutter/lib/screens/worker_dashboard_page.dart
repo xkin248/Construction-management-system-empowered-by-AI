@@ -16,6 +16,7 @@ import '../widgets/guided_empty_state.dart';
 import '../widgets/worker_task_tile.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
 import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
 import 'worker_task_detail_page.dart';
@@ -33,6 +34,9 @@ class WorkerDashboardPage extends StatefulWidget {
 }
 
 class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
+  /// Drives the always-available scrollbar of the dashboard scroll view.
+  final ScrollController _scrollCtrl = ScrollController();
+
   bool _loadingAtt = true;
   bool _loadingTasks = true;
   bool _checkInLoading = false;
@@ -80,6 +84,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     _syncTimer?.cancel();
@@ -549,7 +554,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             width: double.infinity,
             child: RefreshIndicator(
               onRefresh: _loadAll,
-              child: ListView(
+              child: AppScrollbar(
+                controller: _scrollCtrl,
+                child: ListView(
+                controller: _scrollCtrl,
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
                   const SizedBox(height: AppSpacing.xs),
@@ -574,6 +582,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                     children: [_buildTaskBoardBody(isWide: isWide)],
                   ),
                 ],
+              ),
               ),
             ),
           ),

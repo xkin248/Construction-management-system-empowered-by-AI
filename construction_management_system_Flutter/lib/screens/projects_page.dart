@@ -18,6 +18,8 @@ import '../widgets/task_form.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
+import '../widgets/project_card.dart';
 import 'tasks_page.dart' show TaskDetailPage;
 
 // ─────────────────────────────────────────────
@@ -132,6 +134,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
   List projects = [];
   Object? _loadError;
 
+  /// Drives the always-visible scrollbar of the project list.
+  final ScrollController _scrollCtrl = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -146,6 +151,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     super.dispose();
@@ -201,8 +207,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 ? const SkeletonList(rows: 5)
                 : RefreshIndicator(
                     onRefresh: _load,
-                    child: projects.isEmpty
-                        ? ListView(children: [
+                    child: AppScrollbar(
+                      controller: _scrollCtrl,
+                      child: projects.isEmpty
+                        ? ListView(
+                            controller: _scrollCtrl,
+                            children: [
                             SizedBox(
                               height: MediaQuery.of(context).size.height * 0.62,
                               child: _loadError != null
@@ -223,12 +233,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
                             builder: (ctx, constraints) {
                               if (constraints.maxWidth < AppBreakpoints.phone) {
                                 return ListView.builder(
+                                  controller: _scrollCtrl,
                                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                                   itemCount: projects.length,
-                                  itemBuilder: (ctx, i) => _projectCard(projects[i]),
+                                  addAutomaticKeepAlives: false,
+                                  addRepaintBoundaries: true,
+                                  itemBuilder: (ctx, i) => _buildCard(projects[i]),
                                 );
                               }
                               return GridView.builder(
+                                controller: _scrollCtrl,
                                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
@@ -237,10 +251,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                                   mainAxisExtent: 210,
                                 ),
                                 itemCount: projects.length,
-                                itemBuilder: (ctx, i) => _projectCard(projects[i], inGrid: true),
+                                addAutomaticKeepAlives: false,
+                                itemBuilder: (ctx, i) => _buildCard(projects[i], inGrid: true),
                               );
                             },
                           ),
+                    ),
                   ),
           ),
         ),
@@ -260,105 +276,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
-  Widget _projectCard(Map p, {bool inGrid = false}) {
-    final progress = (p['progress'] as num? ?? 0).toDouble();
-    final workerCount = p['worker_count'] ?? p['tracked_workers'] ?? 0;
-    final radius = (p['fence_radius'] as num? ?? 5000).toInt();
-    return sectionCard(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        borderRadius: AppRadius.rLg,
-        onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: p['project_id']))),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Expanded(
-                child: Text(p['project_name'] ?? '-',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                statusPill(p['status'] ?? 'planning'),
-                if ((p['status'] ?? 'planning') != 'completed' && progress >= 100) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () => _markProjectComplete(p),
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: AppColors.greenLight,
-                        borderRadius: AppRadius.rSm,
-                      ),
-                      child: Icon(Icons.check_circle_rounded,
-                          size: 14, color: AppColors.green),
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 8),
-                // Edit button
-                GestureDetector(
-                  onTap: () => _openProjectForm(existing: Map<String, dynamic>.from(p)),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgMain,
-                      borderRadius: AppRadius.rSm,
-                    ),
-                    child: Icon(Icons.edit_outlined, size: 14, color: AppColors.textMuted),
-                  ),
-                ),
-              ]),
-            ]),
-            const SizedBox(height: 4),
-            Row(children: [
-              Icon(Icons.place_outlined, size: 13, color: AppColors.textMuted),
-              const SizedBox(width: 4),
-              Expanded(child: Text(p['location_address'] ?? '-',
-                  style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14),
-                  overflow: TextOverflow.ellipsis)),
-            ]),
-            const SizedBox(height: 12),
-            // Geofence badge
-            Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: AppRadius.rMd),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.gps_fixed_rounded, size: 11, color: AppColors.green),
-                  const SizedBox(width: 4),
-                  Text('Geofence: ${radius}m radius',
-                      style: GoogleFonts.inter(fontSize: 14, color: AppColors.green, fontWeight: FontWeight.w700)),
-                ]),
-              ),
-              if (workerCount > 0) ...[
-                const SizedBox(width: 12),
-                Text('$workerCount workers tracked',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w600)),
-              ],
-            ]),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: AppRadius.rMd,
-              child: LinearProgressIndicator(
-                value: progress / 100,
-                minHeight: 7, backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(AppColors.green),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('${progress.toStringAsFixed(0)}% complete',
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-              if (p['end_date'] != null)
-                Text('Due ${DateHelper.tryFormatShort(p['end_date'])}',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-            ]),
-          ]),
-        ),
-      ),
+  /// Builds one lazy list item; the card itself lives in its own widget so a
+  /// scroll rebuild does not re-run this page's whole builder closure.
+  Widget _buildCard(Map p, {bool inGrid = false}) {
+    return ProjectCard(
+      key: ValueKey('proj-${p['project_id']}'),
+      project: p,
+      inGrid: inGrid,
+      onOpen: () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) => ProjectDetailPage(projectId: p['project_id']))),
+      onEdit: () => _openProjectForm(existing: Map<String, dynamic>.from(p)),
+      onMarkComplete: () => _markProjectComplete(p),
     );
   }
 }

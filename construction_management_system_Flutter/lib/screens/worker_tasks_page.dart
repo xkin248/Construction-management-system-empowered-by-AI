@@ -10,6 +10,7 @@ import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../widgets/worker_task_tile.dart';
+import '../widgets/app_scrollbar.dart';
 import 'worker_task_detail_page.dart';
 
 /// Dedicated "Tasks" tab for the worker shell.
@@ -25,6 +26,9 @@ class WorkerTasksPage extends StatefulWidget {
 }
 
 class _WorkerTasksPageState extends State<WorkerTasksPage> {
+  /// Drives the always-available scrollbar of the task list.
+  final ScrollController _scrollCtrl = ScrollController();
+
   bool _loading = true;
   bool _failed = false;
   List _tasks = [];
@@ -45,6 +49,7 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     super.dispose();
@@ -125,70 +130,106 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
     }
 
     if (_tasks.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
-          GuidedEmptyState(
-            icon: Icons.assignment_outlined,
-            title: AppStrings.t('worker.emptyTasksTitle'),
-            description: AppStrings.t('worker.emptyTasksDesc'),
-            primaryLabel: AppStrings.t('worker.emptyTasksAction'),
-            primaryIcon: Icons.refresh_rounded,
-            onPrimary: _load,
-            secondaryHint: AppStrings.t('worker.noTasksHint'),
-          ),
-        ],
+      return AppScrollbar(
+        controller: _scrollCtrl,
+        child: ListView(
+          controller: _scrollCtrl,
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          children: [
+            GuidedEmptyState(
+              icon: Icons.assignment_outlined,
+              title: AppStrings.t('worker.emptyTasksTitle'),
+              description: AppStrings.t('worker.emptyTasksDesc'),
+              primaryLabel: AppStrings.t('worker.emptyTasksAction'),
+              primaryIcon: Icons.refresh_rounded,
+              onPrimary: _load,
+              secondaryHint: AppStrings.t('worker.noTasksHint'),
+            ),
+          ],
+        ),
       );
     }
 
-    final tiles = _tasks.map((t) {
-      final task = Map<String, dynamic>.from(t as Map);
+    Widget tileAt(int i) {
+      final task = Map<String, dynamic>.from(_tasks[i] as Map);
       return WorkerTaskTile(
+        key: ValueKey('worker-task-${task['id'] ?? i}'),
         task: task,
         inGrid: isWide,
         onTap: () => _openTask(task),
       );
-    }).toList();
+    }
 
-    return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      children: [
-        Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppStrings.t('worker.tasks'),
-                  style: GoogleFonts.inter(
-                      fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              const SizedBox(height: 2),
-              Text(AppStrings.t('worker.tasksSectionSub'),
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-            ]),
-          ),
-          if (_lastUpdated.length >= 16)
-            Text(_lastUpdated.substring(11, 16),
-                style: GoogleFonts.inter(
-                    fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, size: 18, color: AppColors.accent),
-            tooltip: AppStrings.t('worker.emptyTasksAction'),
-            onPressed: _load,
-          ),
-        ]),
-        const SizedBox(height: 4),
-        if (isWide)
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.sm,
-            children: tiles
-                .map((t) => SizedBox(
-                      width: (MediaQuery.of(context).size.width - AppSpacing.lg * 2 - AppSpacing.md) / 2,
-                      child: t,
-                    ))
-                .toList(),
+    // Lazy: rows are created on demand as the list scrolls.
+    final sliverList = isWide
+        ? SliverList.builder(
+            itemCount: (_tasks.length / 2).ceil(),
+            itemBuilder: (_, row) {
+              final left = row * 2;
+              final right = left + 1;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: tileAt(left)),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: right < _tasks.length
+                          ? tileAt(right)
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              );
+            },
           )
-        else
-          ...tiles,
-      ],
+        : SliverList.builder(
+            itemCount: _tasks.length,
+            itemBuilder: (_, i) => tileAt(i),
+          );
+
+    return AppScrollbar(
+      controller: _scrollCtrl,
+      child: CustomScrollView(
+        controller: _scrollCtrl,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, 4),
+            sliver: SliverList.list(
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(AppStrings.t('worker.tasks'),
+                          style: GoogleFonts.inter(
+                              fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                      const SizedBox(height: 2),
+                      Text(AppStrings.t('worker.tasksSectionSub'),
+                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                    ]),
+                  ),
+                  if (_lastUpdated.length >= 16)
+                    Text(_lastUpdated.substring(11, 16),
+                        style: GoogleFonts.inter(
+                            fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+                  IconButton(
+                    icon: Icon(Icons.refresh_rounded, size: 18, color: AppColors.accent),
+                    tooltip: AppStrings.t('worker.emptyTasksAction'),
+                    onPressed: _load,
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.lg),
+            sliver: sliverList,
+          ),
+        ],
+      ),
     );
   }
 }

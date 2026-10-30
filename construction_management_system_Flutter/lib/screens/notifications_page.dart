@@ -15,6 +15,8 @@ import '../models/notification.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
+import '../widgets/notification_list_tile.dart';
 import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'workers_page.dart';
@@ -75,6 +77,12 @@ class _NotificationsPageState extends State<NotificationsPage>
   String _category = 'safety';
   bool _isWorker = false;
 
+  /// Scroll controllers so each tab keeps an always-visible scrollbar and its
+  /// own scroll offset across tab switches.
+  final ScrollController _notifScrollCtrl = ScrollController();
+  final ScrollController _repScrollCtrl = ScrollController();
+  final ScrollController _issScrollCtrl = ScrollController();
+
   @override
   void initState() {
     super.initState();
@@ -111,6 +119,9 @@ class _NotificationsPageState extends State<NotificationsPage>
 
   @override
   void dispose() {
+    _notifScrollCtrl.dispose();
+    _repScrollCtrl.dispose();
+    _issScrollCtrl.dispose();
     WidgetsBinding.instance.removeObserver(this);
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
@@ -495,10 +506,28 @@ class _NotificationsPageState extends State<NotificationsPage>
     }
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        itemCount: _items.length,
-        itemBuilder: (ctx, i) => _notificationTile(_items[i]),
+      child: AppScrollbar(
+        controller: _notifScrollCtrl,
+        child: ListView.builder(
+          controller: _notifScrollCtrl,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: _items.length,
+          addAutomaticKeepAlives: false,
+          itemBuilder: (ctx, i) {
+            final item = _items[i];
+            return NotificationListTile(
+              key: ValueKey('notif-${item.notificationId}'),
+              item: item,
+              onTap: () {
+                _markRead(item);
+                if (item.relatedEntityType != null &&
+                    item.relatedEntityType!.isNotEmpty) {
+                  _navigateToRelated(item);
+                }
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -507,115 +536,148 @@ class _NotificationsPageState extends State<NotificationsPage>
     if (_repLoading) return const SkeletonList(rows: 5);
     return RefreshIndicator(
       onRefresh: _loadReports,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_repError != null)
-            FailureInline(error: _repError, onRetry: _loadReports),
-          _sectionCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(AppStrings.t('notif.submitDailyReport'),
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-              const SizedBox(height: 16),
-              if (projects.length > 1) ...[
-                DropdownButtonFormField<int>(
-                  initialValue: _repPid,
-                  decoration: const InputDecoration(labelText: 'Project'),
-                  items: projects.map<DropdownMenuItem<int>>((p) =>
-                      DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
-                  onChanged: (v) async {
-                    setState(() => _repPid = v);
-                    if (v != null) {
-                      setState(() => _repLoading = true);
-                      reports = await ApiService().getReports(v);
-                      if (mounted) setState(() => _repLoading = false);
-                    }
-                  },
+      child: AppScrollbar(
+        controller: _repScrollCtrl,
+        child: CustomScrollView(
+          controller: _repScrollCtrl,
+          slivers: [
+            // Static header (error strip + submit form + section title) is a
+            // single sliver; the report rows below stay lazily built.
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: _reportHeader(),
+              ),
+            ),
+            if (reports.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(AppStrings.t('notif.noReports'),
+                        style: TextStyle(color: AppColors.textMuted)),
+                  ),
                 ),
-                const SizedBox(height: 12),
-              ],
-              DropdownButtonFormField<String>(
-                initialValue: _weather,
-                decoration: const InputDecoration(labelText: 'Weather'),
-                items: _weathers.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
-                onChanged: (v) => setState(() => _weather = v!),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _manpower,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: AppStrings.t('notif.workersPresent'), hintText: AppStrings.t('notif.workersPresentHint')),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _workProgress,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: "Today's Progress *", hintText: "Describe today's progress..."),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _materials,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Materials Used'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _issuesEnc,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Safety Notes / Issues Encountered'),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _submitReport,
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                sliver: SliverList.builder(
+                  itemCount: reports.length,
+                  addAutomaticKeepAlives: false,
+                  itemBuilder: (ctx, i) => _reportCard(reports[i]),
                 ),
-                child: Text(AppStrings.t('notif.submitReport')),
               ),
-            ]),
-          ),
-          const SizedBox(height: 24),
-          Text(AppStrings.t('notif.recentReports'),
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-          const SizedBox(height: 12),
-          if (reports.isEmpty)
-            Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text(AppStrings.t('notif.noReports'),
-                  style: TextStyle(color: AppColors.textMuted))),
-            )
-          else
-            ...reports.map((r) => _sectionCard(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Row(children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentLight,
-                        borderRadius: AppRadius.rMd,
-                      ),
-                      child: Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${DateHelper.tryFormatShort(r['report_date'])} · ${r['weather'] ?? ''}',
-                            style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
-                        const SizedBox(height: 4),
-                        Text(r['work_progress']?.toString() ?? 'No content',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-                      ]),
-                    ),
-                    Text('${r['manpower_count'] ?? 0}\nworkers',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-                  ]),
-                )),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  /// Error strip + "submit daily report" form + the "recent reports" heading.
+  /// Kept as a plain (non-lazy) header block so it scrolls with the list.
+  Widget _reportHeader() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_repError != null)
+        FailureInline(error: _repError, onRetry: _loadReports),
+      _sectionCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(AppStrings.t('notif.submitDailyReport'),
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          if (projects.length > 1) ...[
+            DropdownButtonFormField<int>(
+              initialValue: _repPid,
+              decoration: const InputDecoration(labelText: 'Project'),
+              items: projects.map<DropdownMenuItem<int>>((p) =>
+                  DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
+              onChanged: (v) async {
+                setState(() => _repPid = v);
+                if (v != null) {
+                  setState(() => _repLoading = true);
+                  reports = await ApiService().getReports(v);
+                  if (mounted) setState(() => _repLoading = false);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+          DropdownButtonFormField<String>(
+            initialValue: _weather,
+            decoration: const InputDecoration(labelText: 'Weather'),
+            items: _weathers.map((w) => DropdownMenuItem(value: w, child: Text(w))).toList(),
+            onChanged: (v) => setState(() => _weather = v!),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _manpower,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: AppStrings.t('notif.workersPresent'), hintText: AppStrings.t('notif.workersPresentHint')),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _workProgress,
+            maxLines: 3,
+            decoration: const InputDecoration(labelText: "Today's Progress *", hintText: "Describe today's progress..."),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _materials,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Materials Used'),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _issuesEnc,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'Safety Notes / Issues Encountered'),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _submitReport,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+            ),
+            child: Text(AppStrings.t('notif.submitReport')),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 24),
+      Text(AppStrings.t('notif.recentReports'),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+      const SizedBox(height: 12),
+    ]);
+  }
+
+  Widget _reportCard(Map r) {
+    return _sectionCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.accentLight,
+            borderRadius: AppRadius.rMd,
+          ),
+          child: Icon(Icons.description_outlined, color: AppColors.accent, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${DateHelper.tryFormatShort(r['report_date'])} · ${r['weather'] ?? ''}',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary)),
+            const SizedBox(height: 4),
+            Text(r['work_progress']?.toString() ?? 'No content',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+          ]),
+        ),
+        Text('${r['manpower_count'] ?? 0}\nworkers',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+      ]),
     );
   }
 
@@ -627,92 +689,132 @@ class _NotificationsPageState extends State<NotificationsPage>
         issues.where((i) => _isResolvedIssue(i as Map)).toList();
     return RefreshIndicator(
       onRefresh: _loadIssues,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_issError != null)
-            FailureInline(error: _issError, onRetry: _loadIssues),
-          _sectionCard(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(AppStrings.t('notif.reportIssue'),
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-              const SizedBox(height: 16),
-              if (projects.length > 1) ...[
-                DropdownButtonFormField<int>(
-                  initialValue: _issPid,
-                  decoration: const InputDecoration(labelText: 'Project'),
-                  items: projects.map<DropdownMenuItem<int>>((p) =>
-                      DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
-                  onChanged: (v) => setState(() => _issPid = v),
-                ),
-                const SizedBox(height: 12),
-              ],
-              TextField(
-                controller: _issTitle,
-                decoration: InputDecoration(labelText: AppStrings.t('notif.issueTitle'), hintText: AppStrings.t('notif.issueTitleHint')),
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _severity,
-                    decoration: const InputDecoration(labelText: 'Severity'),
-                    items: _severities.map((s) => DropdownMenuItem(
-                        value: s, child: Text(s[0].toUpperCase() + s.substring(1)))).toList(),
-                    onChanged: (v) => setState(() => _severity = v!),
+      child: AppScrollbar(
+        controller: _issScrollCtrl,
+        child: CustomScrollView(
+          controller: _issScrollCtrl,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              sliver: SliverToBoxAdapter(child: _issueHeader()),
+            ),
+            if (activeIssues.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                sliver: SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(AppStrings.t('notif.noActiveIssues'),
+                        style: TextStyle(color: AppColors.textMuted)),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _category,
-                    decoration: const InputDecoration(labelText: 'Category'),
-                    items: _categories.map((c) => DropdownMenuItem(
-                        value: c, child: Text(c[0].toUpperCase() + c.substring(1)))).toList(),
-                    onChanged: (v) => setState(() => _category = v!),
-                  ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                sliver: SliverList.builder(
+                  itemCount: activeIssues.length,
+                  addAutomaticKeepAlives: false,
+                  itemBuilder: (ctx, i) => _issueCard(activeIssues[i] as Map),
                 ),
-              ]),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _issDesc,
-                maxLines: 3,
-                decoration: InputDecoration(labelText: AppStrings.t('notif.issueDetail'), hintText: AppStrings.t('notif.issueDetailHint')),
               ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _submitIssue,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.red,
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+            if (resolvedIssues.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                sliver: SliverList.builder(
+                  itemCount: resolvedIssues.length + 1,
+                  addAutomaticKeepAlives: false,
+                  itemBuilder: (ctx, i) {
+                    if (i == 0) {
+                      // Heading for the resolved group travels with its sliver
+                      // so it stays lazy instead of pre-building every card.
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 24, bottom: 12),
+                        child: Text(AppStrings.t('notif.resolvedIssues'),
+                            style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: AppColors.textPrimary)),
+                      );
+                    }
+                    return _issueCard(resolvedIssues[i - 1] as Map);
+                  },
                 ),
-                child: Text(AppStrings.t('notif.reportIssueSubmit')),
               ),
-            ]),
-          ),
-          const SizedBox(height: 24),
-          Text(AppStrings.t('notif.activeIssues'),
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-          const SizedBox(height: 12),
-          if (activeIssues.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: Text(AppStrings.t('notif.noActiveIssues'),
-                  style: TextStyle(color: AppColors.textMuted))),
-            )
-          else
-            ...activeIssues.map((iss) => _issueCard(iss as Map)),
-          if (resolvedIssues.isNotEmpty) ...[
-            const SizedBox(height: 24),
-            Text(AppStrings.t('notif.resolvedIssues'),
-                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
-            const SizedBox(height: 12),
-            ...resolvedIssues.map((iss) => _issueCard(iss as Map)),
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  /// Error strip + "report issue" form + the "active issues" heading.
+  Widget _issueHeader() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (_issError != null)
+        FailureInline(error: _issError, onRetry: _loadIssues),
+        _sectionCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(AppStrings.t('notif.reportIssue'),
+                style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+            const SizedBox(height: 16),
+            if (projects.length > 1) ...[
+              DropdownButtonFormField<int>(
+                initialValue: _issPid,
+                decoration: const InputDecoration(labelText: 'Project'),
+                items: projects.map<DropdownMenuItem<int>>((p) =>
+                    DropdownMenuItem(value: p['project_id'] as int, child: Text(p['project_name'] as String? ?? ''))).toList(),
+                onChanged: (v) => setState(() => _issPid = v),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              controller: _issTitle,
+              decoration: InputDecoration(labelText: AppStrings.t('notif.issueTitle'), hintText: AppStrings.t('notif.issueTitleHint')),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _severity,
+                  decoration: const InputDecoration(labelText: 'Severity'),
+                  items: _severities.map((s) => DropdownMenuItem(
+                      value: s, child: Text(s[0].toUpperCase() + s.substring(1)))).toList(),
+                  onChanged: (v) => setState(() => _severity = v!),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: _category,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: _categories.map((c) => DropdownMenuItem(
+                      value: c, child: Text(c[0].toUpperCase() + c.substring(1)))).toList(),
+                  onChanged: (v) => setState(() => _category = v!),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _issDesc,
+              maxLines: 3,
+              decoration: InputDecoration(labelText: AppStrings.t('notif.issueDetail'), hintText: AppStrings.t('notif.issueDetailHint')),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _submitIssue,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.red,
+                minimumSize: const Size.fromHeight(48),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
+              ),
+              child: Text(AppStrings.t('notif.reportIssueSubmit')),
+            ),
+          ]),
+        ),
+      const SizedBox(height: 24),
+      Text(AppStrings.t('notif.activeIssues'),
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.textPrimary)),
+      const SizedBox(height: 12),
+    ]);
   }
 
   /// An issue counts as resolved only when the backend says so (``resolved``
@@ -893,136 +995,4 @@ class _NotificationsPageState extends State<NotificationsPage>
         ),
       );
 
-  Widget _notificationTile(NotificationItem item) {
-    final unread = !item.isRead;
-    return GestureDetector(
-      onTap: () {
-        _markRead(item);
-        if (item.relatedEntityType != null && item.relatedEntityType!.isNotEmpty) {
-          _navigateToRelated(item);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: unread ? AppColors.bgCard : AppColors.bgMain,
-          borderRadius: AppRadius.rMd,
-          border: Border.all(
-              color: unread ? AppColors.border : AppColors.transparent),
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Unread indicator bar
-              if (unread)
-                Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(AppRadius.md),
-                        bottomLeft: Radius.circular(AppRadius.md)),
-                  ),
-                ),
-              // Content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Type icon
-                      Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          color: _iconColor(item.notificationType)
-                              .withValues(alpha: 0.12),
-                          borderRadius: AppRadius.rMd,
-                        ),
-                        child: Icon(
-                          _typeIcon(item.notificationType),
-                          size: 20,
-                          color: _iconColor(item.notificationType),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Text
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                    fontSize: 13.5,
-                                    fontWeight:
-                                        unread ? FontWeight.w700 : FontWeight.w600,
-                                    color: unread
-                                        ? AppColors.textPrimary
-                                        : AppColors.textSecondary)),
-                            const SizedBox(height: 4),
-                            Text(item.content,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: AppColors.textMuted,
-                                    height: 1.35)),
-                            const SizedBox(height: 8),
-                            Text(item.relativeTime,
-                                style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: AppColors.textMuted)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  IconData _typeIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'attendance':
-        return Icons.calendar_month_rounded;
-      case 'task_overdue':
-      case 'task_assigned':
-        return Icons.check_circle_outline_rounded;
-      case 'issue':
-        return Icons.warning_amber_rounded;
-      case 'safety':
-        return Icons.health_and_safety_rounded;
-      case 'daily_report':
-        return Icons.description_rounded;
-      default:
-        return Icons.notifications_rounded;
-    }
-  }
-
-  Color _iconColor(String type) {
-    switch (type.toLowerCase()) {
-      case 'attendance':
-        return AppColors.green;
-      case 'task_overdue':
-        return AppColors.red;
-      case 'task_assigned':
-        return AppColors.blue;
-      case 'issue':
-        return AppColors.yellow;
-      case 'safety':
-        return AppColors.red;
-      case 'daily_report':
-        return AppColors.purple;
-      default:
-        return AppColors.accent;
-    }
-  }
 }

@@ -9,6 +9,8 @@ import '../widgets/add_worker_sheet.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
+import '../widgets/worker_list_card.dart';
 import 'worker_detail_page.dart';
 
 class WorkersPage extends StatefulWidget {
@@ -22,6 +24,9 @@ class _WorkersPageState extends State<WorkersPage> {
   List workers = [];
   Object? _loadError;
   String _searchQuery = '';
+
+  /// Drives the always-visible scrollbar of the worker list.
+  final ScrollController _scrollCtrl = ScrollController();
 
   @override
   void initState() {
@@ -37,6 +42,7 @@ class _WorkersPageState extends State<WorkersPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     super.dispose();
@@ -161,27 +167,37 @@ class _WorkersPageState extends State<WorkersPage> {
                           ))
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: LayoutBuilder(builder: (ctx, constraints) {
-                          if (constraints.maxWidth < AppBreakpoints.phone) {
-                            return ListView.builder(
+                        child: AppScrollbar(
+                          controller: _scrollCtrl,
+                          child: LayoutBuilder(builder: (ctx, constraints) {
+                            // Filter once per build, then let the lazy list
+                            // drive which cards are actually constructed.
+                            final rows = _filtered;
+                            if (constraints.maxWidth < AppBreakpoints.phone) {
+                              return ListView.builder(
+                                controller: _scrollCtrl,
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                                itemCount: rows.length,
+                                addAutomaticKeepAlives: false,
+                                itemBuilder: (ctx, i) => _buildCard(rows[i]),
+                              );
+                            }
+                            // Tablet / desktop: two-column grid
+                            return GridView.builder(
+                              controller: _scrollCtrl,
                               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                              itemCount: _filtered.length,
-                              itemBuilder: (ctx, i) => _workerCard(_filtered[i]),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: AppSpacing.sm,
+                                crossAxisSpacing: AppSpacing.sm,
+                                mainAxisExtent: 152,
+                              ),
+                              itemCount: rows.length,
+                              addAutomaticKeepAlives: false,
+                              itemBuilder: (ctx, i) => _buildCard(rows[i], inGrid: true),
                             );
-                          }
-                          // Tablet / desktop: two-column grid
-                          return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: AppSpacing.sm,
-                              crossAxisSpacing: AppSpacing.sm,
-                              mainAxisExtent: 152,
-                            ),
-                            itemCount: _filtered.length,
-                            itemBuilder: (ctx, i) => _workerCard(_filtered[i], inGrid: true),
-                          );
-                        }),
+                          }),
+                        ),
                       ),
               ),     // Expanded
             ]),      // Column
@@ -191,77 +207,19 @@ class _WorkersPageState extends State<WorkersPage> {
     );         // Scaffold
   }
 
-  Widget _workerCard(Map w, {bool inGrid = false}) {
-    // Tapping a card opens the read-only worker profile (P1: cards previously
-    // had no entry point at all).
+  /// One lazy list item. The card itself is a standalone widget so scrolling
+  /// never rebuilds this page's whole builder closure.
+  Widget _buildCard(Map w, {bool inGrid = false}) {
     final wid = w['worker_id'] ?? w['id'];
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return WorkerListCard(
+      key: ValueKey('worker-${wid ?? w['name']}'),
+      worker: w,
+      inGrid: inGrid,
       onTap: wid is int
           ? () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => WorkerDetailPage(workerId: wid, initial: w)))
           : null,
-      child: sectionCard(
-      margin: inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
-      child: Row(children: [
-        initialsAvatar(w['name'] ?? '?', radius: 22),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(w['name'] ?? '-',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 14.5),
-                  overflow: TextOverflow.ellipsis)),
-              statusPill(w['today_status'] ?? 'absent'),
-            ]),
-            const SizedBox(height: 4),
-            Row(children: [
-              Icon(Icons.handyman_outlined, size: 13, color: AppColors.textMuted),
-              const SizedBox(width: 4),
-              Expanded(child: Text(w['trade'] ?? 'General Worker',
-                  style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13.5),
-                  overflow: TextOverflow.ellipsis)),
-            ]),
-            if (w['project'] != null) ...[
-              const SizedBox(height: 4),
-              Row(children: [
-                Icon(Icons.location_on_outlined, size: 13, color: AppColors.textMuted),
-                const SizedBox(width: 4),
-                Expanded(child: Text(w['project']['project_name'] ?? '',
-                    style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
-                    overflow: TextOverflow.ellipsis)),
-              ]),
-            ],
-            if (w['check_in_time'] != null || w['hours_today'] != null) ...[
-              const SizedBox(height: 8),
-              Row(children: [
-                Icon(Icons.schedule_rounded, size: 13, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Expanded(child: Text(
-                  [
-                    if (w['check_in_time'] != null) 'In ${_fmtTime(w['check_in_time'])}',
-                    if (w['check_out_time'] != null) 'Out ${_fmtTime(w['check_out_time'])}',
-                    if (w['hours_today'] != null) '${w['hours_today']}h',
-                  ].join(' · '),
-                  style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
-                )),
-              ]),
-            ],
-          ]),
-        ),
-      ]),
-      ),
     );
-  }
-
-  String _fmtTime(String iso) {
-    try {
-      final d = DateTime.parse(iso).toLocal();
-      return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return iso;
-    }
   }
 }
 

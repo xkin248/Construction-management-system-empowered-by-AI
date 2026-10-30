@@ -14,6 +14,9 @@ import '../utils/download_saver.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
+import '../widgets/file_tiles.dart';
+import '../widgets/signed_file_image.dart';
 
 class FilesPage extends StatefulWidget {
   const FilesPage({super.key});
@@ -29,6 +32,9 @@ class _FilesPageState extends State<FilesPage> {
   int? _selectedProjectId;
   String _selectedCategory = 'all';
   bool _gridMode = true;
+
+  /// Drives the always-available scrollbar of the list/grid.
+  final ScrollController _scrollCtrl = ScrollController();
 
   static const _categories = [
     {'value': 'all', 'label': 'All'},
@@ -58,6 +64,7 @@ class _FilesPageState extends State<FilesPage> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     super.dispose();
@@ -342,11 +349,12 @@ class _FilesPageState extends State<FilesPage> {
             if (file.isImage) ...[
               ClipRRect(
                 borderRadius: AppRadius.rMd,
-                child: _SignedFileImage(
+                child: SignedFileImage(
                   fileId: file.fileId,
                   height: 220,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  cacheWidth: 720,
                   errorWidget: Container(
                     height: 220,
                     color: AppColors.bgMain,
@@ -607,255 +615,50 @@ class _FilesPageState extends State<FilesPage> {
         final cardWidth =
             (constraints.maxWidth - 32 - (crossAxisCount - 1) * 10) /
                 crossAxisCount;
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: cardWidth / (cardWidth * 0.95),
+        // Decode thumbnails at display size instead of full resolution.
+        final dpr = MediaQuery.of(ctx).devicePixelRatio;
+        final thumbPx = (cardWidth * dpr).round().clamp(120, 1024);
+        return AppScrollbar(
+          controller: _scrollCtrl,
+          child: GridView.builder(
+            controller: _scrollCtrl,
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: cardWidth / (cardWidth * 0.95),
+            ),
+            itemCount: _files.length,
+            addAutomaticKeepAlives: false,
+            itemBuilder: (ctx, i) => FileGridCard(
+              key: ValueKey('file-grid-${_files[i].fileId}'),
+              file: _files[i],
+              cacheSize: thumbPx,
+              onTap: () => _openPreview(_files[i]),
+              onLongPress: () => _deleteFile(_files[i]),
+            ),
           ),
-          itemCount: _files.length,
-          itemBuilder: (ctx, i) => _fileCard(_files[i]),
         );
       });
 
-  Widget _buildList() => ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-        itemCount: _files.length,
-        itemBuilder: (ctx, i) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _fileListTile(_files[i]),
+  Widget _buildList() => AppScrollbar(
+        controller: _scrollCtrl,
+        child: ListView.builder(
+          controller: _scrollCtrl,
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+          itemCount: _files.length,
+          addAutomaticKeepAlives: false,
+          itemBuilder: (ctx, i) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: FileListTile(
+              key: ValueKey('file-row-${_files[i].fileId}'),
+              file: _files[i],
+              onTap: () => _openPreview(_files[i]),
+              onLongPress: () => _deleteFile(_files[i]),
+            ),
+          ),
         ),
       );
 
-  // â”€â”€ Grid card â”€â”€
-  Widget _fileCard(FileItem file) {
-    return GestureDetector(
-      onTap: () => _openPreview(file),
-      onLongPress: () => _deleteFile(file),
-      child: sectionCard(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _catBgColor(file.fileCategory),
-                  borderRadius: AppRadius.rMd,
-                ),
-                child: Center(
-                  child: file.isImage && file.thumbnailPath != null
-                      ? ClipRRect(
-                          borderRadius: AppRadius.rMd,
-                          child: _SignedFileImage(
-                            fileId: file.fileId,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            errorWidget: _fileIcon(file),
-                          ),
-                        )
-                      : _fileIcon(file),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              file.originalName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${file.sizeFormatted}  ${file.dateFormatted}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: AppColors.textMuted),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // â”€â”€ List tile â”€â”€
-  Widget _fileListTile(FileItem file) {
-    return GestureDetector(
-      onTap: () => _openPreview(file),
-      onLongPress: () => _deleteFile(file),
-      child: sectionCard(
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: _catBgColor(file.fileCategory),
-              borderRadius: AppRadius.rMd,
-            ),
-            child: Center(child: _fileIcon(file, size: 24)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(file.originalName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  _infoChip(file.categoryLabel),
-                  const SizedBox(width: 8),
-                  Text(file.sizeFormatted,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.textMuted)),
-                  const SizedBox(width: 8),
-                  Text(file.dateFormatted,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.textMuted)),
-                ]),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.chevron_right_rounded,
-              color: AppColors.textMuted, size: 20),
-        ]),
-      ),
-    );
-  }
-
-  Widget _fileIcon(FileItem file, {double size = 32}) {
-    IconData icon;
-    Color color;
-    if (file.isImage) {
-      icon = Icons.image_rounded;
-      color = AppColors.purple;
-    } else if (file.isPDF) {
-      icon = Icons.picture_as_pdf_rounded;
-      color = AppColors.red;
-    } else {
-      switch (file.fileCategory) {
-        case 'drawings':
-          icon = Icons.architecture_rounded;
-          color = AppColors.blue;
-          break;
-        case 'reports':
-          icon = Icons.assessment_rounded;
-          color = AppColors.green;
-          break;
-        default:
-          icon = Icons.description_rounded;
-          color = AppColors.accent;
-      }
-    }
-    return Icon(icon, size: size, color: color);
-  }
-
-  Widget _infoChip(String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppColors.bgMain,
-          borderRadius: AppRadius.rMd,
-        ),
-        child: Text(label,
-            style: GoogleFonts.inter(
-                fontSize: 14, fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary)),
-      );
-
-  Color _catBgColor(String cat) {
-    switch (cat) {
-      case 'drawings':
-        return AppColors.blueLight;
-      case 'photos':
-        return AppColors.purpleLight;
-      case 'reports':
-        return AppColors.greenLight;
-      default:
-        return AppColors.accentLight;
-    }
-  }
-}
-
-/// Renders a server-side image through a short-lived signed URL.
-///
-/// `Image.network` can only carry a URL, and the raw `/files/{id}/download`
-/// endpoint requires an `Authorization` header, so every preview used to fail
-/// with 401 and fall back to the broken-image icon. The link is minted once per
-/// file (ApiService caches it until just before expiry) and then loaded like any
-/// other remote image, so previews also work on Web where headers are impossible.
-class _SignedFileImage extends StatefulWidget {
-  const _SignedFileImage({
-    required this.fileId,
-    required this.errorWidget,
-    this.fit = BoxFit.cover,
-    this.width,
-    this.height,
-  });
-
-  final int fileId;
-  final Widget errorWidget;
-  final BoxFit fit;
-  final double? width;
-  final double? height;
-
-  @override
-  State<_SignedFileImage> createState() => _SignedFileImageState();
-}
-
-class _SignedFileImageState extends State<_SignedFileImage> {
-  late Future<String> _urlFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _urlFuture = ApiService().fetchDownloadLink(widget.fileId);
-  }
-
-  @override
-  void didUpdateWidget(covariant _SignedFileImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.fileId != widget.fileId) {
-      _urlFuture = ApiService().fetchDownloadLink(widget.fileId);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String>(
-      future: _urlFuture,
-      builder: (context, snapshot) {
-        final url = snapshot.data;
-        if (url == null || url.isEmpty) {
-          if (snapshot.hasError) return widget.errorWidget;
-          return Container(
-            width: widget.width,
-            height: widget.height,
-            color: AppColors.bgMain,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        return Image.network(
-          url,
-          width: widget.width,
-          height: widget.height,
-          fit: widget.fit,
-          errorBuilder: (_, __, ___) => widget.errorWidget,
-        );
-      },
-    );
-  }
 }

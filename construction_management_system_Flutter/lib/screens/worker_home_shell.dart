@@ -13,6 +13,7 @@ import '../widgets/app_settings_actions.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
 import 'worker_tasks_page.dart';
 
 // ──────────────── Nav model ────────────────
@@ -211,6 +212,8 @@ class _WorkerAttendanceTab extends StatefulWidget {
 class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
   bool ld = true;
   Object? _attError;
+  /// Drives the always-available scrollbar of the attendance tab.
+  final ScrollController _scrollCtrl = ScrollController();
   Map? attendanceData;
   List history = [];
 
@@ -232,6 +235,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_onDarkChanged);
     AppSettings.lang.removeListener(_onLangChanged);
     super.dispose();
@@ -269,7 +273,10 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
+      child: AppScrollbar(
+        controller: _scrollCtrl,
+        child: ListView(
+        controller: _scrollCtrl,
         padding: const EdgeInsets.all(16),
         children: [
           Row(children: [
@@ -337,6 +344,7 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
             ]),
           ),
         ],
+      ),
       ),
     );
   }

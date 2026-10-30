@@ -10,6 +10,7 @@ import '../widgets/add_worker_sheet.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
+import '../widgets/app_scrollbar.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -34,6 +35,9 @@ class _TeamAttendanceTab extends StatefulWidget {
 }
 
 class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
+  /// Drives the always-available scrollbar of the attendance page.
+  final ScrollController _scrollCtrl = ScrollController();
+
   bool ld = true;
   Object? _loadError;
   Map summary = {};
@@ -55,6 +59,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     super.dispose();
@@ -109,9 +114,15 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
           child: SizedBox(
             width: double.infinity,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
+            child: AppScrollbar(
+              controller: _scrollCtrl,
+              child: CustomScrollView(
+              controller: _scrollCtrl,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList.list(
+                    children: [
                 // ── Add Worker ──
                 Align(
                   alignment: Alignment.centerRight,
@@ -181,9 +192,15 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                 _buildFilterRow(),
                 const SizedBox(height: 12),
 
-                // ── Worker Table ──
-                _buildWorkerTable(filtered),
+                    ],
+                  ),
+                ),
+                // ── Worker cards ──
+                // Built lazily: only the rows near the viewport are created.
+                _buildWorkerSliver(filtered),
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
               ],
+            ),
             ),
           ),
         ),
@@ -326,51 +343,75 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   }
 
   // ── Phone-friendly worker cards (replaces 7-column table) ──
-  Widget _buildWorkerTable(List filtered) {
+  ///
+  /// Returned as slivers so the outer [CustomScrollView] can lay out cards
+  /// lazily instead of inflating every worker up front.
+  Widget _buildWorkerSliver(List filtered) {
     if (filtered.isEmpty) {
-      return sectionCard(
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.person_search_rounded, size: 28, color: AppColors.textMuted),
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        sliver: SliverToBoxAdapter(
+          child: sectionCard(
+            padding: const EdgeInsets.symmetric(vertical: 28),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.person_search_rounded, size: 28, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 16),
+              Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
+            ]),
           ),
-          const SizedBox(height: 16),
-          Text(AppStrings.t('att.noWorkers'), style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-        ]),
+        ),
       );
     }
-    return LayoutBuilder(builder: (ctx, constraints) {
-      if (constraints.maxWidth < AppBreakpoints.phone) {
-        return Column(
-          children: filtered.map((w) => _WorkerAttCard(worker: w)).toList(),
+    return SliverLayoutBuilder(builder: (ctx, constraints) {
+      if (constraints.crossAxisExtent < AppBreakpoints.phone) {
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          sliver: SliverList.builder(
+            itemCount: filtered.length,
+            itemBuilder: (_, i) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _WorkerAttCard(
+                key: ValueKey('att-worker-${filtered[i]['id'] ?? filtered[i]['name'] ?? i}'),
+                worker: filtered[i],
+              ),
+            ),
+          ),
         );
       }
       // Tablet / desktop: two-column grid
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: AppSpacing.sm,
-          crossAxisSpacing: AppSpacing.sm,
-          mainAxisExtent: 158,
+      return SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+        sliver: SliverGrid.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: AppSpacing.sm,
+            crossAxisSpacing: AppSpacing.sm,
+            mainAxisExtent: 158,
+          ),
+          itemCount: filtered.length,
+          itemBuilder: (_, i) => _WorkerAttCard(
+            key: ValueKey('att-worker-${filtered[i]['id'] ?? filtered[i]['name'] ?? i}'),
+            worker: filtered[i],
+            inGrid: true,
+          ),
         ),
-        itemCount: filtered.length,
-        itemBuilder: (_, i) => _WorkerAttCard(worker: filtered[i], inGrid: true),
       );
     });
   }
+
 }
 
 class _WorkerAttCard extends StatelessWidget {
   final Map worker;
   final bool inGrid;
-  const _WorkerAttCard({required this.worker, this.inGrid = false});
+  const _WorkerAttCard({super.key, required this.worker, this.inGrid = false});
 
   String _fmtTime(String? iso) {
     if (iso == null) return '—';
