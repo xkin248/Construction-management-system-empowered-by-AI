@@ -12,11 +12,20 @@ import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
 import '../utils/date_helper.dart';
+import '../widgets/guided_empty_state.dart';
+import '../widgets/worker_task_tile.dart';
 import 'attendance_geo_helper.dart';
+import 'notifications_page.dart';
 import 'worker_task_detail_page.dart';
+import 'worker_tasks_page.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
-  const WorkerDashboardPage({super.key});
+  /// Lets the shell switch tabs from the dashboard shortcuts (0=Home,
+  /// 1=Tasks, 2=Attendance, 3=Alerts). When null the dashboard pushes the
+  /// standalone page instead, so the widget stays usable on its own.
+  final void Function(int index, int subTab)? onNavigate;
+
+  const WorkerDashboardPage({super.key, this.onNavigate});
   @override
   State<WorkerDashboardPage> createState() => _WorkerDashboardPageState();
 }
@@ -48,6 +57,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   Timer? _syncTimer;
   bool _syncingNow = false;
   bool _checkInError = false; // true when last check-in was rejected (outside fence)
+
+  /// Collapse state for the secondary blocks (attendance detail, task list).
+  final Map<String, bool> _expandedSections = {};
 
   @override
   void initState() {
@@ -532,19 +544,26 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
                   const SizedBox(height: AppSpacing.xs),
-                  if (isWide)
-                    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Expanded(child: _buildWelcomeCard()),
-                      const SizedBox(width: AppSpacing.lg),
-                      Expanded(child: _buildCheckInCard()),
-                    ])
-                  else ...[
-                    _buildWelcomeCard(),
-                    const SizedBox(height: AppSpacing.lg),
-                    _buildCheckInCard(),
-                  ],
+                  _buildWelcomeCard(),
                   const SizedBox(height: AppSpacing.lg),
-                  _buildTaskBoard(isWide: isWide),
+                  // First screen mirrors the supervisor dashboard density:
+                  // welcome → three headline numbers → the three daily steps.
+                  _buildKpiRow(isWide),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildTodayThreeThings(),
+                  const SizedBox(height: AppSpacing.lg),
+                  _collapsibleSection(
+                    icon: Icons.fact_check_outlined,
+                    title: AppStrings.t('worker.attDetails'),
+                    subtitle: AppStrings.t('worker.attDetailsSub'),
+                    children: [_buildAttendanceDetailsCard()],
+                  ),
+                  _collapsibleSection(
+                    icon: Icons.assignment_outlined,
+                    title: AppStrings.t('worker.tasks'),
+                    subtitle: AppStrings.t('worker.tasksSectionSub'),
+                    children: [_buildTaskBoardBody(isWide: isWide)],
+                  ),
                 ],
               ),
             ),
@@ -619,10 +638,357 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     );
   }
 
-  Widget _buildCheckInCard() {
+  // ───────────────────────── Beginner-friendly first screen ─────────────────
+
+  /// Section header — same rhythm as the supervisor dashboard.
+  Widget _sectionHeader(String title, {String? sub}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: GoogleFonts.inter(
+                  fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          if (sub != null) ...[
+            const SizedBox(height: 2),
+            Text(sub, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+          ],
+        ],
+      );
+
+  String get _statusLabel => _checkedOut
+      ? AppStrings.t('worker.statusDone')
+      : _checkedIn
+          ? AppStrings.t('worker.statusOnSite')
+          : AppStrings.t('worker.statusNotIn');
+
+  /// Three headline numbers, mirroring the supervisor dashboard KPI row.
+  Widget _buildKpiRow(bool isWide) {
+    final tasks = (_taskBoard?['tasks'] as List?) ?? [];
+    final pending = tasks.where((t) {
+      final s = ((t as Map)['status'] ?? '').toString().toLowerCase().replaceAll(' ', '_');
+      return s != 'completed';
+    }).length;
+    final hours = _hoursToday.toStringAsFixed(1);
+    final cards = <Widget>[
+      _kpiCard(AppStrings.t('worker.kpiPending'),
+          _loadingTasks ? '—' : '$pending', Icons.playlist_add_check_rounded, AppColors.yellow),
+      _kpiCard(AppStrings.t('worker.kpiHours'), '${hours}h', Icons.schedule_rounded,
+          AppColors.accent),
+      _kpiCard(
+          AppStrings.t('worker.kpiStatus'),
+          _statusLabel,
+          _checkedOut
+              ? Icons.logout_rounded
+              : _checkedIn
+                  ? Icons.gps_fixed_rounded
+                  : Icons.fingerprint_rounded,
+          _checkedOut
+              ? AppColors.blue
+              : _checkedIn
+                  ? AppColors.green
+                  : AppColors.textMuted),
+    ];
+    return Row(
+      children: [
+        for (var i = 0; i < cards.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(child: cards[i]),
+        ],
+      ],
+    );
+  }
+
+  Widget _kpiCard(String label, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 8),
+        Text(value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+        const SizedBox(height: 2),
+        Text(label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+                fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+      ]),
+    );
+  }
+
+  /// "Today's three things": tasks → clock in → report a problem.
+  Widget _buildTodayThreeThings() {
+    final tasks = (_taskBoard?['tasks'] as List?) ?? [];
+    final Map<String, dynamic>? nextTask =
+        tasks.isEmpty ? null : Map<String, dynamic>.from(tasks.first as Map);
+    final nextLabel = nextTask == null
+        ? AppStrings.t('worker.noTaskToday')
+        : '${AppStrings.t('worker.nextUp')}: '
+            '${(nextTask['part_section'] ?? nextTask['task_name'] ?? '').toString()}';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionHeader(AppStrings.t('worker.todayThree'),
+          sub: AppStrings.t('worker.todayThreeSub')),
+      const SizedBox(height: 10),
+      _thingCard(
+        icon: Icons.assignment_rounded,
+        color: AppColors.accent,
+        title: AppStrings.t('worker.thingTasks'),
+        subtitle: nextLabel,
+        trailing: _thingAction(AppStrings.t('worker.viewAll'), _openTasksTab),
+        onTap: _openTasksTab,
+        step: 1,
+      ),
+      const SizedBox(height: 10),
+      _thingCard(
+        icon: _checkedOut
+            ? Icons.logout_rounded
+            : _checkedIn
+                ? Icons.check_circle_rounded
+                : Icons.fingerprint_rounded,
+        color: _checkedOut
+            ? AppColors.blue
+            : _checkedIn
+                ? AppColors.green
+                : AppColors.yellow,
+        title: AppStrings.t('worker.thingCheckIn'),
+        subtitle: _statusMsg,
+        subtitleIsError: _checkInError,
+        trailing: _checkInButton(),
+        step: 2,
+      ),
+      const SizedBox(height: 10),
+      _thingCard(
+        icon: Icons.report_problem_rounded,
+        color: AppColors.red,
+        title: AppStrings.t('worker.thingIssue'),
+        subtitle: AppStrings.t('worker.thingIssueSub'),
+        trailing: _thingAction(AppStrings.t('worker.reportNow'), _openIssuesTab),
+        onTap: _openIssuesTab,
+        step: 3,
+      ),
+    ]);
+  }
+
+  Widget _thingCard({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required int step,
+    Widget? trailing,
+    VoidCallback? onTap,
+    bool subtitleIsError = false,
+  }) {
+    return Material(
+      color: AppColors.bgCard,
+      borderRadius: AppRadius.rLg,
+      child: InkWell(
+        borderRadius: AppRadius.rLg,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.rLg,
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.sm,
+          ),
+          child: Row(children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
+              child: Icon(icon, size: 20, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.16), borderRadius: AppRadius.rSm),
+                    child: Text('$step',
+                        style: GoogleFonts.inter(
+                            fontSize: 10.5, fontWeight: FontWeight.w800, color: color)),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary)),
+                  ),
+                ]),
+                const SizedBox(height: 3),
+                Text(subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        height: 1.35,
+                        color: subtitleIsError ? AppColors.red : AppColors.textSecondary,
+                        fontWeight: subtitleIsError ? FontWeight.w600 : FontWeight.normal)),
+              ]),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _thingAction(String label, VoidCallback onTap) {
+    return Material(
+      color: AppColors.accentLight,
+      borderRadius: AppRadius.rSm,
+      child: InkWell(
+        borderRadius: AppRadius.rSm,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(label,
+                style: GoogleFonts.inter(
+                    fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.accent)),
+            const SizedBox(width: 2),
+            Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.accent),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// Compact clock in / out button that lives inside the second step card.
+  Widget _checkInButton() {
     final showCheckOut = _checkedIn && !_checkedOut;
+    if (_checkInLoading) {
+      return const SizedBox(
+          width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4));
+    }
+    if (_checkedOut) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+            color: AppColors.bgMain, borderRadius: AppRadius.rSm),
+        child: Text(AppStrings.t('worker.statusDone'),
+            style: GoogleFonts.inter(
+                fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+      );
+    }
+    return ElevatedButton(
+      onPressed: showCheckOut ? _doCheckOut : _doCheckIn,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: showCheckOut ? AppColors.red : AppColors.green,
+        foregroundColor: AppColors.onAccent,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
+      ),
+      child: Text(
+          showCheckOut ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn'),
+          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800)),
+    );
+  }
+
+  void _openTasksTab() {
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(1, 0);
+      return;
+    }
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const WorkerTasksPage()));
+  }
+
+  void _openIssuesTab() {
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(3, 1);
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => const NotificationsPage(initialTab: 1)));
+  }
+
+  /// Collapsible block, same interaction as the supervisor dashboard.
+  Widget _collapsibleSection({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
+    final expanded = _expandedSections[title] ?? false;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: AppRadius.rLg,
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.sm,
+      ),
+      child: Column(children: [
+        InkWell(
+          borderRadius: AppRadius.rLg,
+          onTap: () => setState(() => _expandedSections[title] = !expanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            child: Row(children: [
+              Icon(icon, size: 16, color: AppColors.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title,
+                      style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary)),
+                  const SizedBox(height: 1),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+                ]),
+              ),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: Icon(Icons.expand_more_rounded,
+                    size: 20, color: AppColors.textMuted),
+              ),
+            ]),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+            child: Column(children: children),
+          ),
+          crossFadeState:
+              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 180),
+        ),
+      ]),
+    );
+  }
+
+  /// Attendance detail block — project, fence, hours, device. The clock in/out
+  /// button now lives in the "three things" card, so this stays a read-only
+  /// detail area that is collapsed by default.
+  Widget _buildAttendanceDetailsCard() {
     return sectionCard(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Column(children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text('📍 Daily Attendance Check-In',
@@ -675,53 +1041,6 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           }),
         ],
 
-        // Big circle status
-        Center(
-          child: Column(children: [
-            Container(
-              width: 110, height: 110,
-              decoration: BoxDecoration(
-                color: _checkedOut ? AppColors.blueLight : _checkedIn ? AppColors.greenLight : AppColors.accentLight,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: (_checkedOut ? AppColors.blue : _checkedIn ? AppColors.green : AppColors.accent).withValues(alpha: 0.18),
-                    blurRadius: 24,
-                  ),
-                ],
-              ),
-              child: Icon(
-                _checkedOut
-                    ? Icons.logout_rounded
-                    : _checkedIn
-                        ? Icons.check_circle_rounded
-                        : Icons.fingerprint_rounded,
-                size: 54,
-                color: _checkedOut ? AppColors.blue : _checkedIn ? AppColors.green : AppColors.accent,
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: 260,
-              child: Text(
-                _statusMsg,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: _checkInError ? AppColors.red : AppColors.textSecondary,
-                  fontWeight: _checkInError ? FontWeight.w600 : FontWeight.normal,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 8),
-        if (_hoursToday > 0)
-          Text('${AppStrings.t('worker.hoursToday')}: ${_hoursToday.toStringAsFixed(1)}h',
-              style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.accent, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 16),
-
         Row(children: [
           const SizedBox(width: 4),
           Text(_windowEnforced ? 'Check-in: $_checkInWindow' : 'Check-in: Anytime',
@@ -762,38 +1081,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         ),
         const SizedBox(height: 16),
 
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: ElevatedButton.icon(
-            onPressed: _checkInLoading
-                ? null
-                : (_checkedOut
-                    ? null
-                    : (showCheckOut ? _doCheckOut : _doCheckIn)),
-            icon: _checkInLoading
-                ? const SizedBox(width: 24, height: 20, child: CircularProgressIndicator(color: AppColors.accentInk, strokeWidth: 2))
-                : Icon(showCheckOut ? Icons.logout_rounded : Icons.fingerprint_rounded, size: 22),
-            label: Text(
-              _checkedOut
-                  ? 'Attendance Completed Today'
-                  : showCheckOut
-                      ? 'Tap to Check Out'
-                      : '🎯 Tap to Check In (GPS)',
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _checkedOut
-                  ? AppColors.textMuted
-                  : showCheckOut
-                      ? AppColors.red
-                      : AppColors.green,
-              shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
-              elevation: 0,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Text(
           'Device: $_deviceType • $_deviceInfo',
           style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
@@ -802,16 +1090,19 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     );
   }
 
-  Widget _buildTaskBoard({bool isWide = false}) {
+  /// Task board contents (used inside the collapsed "My tasks" section).
+  Widget _buildTaskBoardBody({bool isWide = false}) {
     if (_loadingTasks) {
       return sectionCard(
         padding: const EdgeInsets.all(24),
         child: Column(children: [
-          SizedBox(height: 16),
-          Center(child: CircularProgressIndicator()),
-          SizedBox(height: 12),
-          Center(child: Text(AppStrings.t('worker.loadingTaskBoard'), style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
+          const Center(child: CircularProgressIndicator()),
+          const SizedBox(height: 12),
+          Center(
+              child: Text(AppStrings.t('worker.loadingTaskBoard'),
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 14))),
+          const SizedBox(height: 16),
         ]),
       );
     }
@@ -820,45 +1111,41 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       padding: const EdgeInsets.all(4),
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
           child: Row(children: [
-            Text('🎯 My Assigned Work Sections',
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const Spacer(),
-            if (_lastUpdated.isNotEmpty)
+            Expanded(
+              child: Text(AppStrings.t('worker.tasks'),
+                  style: GoogleFonts.inter(
+                      fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ),
+            if (_lastUpdated.length >= 16)
               Text(_lastUpdated.substring(11, 16),
                   style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
             IconButton(
               icon: Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
-              tooltip: 'Refresh tasks',
+              tooltip: AppStrings.t('worker.emptyTasksAction'),
               onPressed: _loadTaskBoard,
             ),
           ]),
         ),
         if (tasks.isEmpty)
           Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(children: [
-              Container(
-                width: 56, height: 56,
-                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rMd),
-                child: Icon(Icons.assignment_outlined, size: 26, color: AppColors.accent),
-              ),
-              const SizedBox(height: 12),
-              Text(AppStrings.t('worker.noTasks'),
-                  style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-              const SizedBox(height: 4),
-              Text(AppStrings.t('worker.noTasksHint'),
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-            ]),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            child: GuidedEmptyState(
+              icon: Icons.assignment_outlined,
+              title: AppStrings.t('worker.emptyTasksTitle'),
+              description: AppStrings.t('worker.emptyTasksDesc'),
+              primaryLabel: AppStrings.t('worker.viewAll'),
+              primaryIcon: Icons.arrow_forward_rounded,
+              onPrimary: _openTasksTab,
+              secondaryHint: AppStrings.t('worker.noTasksHint'),
+            ),
           )
         else
           LayoutBuilder(builder: (ctx, c) {
-            final tiles = tasks.asMap().entries.map((e) {
-              final task = Map<String, dynamic>.from(e.value as Map);
-              return _TaskTile(
-                idx: e.key,
+            final tiles = tasks.map((e) {
+              final task = Map<String, dynamic>.from(e as Map);
+              return WorkerTaskTile(
                 task: task,
                 inGrid: isWide,
                 onTap: () => _openTask(task),
@@ -877,176 +1164,4 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       ]),
     );
   }
-}
-
-class _TaskTile extends StatelessWidget {
-  final int idx;
-  final Map<String, dynamic> task;
-  final bool inGrid;
-  final VoidCallback? onTap;
-  const _TaskTile({required this.idx, required this.task, this.inGrid = false, this.onTap});
-
-  Color _priorityColor(String? p) {
-    switch (p?.toLowerCase()) {
-      case 'high':
-        return AppColors.red;
-      case 'medium':
-        return AppColors.yellow;
-      case 'low':
-        return AppColors.blue;
-      default:
-        return AppColors.textMuted;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final status = task['status']?.toString() ?? 'Pending';
-    final priority = task['priority']?.toString() ?? 'Medium';
-    final part = task['part_section']?.toString() ?? 'General Section';
-    final instructions = task['work_instructions']?.toString() ?? '';
-    final projectName = task['project_name']?.toString() ?? '';
-    final rawPct = task['progress'];
-    final pct = rawPct is num
-        ? rawPct.round().clamp(0, 100)
-        : (status.toLowerCase().replaceAll(' ', '_') == 'completed'
-            ? 100
-            : (status.toLowerCase().replaceAll(' ', '_') == 'in_progress' ? 50 : 0));
-    final sKey = status.toLowerCase().replaceAll(' ', '_');
-    final barColor = sKey == 'completed'
-        ? AppColors.green
-        : sKey == 'in_progress'
-            ? AppColors.blue
-            : AppColors.yellow;
-
-    return Padding(
-      padding: inGrid ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Material(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        child: InkWell(
-          borderRadius: AppRadius.rMd,
-          onTap: onTap,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: AppRadius.rMd,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rMd),
-                child: Row(children: [
-                  Icon(Icons.layers_rounded, size: 11, color: AppColors.accent),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(part,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(color: AppColors.accent, fontSize: 14, fontWeight: FontWeight.w800)),
-                  ),
-                ]),
-              ),
-            ),
-            const SizedBox(width: 8),
-            statusPill(status),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: _priorityColor(priority).withValues(alpha: 0.18),
-                borderRadius: AppRadius.rMd,
-              ),
-              child: Text(priority.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    color: _priorityColor(priority),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.3,
-                  )),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          Text(task['task_name']?.toString() ?? 'Unnamed Task',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          if (task['description']?.toString().isNotEmpty ?? false) ...[
-            const SizedBox(height: 4),
-            Text(task['description'].toString(),
-                style: GoogleFonts.inter(fontSize: 14, color: AppColors.textSecondary, height: 1.4)),
-          ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              if (projectName.isNotEmpty)
-                _miniTag(Icons.apartment_rounded, projectName, AppColors.blue),
-              if (task['due_date'] != null)
-                _miniTag(Icons.event_rounded, 'Due: ${DateHelper.tryFormatShort(task['due_date'], fallback: task['due_date'].toString().substring(0, 10))}', AppColors.textSecondary),
-            ],
-          ),
-          if (instructions.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.blueLight,
-                borderRadius: AppRadius.rMd,
-                border: Border.all(color: AppColors.blue.withValues(alpha: 0.3)),
-              ),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Icon(Icons.lightbulb_circle_rounded, size: 16, color: AppColors.blue),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(instructions,
-                      style: GoogleFonts.inter(fontSize: 13, color: AppColors.blue, height: 1.4, fontWeight: FontWeight.w600)),
-                ),
-              ]),
-            ),
-          ],
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: AppRadius.rSm,
-                      child: LinearProgressIndicator(
-                        value: pct / 100,
-                        minHeight: 6,
-                        backgroundColor: AppColors.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text('$pct%',
-                      style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w800, color: barColor)),
-                  const SizedBox(width: 2),
-                  Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.accent),
-                ]),
-              ]),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _miniTag(IconData icon, String label, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 10.5, color: color),
-          const SizedBox(width: 3.5),
-          Text(label,
-              style: GoogleFonts.inter(color: color, fontSize: 14, fontWeight: FontWeight.w700)),
-        ]),
-      );
 }

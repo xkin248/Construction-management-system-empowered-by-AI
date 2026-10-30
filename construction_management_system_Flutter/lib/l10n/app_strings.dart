@@ -457,6 +457,61 @@ class AppStrings {
       'Muat naik lukisan, foto tapak atau laporan supaya semuanya di satu tempat.'
     ],
     'empty.files.action': ['Upload a file', 'Muat naik fail'],
+
+    // ============ Worker shell navigation (beginner-friendly regroup) ============
+    'wnav.dashboard': ['Home', 'Utama'],
+    'wnav.tasks': ['Tasks', 'Tugasan'],
+    'wnav.attendance': ['Attendance', 'Kehadiran'],
+    'wnav.alerts': ['Alerts', 'Makluman'],
+    'wnav.more': ['More', 'Lagi'],
+    'wnav.profile': ['Profile', 'Profil'],
+    'wnav.hint.dashboard': ['Today at a glance', 'Ringkasan hari ini'],
+    'wnav.hint.tasks': ['Work assigned to you', 'Kerja untuk anda'],
+    'wnav.hint.attendance': ['Clock in, clock out', 'Masuk dan keluar kerja'],
+    'wnav.hint.alerts': ['Updates and messages', 'Kemas kini dan mesej'],
+    'wnav.hint.profile': ['Your account settings', 'Tetapan akaun anda'],
+
+    // ============ Worker dashboard (today's three things) ============
+    'worker.todayThree': ["Today's three things", 'Tiga perkara hari ini'],
+    'worker.todayThreeSub': [
+      'Do these in order and you are done for the day.',
+      'Lakukan ini mengikut urutan dan selesai untuk hari ini.'
+    ],
+    'worker.thingTasks': ["Today's tasks", 'Tugasan hari ini'],
+    'worker.thingCheckIn': ['Clock in / clock out', 'Masuk / keluar kerja'],
+    'worker.thingIssue': ['Report a problem', 'Laporkan masalah'],
+    'worker.thingIssueSub': [
+      'Safety issue, defect or blocker — tell your supervisor right away.',
+      'Isu keselamatan, kecacatan atau halangan — beritahu penyelia segera.'
+    ],
+    'worker.noTaskToday': [
+      'Nothing assigned yet. Your supervisor will send work here.',
+      'Belum ada tugasan. Penyelia anda akan hantar kerja di sini.'
+    ],
+    'worker.nextUp': ['Next up', 'Seterusnya'],
+    'worker.viewAll': ['View all', 'Lihat semua'],
+    'worker.reportNow': ['Report', 'Lapor'],
+    'worker.kpiPending': ['To do', 'Belum siap'],
+    'worker.kpiHours': ['Hours today', 'Jam hari ini'],
+    'worker.kpiStatus': ['Today status', 'Status hari ini'],
+    'worker.statusNotIn': ['Not checked in', 'Belum daftar masuk'],
+    'worker.statusOnSite': ['On site', 'Di tapak'],
+    'worker.statusDone': ['Checked out', 'Sudah keluar'],
+    'worker.attDetails': ['Check-in details', 'Butiran daftar masuk'],
+    'worker.attDetailsSub': ['Project, fences, windows and device', 'Projek, pagar, waktu dan peranti'],
+    'worker.tasksSectionSub': ['Tap a task to open it and update progress', 'Tekan tugasan untuk buka dan kemas kini kemajuan'],
+    'worker.emptyTasksTitle': ['No tasks yet', 'Belum ada tugasan'],
+    'worker.emptyTasksDesc': [
+      'Your work sections will appear here once the supervisor assigns them. Pull down to refresh.',
+      'Bahagian kerja anda akan muncul di sini selepas penyelia menetapkannya. Tarik ke bawah untuk muat semula.'
+    ],
+    'worker.emptyTasksAction': ['Refresh now', 'Muat semula'],
+    'worker.emptyAttTitle': ['No attendance yet today', 'Belum ada kehadiran hari ini'],
+    'worker.emptyAttDesc': [
+      'Clock in from the Home screen when you reach the site. Your record will show up here.',
+      'Daftar masuk dari skrin Utama apabila tiba di tapak. Rekod anda akan muncul di sini.'
+    ],
+    'worker.emptyAttAction': ['Go to Home', 'Pergi ke Utama'],
   };
 
   /// Chinese copy for the redesigned surfaces.
@@ -540,6 +595,44 @@ class AppStrings {
     'files.noFiles': '还没有文件',
     'common.retry': '重试',
     'common.loading': '加载中…',
+    // Worker shell navigation
+    'wnav.dashboard': '首页',
+    'wnav.tasks': '任务',
+    'wnav.attendance': '考勤',
+    'wnav.alerts': '提醒',
+    'wnav.more': '更多',
+    'wnav.profile': '个人资料',
+    'wnav.hint.dashboard': '今日概览',
+    'wnav.hint.tasks': '分配给你的工作',
+    'wnav.hint.attendance': '上班打卡、下班打卡',
+    'wnav.hint.alerts': '更新与消息',
+    'wnav.hint.profile': '账号设置',
+    // Worker dashboard
+    'worker.todayThree': '今天要做的三件事',
+    'worker.todayThreeSub': '按顺序做完这三步，今天就算完成了。',
+    'worker.thingTasks': '今日任务',
+    'worker.thingCheckIn': '打卡上下班',
+    'worker.thingIssue': '异常/问题上报',
+    'worker.thingIssueSub': '安全隐患、质量问题或受阻情况，请立刻上报给主管。',
+    'worker.noTaskToday': '暂时没有分配任务，主管分配后会显示在这里。',
+    'worker.nextUp': '接下来',
+    'worker.viewAll': '查看全部',
+    'worker.reportNow': '上报',
+    'worker.kpiPending': '待完成',
+    'worker.kpiHours': '今日工时',
+    'worker.kpiStatus': '今日状态',
+    'worker.statusNotIn': '未打卡',
+    'worker.statusOnSite': '在岗',
+    'worker.statusDone': '已下班',
+    'worker.attDetails': '打卡详情',
+    'worker.attDetailsSub': '项目、打卡范围、时间段与设备',
+    'worker.tasksSectionSub': '点击任务可打开并更新进度',
+    'worker.emptyTasksTitle': '还没有任务',
+    'worker.emptyTasksDesc': '主管分配工作内容后，这里就会出现你的任务。下拉可刷新。',
+    'worker.emptyTasksAction': '立即刷新',
+    'worker.emptyAttTitle': '今天还没有考勤记录',
+    'worker.emptyAttDesc': '到达工地后，在「首页」完成打卡，记录就会显示在这里。',
+    'worker.emptyAttAction': '回到首页',
   };
 
   /// Look up a string by key for the current language (en / zh / ms).

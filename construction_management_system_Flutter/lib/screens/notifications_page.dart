@@ -12,6 +12,7 @@ import '../services/project_cache.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../models/notification.dart';
+import '../widgets/guided_empty_state.dart';
 import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'workers_page.dart';
@@ -22,13 +23,18 @@ const _severities = ['low', 'medium', 'high'];
 const _categories = ['safety', 'delay', 'equipment', 'quality', 'other'];
 
 class NotificationsPage extends StatefulWidget {
-  const NotificationsPage({super.key, this.embedded = false});
+  const NotificationsPage({super.key, this.embedded = false, this.initialTab = 0});
 
   /// When true the page is rendered inside a shell that already owns the
   /// AppBar and the bottom navigation (worker shell tab), so this page only
   /// contributes its tab strip + content and never pushes a full-screen
   /// second-level route.
   final bool embedded;
+
+  /// Tab to open on first build: 0 = notifications, 1 = daily reports work
+  /// (supervisor) / issues (worker), 2 = issues (supervisor). Lets a dashboard
+  /// shortcut deep-link straight into the issue report form.
+  final int initialTab;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -412,6 +418,7 @@ class _NotificationsPageState extends State<NotificationsPage>
     );
     return DefaultTabController(
       length: tabs.length,
+      initialIndex: widget.initialTab.clamp(0, tabs.length - 1),
       child: Builder(builder: (ctx) {
         // Attach listener once after the DefaultTabController is created.
         final controller = DefaultTabController.of(ctx);
@@ -859,28 +866,16 @@ class _NotificationsPageState extends State<NotificationsPage>
     }
   }
 
-  Widget _emptyState() => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 72, height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.accentLight,
-              borderRadius: AppRadius.rMd,
-            ),
-            child: Icon(Icons.notifications_none_rounded,
-                size: 36, color: AppColors.accent),
-          ),
-          const SizedBox(height: 16),
-          Text(AppStrings.t('notif.noNotifications'),
-              style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary)),
-          const SizedBox(height: 8),
-          Text(AppStrings.t('notif.allCaughtUp'),
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: AppColors.textMuted)),
-        ]),
+  Widget _emptyState() => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+        child: GuidedEmptyState(
+          icon: Icons.notifications_none_rounded,
+          title: AppStrings.t('notif.noNotifications'),
+          description: AppStrings.t('notif.allCaughtUp'),
+          primaryLabel: AppStrings.t('common.retry'),
+          primaryIcon: Icons.refresh_rounded,
+          onPrimary: _load,
+        ),
       );
 
   Widget _notificationTile(NotificationItem item) {

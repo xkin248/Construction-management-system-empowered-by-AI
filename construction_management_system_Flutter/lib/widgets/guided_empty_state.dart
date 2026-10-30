@@ -30,6 +30,11 @@ class GuidedEmptyState extends StatelessWidget {
   /// Optional low-emphasis helper line shown under the button.
   final String? secondaryHint;
 
+  /// Dense variant for use *inside* a card / list section (no Center, no
+  /// scroll view, smaller plate) — otherwise the widget would demand infinite
+  /// height inside an unbounded parent.
+  final bool compact;
+
   const GuidedEmptyState({
     super.key,
     required this.icon,
@@ -39,76 +44,87 @@ class GuidedEmptyState extends StatelessWidget {
     this.primaryIcon = Icons.add_rounded,
     this.onPrimary,
     this.secondaryHint,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final plate = compact ? 56.0 : 80.0;
+    final content = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 360),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: plate,
+            height: plate,
+            decoration: BoxDecoration(
+              color: AppColors.accentLight,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: compact ? 26 : 34, color: AppColors.accent),
+          ),
+          SizedBox(height: compact ? 12 : 20),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: compact ? 14 : 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: compact ? 12.5 : 13,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          if (primaryLabel != null && onPrimary != null) ...[
+            SizedBox(height: compact ? 14 : 20),
+            ElevatedButton.icon(
+              onPressed: onPrimary,
+              icon: Icon(primaryIcon, size: compact ? 16 : 18),
+              label: Text(
+                primaryLabel!,
+                style: GoogleFonts.inter(
+                    fontSize: compact ? 12.5 : 13.5, fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: AppColors.accentInk,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(horizontal: compact ? 16 : 22, vertical: compact ? 11 : 14),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
+              ),
+            ),
+          ],
+          if (secondaryHint != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              secondaryHint!,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: content),
+      );
+    }
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: AppColors.accentLight,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 34, color: AppColors.accent),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  height: 1.5,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              if (primaryLabel != null && onPrimary != null) ...[
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: onPrimary,
-                  icon: Icon(primaryIcon, size: 18),
-                  label: Text(
-                    primaryLabel!,
-                    style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.accentInk,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
-                  ),
-                ),
-              ],
-              if (secondaryHint != null) ...[
-                const SizedBox(height: 12),
-                Text(
-                  secondaryHint!,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-                ),
-              ],
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }

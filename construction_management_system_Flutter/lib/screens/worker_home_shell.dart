@@ -10,43 +10,34 @@ import 'notifications_page.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/app_settings_actions.dart';
+import '../widgets/guided_empty_state.dart';
+import 'worker_tasks_page.dart';
 
 // ──────────────── Nav model ────────────────
 class _NavItem {
-  final String label;
+  final String labelKey; // key in app_strings (en / zh / ms)
   final IconData icon;
-  const _NavItem(this.label, this.icon);
+  final IconData activeIcon;
+  const _NavItem(this.labelKey, this.icon, this.activeIcon);
 }
 
-/// Translate worker navigation labels (English / 中文 / Bahasa Melayu).
-String _navT(String en) {
-  const zh = {
-    'My Dashboard': '我的仪表盘', 'My Attendance': '我的考勤', 'Notifications': '通知', 'Profile': '个人资料',
-  };
-  const ms = {
-    'My Dashboard': 'Papan Pemuka Saya', 'My Attendance': 'Kehadiran Saya', 'Notifications': 'Notifikasi', 'Profile': 'Profil',
-  };
-  return AppSettings.t(en, zh[en], ms[en]);
-}
-
+/// Worker tabs — kept at five so every entry keeps a comfortable tap target
+/// on a phone. "Tasks" is now a first-class entry (it used to be buried in the
+/// dashboard), and Profile lives here instead of a second AppBar icon.
 const _workerMenu = [
-  _NavItem('My Dashboard', Icons.grid_view_rounded),
-  _NavItem('My Attendance', Icons.calendar_month_rounded),
-  _NavItem('Notifications', Icons.notifications_outlined),
-  _NavItem('Profile', Icons.person_outline_rounded),
+  _NavItem('wnav.dashboard', Icons.home_outlined, Icons.home_rounded),
+  _NavItem('wnav.tasks', Icons.assignment_outlined, Icons.assignment_rounded),
+  _NavItem('wnav.attendance', Icons.fact_check_outlined, Icons.fact_check_rounded),
+  _NavItem('wnav.alerts', Icons.notifications_outlined, Icons.notifications_rounded),
+  _NavItem('wnav.profile', Icons.person_outline_rounded, Icons.person_rounded),
 ];
 
-final _workerPages = <Widget>[
-  const WorkerDashboardPage(),
-  const _WorkerAttendanceTab(),
-  // Notifications lives inside this shell so the bottom navigation (and its
-  // tap targets) stay in place — no full-screen second-level page where a tap
-  // aimed at the nav bar would hit a list row instead.
-  const NotificationsPage(embedded: true),
-  const ProfilePage(),
-];
-
-final _workerTitles = _workerMenu.map((e) => e.label).toList();
+/// Index of each tab, so dashboard shortcuts do not hard-code numbers.
+const int kWorkerTabHome = 0;
+const int kWorkerTabTasks = 1;
+const int kWorkerTabAttendance = 2;
+const int kWorkerTabAlerts = 3;
+const int kWorkerTabProfile = 4;
 
 class WorkerHomeShell extends StatefulWidget {
   const WorkerHomeShell({super.key});
@@ -55,9 +46,12 @@ class WorkerHomeShell extends StatefulWidget {
 }
 
 class _WorkerHomeShellState extends State<WorkerHomeShell> {
-  int idx = 0;
-  // Single IndexedStack instance keeps page state alive across navigation.
-  final _pagesKey = GlobalKey();
+  int idx = kWorkerTabHome;
+
+  /// Sub-tab requested for the Alerts page (0 = notifications, 1 = issues).
+  /// The dashboard "report a problem" shortcut jumps straight to the issue
+  /// form; the key below is what forces the page to honour it.
+  int _notifTab = 0;
 
   @override
   void initState() {
@@ -89,14 +83,34 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
         context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
   }
 
-  void _go(int i) {
-    setState(() => idx = i);
+  void _go(int i, [int subTab = 0]) {
+    setState(() {
+      idx = i;
+      if (i == kWorkerTabAlerts) _notifTab = subTab;
+    });
   }
+
+  /// Pages are rebuilt on every build so the dashboard can drive navigation
+  /// and the alerts tab can honour a requested sub-tab.
+  List<Widget> _buildPages() => [
+        WorkerDashboardPage(onNavigate: _go),
+        const WorkerTasksPage(),
+        _WorkerAttendanceTab(onGoHome: () => _go(kWorkerTabHome)),
+        // Notifications lives inside this shell so the bottom navigation (and
+        // its tap targets) stay in place — no full-screen second-level page
+        // where a tap aimed at the nav bar would hit a list row instead.
+        NotificationsPage(
+          key: ValueKey('worker-notif-$_notifTab'),
+          embedded: true,
+          initialTab: _notifTab,
+        ),
+        const ProfilePage(),
+      ];
 
   @override
   Widget build(BuildContext c) {
     return _NarrowLayout(
-      pages: IndexedStack(key: _pagesKey, index: idx, children: _workerPages),
+      pages: IndexedStack(index: idx, children: _buildPages()),
       idx: idx,
       onNav: _go,
       onLogout: _logout,
@@ -108,7 +122,7 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
 class _NarrowLayout extends StatelessWidget {
   final Widget pages;
   final int idx;
-  final ValueChanged<int> onNav;
+  final void Function(int index, [int subTab]) onNav;
   final VoidCallback onLogout;
 
   const _NarrowLayout({
@@ -120,23 +134,17 @@ class _NarrowLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final title = AppStrings.t(_workerMenu[idx.clamp(0, _workerMenu.length - 1)].labelKey);
     return Scaffold(
       backgroundColor: AppColors.bgMain,
       appBar: AppBar(
         backgroundColor: AppColors.bgCard,
         elevation: 0,
         surfaceTintColor: AppColors.transparent,
-        title: Text(_navT(_workerTitles[idx]),
+        title: Text(title,
             style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
         actions: [
           const AppSettingsActions(),
-          // Profile entry in the top-right corner (mobile-friendly replacement
-          // for the removed sidebar / drawer profile entry).
-          IconButton(
-            icon: Icon(Icons.person_rounded, color: AppColors.textPrimary, size: 22),
-            tooltip: _navT('Profile'),
-            onPressed: () => onNav(3),
-          ),
           IconButton(
             icon: Icon(Icons.power_settings_new_rounded, color: AppColors.red),
             tooltip: AppStrings.t('profile.logout'),
@@ -162,18 +170,21 @@ class _NarrowLayout extends StatelessWidget {
             child: SafeArea(
               top: false,
               child: BottomNavigationBar(
-                currentIndex: idx.clamp(0, _workerPages.length - 1),
-                onTap: onNav,
+                currentIndex: idx.clamp(0, _workerMenu.length - 1),
+                onTap: (i) => onNav(i),
                 backgroundColor: AppColors.transparent,
                 selectedItemColor: AppColors.accent,
                 unselectedItemColor: AppColors.textMuted,
                 type: BottomNavigationBarType.fixed,
                 elevation: 0,
+                selectedFontSize: 11,
+                unselectedFontSize: 11,
                 items: _workerMenu
                     .map((e) => BottomNavigationBarItem(
                           icon: Icon(e.icon),
-                          label: _navT(e.label),
-                          tooltip: _navT(e.label),
+                          activeIcon: Icon(e.activeIcon),
+                          label: AppStrings.t(e.labelKey),
+                          tooltip: AppStrings.t(e.labelKey),
                         ))
                     .toList(),
               ),
@@ -187,7 +198,10 @@ class _NarrowLayout extends StatelessWidget {
 
 // ──────────────── Worker Attendance Tab (standalone page) ────────────────
 class _WorkerAttendanceTab extends StatefulWidget {
-  const _WorkerAttendanceTab();
+  /// Jump back to the dashboard (where the check-in button lives) when there
+  /// is no record for today yet.
+  final VoidCallback? onGoHome;
+  const _WorkerAttendanceTab({this.onGoHome});
   @override
   State<_WorkerAttendanceTab> createState() => _WorkerAttendanceTabState();
 }
@@ -264,8 +278,15 @@ class _WorkerAttendanceTabState extends State<_WorkerAttendanceTab> {
                   style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 12),
               if (attRec == null)
-                Text('No attendance record for today yet. Check in from the Dashboard.',
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 14))
+                GuidedEmptyState(
+                  compact: true,
+                  icon: Icons.punch_clock_outlined,
+                  title: AppStrings.t('worker.emptyAttTitle'),
+                  description: AppStrings.t('worker.emptyAttDesc'),
+                  primaryLabel: AppStrings.t('worker.emptyAttAction'),
+                  primaryIcon: Icons.home_rounded,
+                  onPrimary: () => widget.onGoHome?.call(),
+                )
               else ...[
                 _row('Check In', _fmtTime(attRec['check_in_time']),
                     attRec['check_in_time'] != null ? AppColors.green : AppColors.textMuted),
