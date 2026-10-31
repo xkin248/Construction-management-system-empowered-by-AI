@@ -25,7 +25,9 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-3.6-flash
+        # lite first: the full flash ids answer 429 on the free tier and would
+        # take the whole AI layer down with them (see app/ai_service.py rotation).
+        value: gemini-flash-lite-latest
       - key: GEMINI_THINKING_BUDGET
         value: "0"
       - key: GEMINI_TIMEOUT
