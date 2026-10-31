@@ -11,14 +11,19 @@ import '../services/project_cache.dart';
 import '../services/gps_notification_service.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
-import '../widgets/charts.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../widgets/task_form.dart';
 import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
-import '../widgets/a11y.dart';
+import '../widgets/dashboard/dashboard_chart_cards.dart';
+import '../widgets/dashboard/dashboard_checkin_card.dart';
+import '../widgets/dashboard/dashboard_kpi_cards.dart';
+import '../widgets/dashboard/dashboard_project_cards.dart';
+import '../widgets/dashboard/dashboard_quick_actions.dart';
+import '../widgets/dashboard/dashboard_section_parts.dart';
+import '../widgets/dashboard/dashboard_welcome_card.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -305,57 +310,33 @@ class _DashboardPageState extends State<DashboardPage> {
         children: [
           // ── Load error banner with retry ──
           if (_loadError != null) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.redLight,
-                borderRadius: AppRadius.rSm,
-                border: Border.all(color: AppColors.red.withValues(alpha: 0.35)),
-              ),
-              child: Row(children: [
-                Icon(Icons.error_outline_rounded, size: 18, color: AppColors.red),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    AppStrings.t(failureKindOf(_loadError).descriptionKey),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.red),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => _load(forceRefresh: true),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.red,
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  ),
-                  child: Text(AppStrings.t('common.retry')),
-                ),
-              ]),
+            DashboardErrorBanner(
+              message: AppStrings.t(failureKindOf(_loadError).descriptionKey),
+              onRetry: () => _load(forceRefresh: true),
             ),
             const SizedBox(height: 16),
           ],
           // ── 1. Welcome greeting (who you are + what this page does) ──
-          _welcomeHeader(),
+          WelcomeCard(me: _me),
           const SizedBox(height: 16),
 
           // ── 2. Core KPI — three numbers only ──
           RepaintBoundary(
-            child: _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct)),
+            child: DashboardKpiRow(onSite: onSite, totalWorkers: totalWorkers, activeTasks: activeTasks, productivity: productivity, todayRate: todayRate, present: present, late: late, absent: absent, completed: completed, inProgress: inProgress, totalTasks: totalTasks, completedPct: completedPct)),
           const SizedBox(height: 16),
 
           // ── 3. Quick actions — the 3 things a new user does most ──
-          _quickActionsCard(),
+          QuickActionsCard(onNewTask: _quickNewTask, onAddWorker: _quickAddWorker, onNotifications: _quickNotifications),
           const SizedBox(height: 16),
 
           // ── Supervisor quick check-in (a one-tap action, stays on top) ──
           if (_isSupervisor) ...[
-            RepaintBoundary(child: _buildQuickCheckInCard()),
+            RepaintBoundary(child: SupervisorCheckInCard(checkedIn: _supCheckedIn, loading: _supLoading, message: _supMsg, onCheckIn: _quickCheckIn, onCheckOut: _quickCheckOut)),
             const SizedBox(height: 16),
           ],
 
           // ── 4. Charts / trends — collapsed, opened on demand ──
-          _collapsibleSection(
+          CollapsibleSection(
             icon: Icons.insights_rounded,
             title: AppStrings.t('dash.insightsTitle'),
             subtitle: AppStrings.t('dash.insightsSub'),
@@ -375,36 +356,36 @@ class _DashboardPageState extends State<DashboardPage> {
                 final isWide = cs.maxWidth > 600;
                 if (isWide) {
                   return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Expanded(flex: 3, child: RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels))),
+                    Expanded(flex: 3, child: RepaintBoundary(child: WeeklyAttendanceCard(data: weeklyData, labels: weekLabels))),
                     const SizedBox(width: 16),
-                    SizedBox(width: 240, child: RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0))),
+                    SizedBox(width: 240, child: RepaintBoundary(child: TaskDistributionCard(completedPct: completedPct, inProgressPct: inProgressPct, pendingPct: pendingPct, hasTasks: totalTasks > 0))),
                   ]);
                 }
                 return Column(children: [
-                  RepaintBoundary(child: _weeklyAttCard(weeklyData, weekLabels)),
+                  RepaintBoundary(child: WeeklyAttendanceCard(data: weeklyData, labels: weekLabels)),
                   const SizedBox(height: 16),
-                  RepaintBoundary(child: _taskDistCard(completedPct, inProgressPct, pendingPct, hasTasks: totalTasks > 0)),
+                  RepaintBoundary(child: TaskDistributionCard(completedPct: completedPct, inProgressPct: inProgressPct, pendingPct: pendingPct, hasTasks: totalTasks > 0)),
                 ]);
               }),
               const SizedBox(height: 20),
-              _sectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
+              SectionHeader('Productivity Trend by Project', sub: 'Weekly task completion rate (%)'),
               const SizedBox(height: 12),
               if (projects.isEmpty)
-                _emptyBox(AppStrings.t('proj.noProjects'), icon: Icons.folder_open_outlined)
+                DashboardEmptyBox(AppStrings.t('proj.noProjects'), icon: Icons.folder_open_outlined)
               else
-                ...projects.take(4).map((p) => _projectProductivityRow(p)),
+                ...projects.take(4).map((p) => ProjectProductivityRow(project: p)),
               const SizedBox(height: 20),
-              _sectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
+              SectionHeader('Upcoming Due Projects', sub: 'Projects due within 30 days or overdue'),
               const SizedBox(height: 12),
               if (upcoming.isEmpty)
-                _emptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
+                DashboardEmptyBox(AppStrings.t('dash.noDueProjects'), icon: Icons.event_note_outlined)
               else
-                ...upcoming.map((p) => _upcomingProjectCard(p)),
+                ...upcoming.map((p) => UpcomingProjectCard(project: p)),
             ],
           ),
 
           // ── 5. AI prediction — collapsed by default, manual trigger ──
-          _collapsibleSection(
+          CollapsibleSection(
             icon: Icons.auto_awesome_rounded,
             title: AppStrings.t('dash.aiPredictionTitle'),
             subtitle: AppStrings.t('dash.aiPredictionSub'),
@@ -414,124 +395,6 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
       },
-    );
-  }
-
-  // ── Welcome header (first thing a new user sees) ──
-  Widget _welcomeHeader() {
-    final name = (_me['full_name'] ?? _me['name'] ?? '').toString().trim();
-    final hour = DateTime.now().hour;
-    final greetKey = hour < 12
-        ? 'dash.goodMorning'
-        : hour < 18
-            ? 'dash.goodAfternoon'
-            : 'dash.goodEvening';
-    final greeting = name.isEmpty
-        ? AppStrings.t(greetKey)
-        : '${AppStrings.t(greetKey)}, ${name.split(' ').first}';
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Row(children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(color: AppColors.accentLight, shape: BoxShape.circle),
-          child: Icon(Icons.waving_hand_rounded, size: 22, color: AppColors.accent),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(
-              greeting,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              AppStrings.t('dash.welcomeHint'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary),
-            ),
-          ]),
-        ),
-      ]),
-    );
-  }
-
-  // ── Quick actions: the three most common first steps ──
-  Widget _quickActionsCard() {
-    final actions = [
-      (Icons.add_task_rounded, AppStrings.t('dash.actionNewTask'), _quickNewTask),
-      (Icons.person_add_alt_1_rounded, AppStrings.t('dash.actionAddWorker'), _quickAddWorker),
-      (Icons.notifications_active_outlined, AppStrings.t('dash.actionNotifications'), _quickNotifications),
-    ];
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionHeader(AppStrings.t('dash.quickActions')),
-      const SizedBox(height: 10),
-      Row(
-        children: [
-          for (var i = 0; i < actions.length; i++) ...[
-            if (i > 0) const SizedBox(width: 10),
-            Expanded(
-              child: _quickActionTile(
-                icon: actions[i].$1,
-                label: actions[i].$2,
-                onTap: actions[i].$3,
-              ),
-            ),
-          ],
-        ],
-      ),
-    ]);
-  }
-
-  Widget _quickActionTile({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return semanticTapTarget(
-      label: label,
-      child: Material(
-      color: AppColors.bgCard,
-      borderRadius: AppRadius.rMd,
-      child: InkWell(
-        borderRadius: AppRadius.rMd,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.rMd,
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rSm),
-              child: Icon(icon, size: 19, color: AppColors.accent),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-            ),
-          ]),
-        ),
-      )),
     );
   }
 
@@ -559,531 +422,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// Collapsible card: keeps secondary content one tap away instead of
-  /// pushing the first screen down. Collapsed by default.
-  Widget _collapsibleSection({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required List<Widget> children,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        // Hide the default ExpansionTile divider lines.
-        data: Theme.of(context).copyWith(dividerColor: AppColors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          iconColor: AppColors.accent,
-          collapsedIconColor: AppColors.textMuted,
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.accentLight, borderRadius: AppRadius.rSm),
-            child: Icon(icon, size: 18, color: AppColors.accent),
-          ),
-          title: Text(
-            title,
-            style: GoogleFonts.inter(
-                fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          ),
-          subtitle: Text(
-            subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted),
-          ),
-          expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
-      ),
-    );
-  }
-
-  // ── Supervisor quick check-in card ──
-  Widget _buildQuickCheckInCard() {
-    final accent = _supCheckedIn ? AppColors.green : AppColors.accent;
-    final bg = _supCheckedIn ? AppColors.greenLight : AppColors.accentLight;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Row(children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-          child: Icon(
-            _supCheckedIn ? Icons.check_circle_rounded : Icons.location_on_rounded,
-            color: accent,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_supCheckedIn ? AppStrings.t('dash.onSite') : AppStrings.t('dash.quickCheckin'),
-                style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            const SizedBox(height: 4),
-            Text(_supMsg,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary)),
-          ]),
-        ),
-        const SizedBox(width: 12),
-        _supLoading
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5))
-            : ElevatedButton.icon(
-                onPressed: _supCheckedIn ? _quickCheckOut : _quickCheckIn,
-                icon: Icon(_supCheckedIn ? Icons.logout_rounded : Icons.login_rounded, size: 16),
-                label: Text(_supCheckedIn ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accent,
-                  foregroundColor: AppColors.accentInk,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                ),
-              ),
-      ]),
-    );
-  }
 
   // ── KPI row builder ──
   /// Three headline numbers only — a first-time user should grasp the site
-  /// status without scrolling. Secondary counts live in the insights section.
-  Widget _buildKpiRow(onSite, totalWorkers, activeTasks, productivity, todayRate, present, late, absent, completed, inProgress, totalTasks, completedPct) {
-    return LayoutBuilder(builder: (ctx, cs) {
-      final isWide = cs.maxWidth > 600;
-      final cards = [
-        _kpiCard(
-          label: AppStrings.t('dash.todayAttendanceRate'),
-          value: '$todayRate%',
-          sub: '$onSite/$totalWorkers on site · $late late · $absent absent',
-          icon: Icons.fact_check_rounded,
-          iconColor: AppColors.accent,
-        ),
-        _kpiCard(
-          label: 'Active Tasks',
-          value: '$activeTasks',
-          // Show real completed + in-progress counts from the KPI response.
-          sub: completed > 0 || inProgress > 0
-              ? '$completed done · $inProgress in progress'
-              : null,
-          icon: Icons.assignment_rounded,
-          iconColor: AppColors.blue,
-        ),
-        _kpiCard(
-          label: 'Overall Productivity',
-          value: '$productivity%',
-          // No reliable week-over-week delta from the API — omit rather than
-          // show fake '+4%' that misleads users.
-          sub: totalTasks > 0
-              ? '$completedPct% tasks completed'
-              : null,
-          icon: Icons.trending_up_rounded,
-          iconColor: AppColors.green,
-          valueColor: AppColors.green,
-        ),
-      ];
-
-      if (isWide) {
-        return Row(children: cards.expand((c) => [Expanded(child: c), const SizedBox(width: 16)]).toList()..removeLast());
-      }
-      // Mobile: full-width hero card + compact metric rows.
-      // Single-column layout is kept on purpose — the previous 2x2 grid left
-      // the whole dashboard blank after scrolling on Honor 50 (GPU/driver
-      // related paint drop). Full-width cards do not trigger it.
-      return Column(children: [
-        _heroAttendanceCard(
-          rate: todayRate,
-          onSite: onSite,
-          totalWorkers: totalWorkers,
-          present: present,
-          late: late,
-          absent: absent,
-        ),
-        const SizedBox(height: 12),
-        _compactMetricCard(
-          label: 'Active Tasks',
-          value: '$activeTasks',
-          sub: totalTasks > 0 ? '$completed done · $inProgress in progress' : null,
-          icon: Icons.assignment_rounded,
-          iconColor: AppColors.blue,
-        ),
-        const SizedBox(height: 12),
-        _compactMetricCard(
-          label: 'Overall Productivity',
-          value: '$productivity%',
-          sub: totalTasks > 0 ? '$completedPct% of tasks completed' : null,
-          icon: Icons.trending_up_rounded,
-          iconColor: AppColors.green,
-          valueColor: AppColors.green,
-        ),
-      ]);
-    });
-  }
-
-  /// Hero attendance card — the single most important number on the page.
-  Widget _heroAttendanceCard({
-    required int rate,
-    required int onSite,
-    required int totalWorkers,
-    required int present,
-    required int late,
-    required int absent,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.accentLight,
-              borderRadius: AppRadius.rSm,
-            ),
-            child: Icon(Icons.fact_check_rounded, size: 20, color: AppColors.accent),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              AppStrings.t('dash.todayAttendanceRate'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text('$rate%',
-              style: GoogleFonts.inter(
-                  fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.accent)),
-        ]),
-        const SizedBox(height: 16),
-        ClipRRect(
-          borderRadius: AppRadius.rXs,
-          child: LinearProgressIndicator(
-            value: rate.clamp(0, 100) / 100,
-            minHeight: 8,
-            backgroundColor: AppColors.border,
-            valueColor: AlwaysStoppedAnimation(AppColors.accent),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          _metricChip('$onSite/$totalWorkers on site', AppColors.accent),
-          _metricChip('$present present', AppColors.green),
-          _metricChip('$late late', AppColors.yellow),
-          _metricChip('$absent absent', AppColors.red),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _metricChip(String text, Color color) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: AppRadius.rLg,
-        ),
-        child: Text(text,
-            style: GoogleFonts.inter(
-                fontSize: 11.5, fontWeight: FontWeight.w600, color: color)),
-      );
-
-  /// Compact single-line metric card (icon + label/sub + value on the right).
-  Widget _compactMetricCard({
-    required String label,
-    required String value,
-    String? sub,
-    required IconData icon,
-    required Color iconColor,
-    Color? valueColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Row(children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: iconColor.withValues(alpha: 0.10),
-            borderRadius: AppRadius.rSm,
-          ),
-          child: Icon(icon, size: 18, color: iconColor),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                    fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-            if (sub != null) ...[
-              const SizedBox(height: 4),
-              Text(sub,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
-            ],
-          ]),
-        ),
-        const SizedBox(width: 12),
-        Text(value,
-            style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: valueColor ?? AppColors.textPrimary)),
-      ]),
-    );
-  }
-
-  Widget _kpiCard({required String label, required String value, String? sub, required IconData icon, required Color iconColor, Color? valueColor}) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: Text(label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.10), borderRadius: AppRadius.rSm),
-            child: Icon(icon, size: 16, color: iconColor),
-          ),
-        ]),
-        const SizedBox(height: 12),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(value,
-              style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: valueColor ?? AppColors.textPrimary)),
-        ),
-        if (sub != null) ...[
-          const SizedBox(height: 4),
-          Text(sub,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-        ],
-      ]),
-    );
-  }
-
-  // ── Weekly Attendance Chart Card ──
-  Widget _weeklyAttCard(List<double> data, List<String> labels) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Flexible(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(AppStrings.t('dash.weeklyAttendance'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-              Text(AppStrings.t('dash.allProjectsCombined'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-            ]),
-          ),
-          TextButton(
-            onPressed: () {},
-            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
-            child: Text('${AppStrings.t('dash.viewAll')} →',
-                style: GoogleFonts.inter(fontSize: 13, color: AppColors.accent, fontWeight: FontWeight.w700)),
-          ),
-        ]),
-        const SizedBox(height: 16),
-        if (data.isNotEmpty)
-          // Always render the bar chart when the weekly payload exists, even if
-          // all values are 0 (LabeledBarChart handles all-zero with 4px stubs).
-          // Previously `data.any((v) => v > 0)` showed a "no data" placeholder
-          // on phones, making the bar chart invisible whenever the week had no
-          // attendance yet.
-          LabeledBarChart(values: data, labels: labels, height: 150, color: AppColors.blue.withValues(alpha: 0.25), highlightColor: AppColors.blue)
-        else
-          Container(
-            height: 150,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.bgCard,
-              borderRadius: AppRadius.rSm,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text(AppStrings.t('dash.noAttendanceData'),
-                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-          ),
-      ]),
-    );
-  }
-
-  // ── Task Distribution Donut Card ──
-  Widget _taskDistCard(int completedPct, int inProgressPct, int pendingPct, {bool hasTasks = true}) {
-    final slices = hasTasks
-        ? [
-            DonutSlice(completedPct.toDouble(), AppColors.green, 'Completed'),
-            DonutSlice(inProgressPct.toDouble(), AppColors.accent, 'In Progress'),
-            DonutSlice(pendingPct.toDouble(), AppColors.border, 'Pending'),
-          ]
-        : [DonutSlice(1, AppColors.border, 'Empty')];
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(AppStrings.t('dash.taskDistribution'),
-            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        const SizedBox(height: 4),
-        Text(AppStrings.t('dash.allActiveProjects'),
-            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 16),
-        Center(
-          child: SimpleDonutChart(
-            size: 118,
-            slices: slices,
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (hasTasks) ...[
-          _legendRow('Completed', '$completedPct%', AppColors.green),
-          const SizedBox(height: 8),
-          _legendRow('In Progress', '$inProgressPct%', AppColors.accent),
-          const SizedBox(height: 8),
-          _legendRow('Pending', '$pendingPct%', AppColors.textMuted),
-        ] else
-          Center(
-            child: Text(AppStrings.t('dash.noTaskData'),
-                style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-          ),
-      ]),
-    );
-  }
-
-  Widget _legendRow(String label, String pct, Color color) => Row(children: [
-        Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(label, style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary))),
-        Text(pct, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-      ]);
-
-  Widget _sectionHeader(String title, {String? sub}) => Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Container(width: 3.5, height: 16, decoration: BoxDecoration(
-          color: AppColors.accent,
-          borderRadius: AppRadius.rPill,
-        )),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            if (sub != null)
-              Text(sub,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
-          ]),
-        ),
-      ]);
-
-  /// Compact empty-state block used across dashboard list sections.
-  Widget _emptyBox(String message, {IconData icon = Icons.inbox_outlined}) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: AppRadius.rMd,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(children: [
-          Icon(icon, size: 26, color: AppColors.textMuted.withValues(alpha: 0.6)),
-          const SizedBox(height: 8),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-        ]),
-      );
-
-  Widget _projectProductivityRow(Map p) {
-    final progress = (p['progress'] as num? ?? 0).toDouble();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Expanded(
-            child: Text(p['project_name'] ?? '-',
-                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700),
-                overflow: TextOverflow.ellipsis),
-          ),
-          Text('${progress.toStringAsFixed(0)}%',
-              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.accent)),
-        ]),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: AppRadius.rXs,
-          child: LinearProgressIndicator(
-            value: progress / 100,
-            minHeight: 6,
-            backgroundColor: AppColors.border,
-            valueColor: AlwaysStoppedAnimation(AppColors.accent),
-          ),
-        ),
-      ]),
-    );
-  }
 
   // ── Upcoming Due Projects ──
   List _upcomingProjects() {
@@ -1104,52 +445,6 @@ class _DashboardPageState extends State<DashboardPage> {
     });
     return due;
   }
-
-  Widget _upcomingProjectCard(Map p) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final end = DateTime.tryParse((p['end_date'] as String?) ?? '');
-    int daysLeft = 0;
-    if (end != null) {
-      final endDay = DateTime(end.year, end.month, end.day);
-      daysLeft = endDay.difference(today).inDays;
-    }
-    final overdue = daysLeft < 0;
-    final dueToday = daysLeft == 0;
-    final label = overdue ? '${-daysLeft} day(s) overdue' : (dueToday ? 'Due today' : '$daysLeft day(s) left');
-    final color = overdue ? AppColors.red : (dueToday ? AppColors.yellow : AppColors.green);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rMd,
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rSm),
-          child: Icon(overdue ? Icons.event_busy_rounded : (dueToday ? Icons.event_available_rounded : Icons.event_rounded), size: 18, color: color),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(p['project_name'] ?? '-', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text('Due: ${_fmtDate((p['end_date'] as String?) ?? '')}', style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: AppRadius.rMd),
-          child: Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        ),
-      ]),
-    );
-  }
-
 
   String _fmtDate(String iso) {
     final dt = DateTime.tryParse(iso);
