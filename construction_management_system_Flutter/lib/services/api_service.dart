@@ -345,6 +345,11 @@ class ApiService {
   Future<Map> progressPrediction(int projectId) async =>
       Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
 
+  /// Which engine the AI layer is actually running on (model id, circuit
+  /// state, last error). Surfaced on the dashboard so a degraded rule-only run
+  /// is visible instead of being mistaken for a model verdict.
+  Future<Map> aiStatus() async => Map.from((await dio.get('/ai/status')).data);
+
   Future<Map> getWorker(int wid) async =>
       Map.from((await dio.get('/workers/$wid')).data);
 

@@ -17,6 +17,7 @@ import '../widgets/add_worker_sheet.dart';
 import '../widgets/task_form.dart';
 import 'attendance_geo_helper.dart';
 import 'notifications_page.dart';
+import '../widgets/dashboard/dashboard_ai_engine_card.dart';
 import '../widgets/dashboard/dashboard_chart_cards.dart';
 import '../widgets/dashboard/dashboard_checkin_card.dart';
 import '../widgets/dashboard/dashboard_kpi_cards.dart';
@@ -319,6 +320,10 @@ class _DashboardPageState extends State<DashboardPage> {
           // ── 1. Welcome greeting (who you are + what this page does) ──
           WelcomeCard(me: _me),
           const SizedBox(height: 16),
+
+          // ── 1b. Which AI engine is actually answering (diagnostics strip) ──
+          const RepaintBoundary(child: DashboardAiEngineCard()),
+          const SizedBox(height: 4),
 
           // ── 2. Core KPI — three numbers only ──
           RepaintBoundary(
