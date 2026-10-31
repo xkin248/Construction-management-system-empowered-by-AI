@@ -25,6 +25,10 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-1.5-flash
+        value: gemini-3.6-flash
+      - key: GEMINI_THINKING_BUDGET
+        value: "0"
+      - key: GEMINI_TIMEOUT
+        value: "15"
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false

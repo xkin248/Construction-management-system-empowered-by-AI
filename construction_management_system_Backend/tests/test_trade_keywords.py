@@ -109,6 +109,9 @@ ADDED_V2 = {
     "laborer": ["material handler", "cargo handler", "package handler", "freight handler"],
     "painting": ["wallpaper", "wallpapering", "decorator"],
     "masonry": ["cement patcher", "furnace mason", "refractory"],
+    # v2.1: "Plumb the bathrooms" hit no keyword, so the classifier's 0.18 stayed
+    # under the skip floor and a real plumbing task was left unassigned.
+    "plumbing": ["plumb", "piping", "drainage", "sink"],
 }
 
 

@@ -210,30 +210,30 @@ def test_resolve_degrades_to_rules_without_llm(monkeypatch):
     assert trace["llm_used"] is False
 
 
-class _BoomModel:
-    def generate_content(self, *args, **kwargs):
-        raise TimeoutError("gemini timeout")
-
-
-class _GarbageModel:
-    def generate_content(self, *args, **kwargs):
-        return type("R", (), {"text": "not json at all"})()
+def _boom(*args, **kwargs):
+    raise TimeoutError("gemini timeout")
 
 
 def test_llm_decision_returns_none_on_timeout(monkeypatch):
-    monkeypatch.setattr(ai_service, "get_gemini_model", lambda: _BoomModel())
+    # The transport lives in _gemini_text now; a timeout there must still degrade
+    # to "no verdict" instead of propagating into auto-assign.
+    monkeypatch.setattr(ai_service, "_gemini_text", _boom)
+    assert ai_service._llm_trade_decision("tile the floor", ["tiling", "flooring"]) is None
+
+
+def test_llm_decision_returns_none_without_key(monkeypatch):
+    monkeypatch.setattr(ai_service, "get_gemini_model", lambda: None)
     assert ai_service._llm_trade_decision("tile the floor", ["tiling", "flooring"]) is None
 
 
 def test_llm_decision_returns_none_on_unparsable_answer(monkeypatch):
-    monkeypatch.setattr(ai_service, "get_gemini_model", lambda: _GarbageModel())
+    monkeypatch.setattr(ai_service, "_gemini_text", lambda *a, **k: "not json at all")
     assert ai_service._llm_trade_decision("tile the floor", ["tiling", "flooring"]) is None
 
 
 def test_llm_decision_rejects_trade_outside_candidates(monkeypatch):
     payload = json.dumps({"trade": "welding", "confidence": 0.9, "reason": "x"})
-    monkeypatch.setattr(ai_service, "get_gemini_model",
-                        lambda: type("M", (), {"generate_content": lambda self, *a, **k: type("R", (), {"text": payload})()})())
+    monkeypatch.setattr(ai_service, "_gemini_text", lambda *a, **k: payload)
 
     assert ai_service._llm_trade_decision("tile the floor", ["tiling", "flooring"]) is None
 
@@ -242,8 +242,7 @@ def test_llm_decision_parses_valid_payload(monkeypatch):
     payload = "```json\n" + json.dumps(
         {"trade": "Flooring", "confidence": 1.4, "reason": "floor work"}
     ) + "\n```"
-    monkeypatch.setattr(ai_service, "get_gemini_model",
-                        lambda: type("M", (), {"generate_content": lambda self, *a, **k: type("R", (), {"text": payload})()})())
+    monkeypatch.setattr(ai_service, "_gemini_text", lambda *a, **k: payload)
 
     result = ai_service._llm_trade_decision("tile the floor", ["flooring", "tiling"])
     assert result is not None

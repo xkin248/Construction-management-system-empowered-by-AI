@@ -15,7 +15,7 @@ from app.schemas import (
 )
 from app.routers.auth import cu, require_site_supervisor
 from app.ai_service import (
-    analyze_task, auto_assign_tasks, predict_site_progress
+    analyze_task, auto_assign_tasks, predict_site_progress, llm_status
 )
 from app.ai_stats import build_decision_stats, empty_stats
 
@@ -126,6 +126,19 @@ def prediction_history(
             "created_at": r.created_at.isoformat() if r.created_at else None,
         })
     return out
+
+
+@router.get("/ai/status")
+def ai_layer_status(current_user=Depends(require_site_supervisor)):
+    """What the AI layer can actually do right now.
+
+    The app used to expose only the *results* of the AI pipeline, so a deployment
+    with a missing key or an exhausted Gemini quota looked identical to a healthy
+    one - every answer silently came from the rule layer. This endpoint reports
+    the degraded state (``last_error``) so the UI and the report can say honestly
+    which layer produced an answer.
+    """
+    return llm_status()
 
 
 @router.get("/ai/decision-log/stats")

@@ -236,13 +236,50 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       }
       await _refreshTaskFromServer();
       if (mounted) {
-        toast('Auto assign done — worker refreshed');
+        toast(_autoAssignSummary(_assignmentFor(result, tid)));
       }
     } catch (e) {
       if (mounted) toast('Auto assign failed: $e');
     } finally {
       if (mounted) setState(() => _autoAssigning = false);
     }
+  }
+
+  Map? _assignmentFor(Map result, int taskId) {
+    final list = result['assignments'];
+    if (list is List) {
+      for (final x in list) {
+        if (x is Map && x['task_id'] == taskId) return Map.from(x);
+      }
+    }
+    return null;
+  }
+
+  /// "Auto assigned to Ali (plumbing) - decided by trade rules 62%"
+  ///
+  /// The backend reports how the verdict was reached (rule / semantic / llm);
+  /// surfacing it stops a degraded, rule-only run from looking like a model
+  /// decision, which matters when the Gemini quota is exhausted.
+  String _autoAssignSummary(Map? item) {
+    final w = _assignedWorkers.isNotEmpty ? _assignedWorkers.first : null;
+    final name = (w?['name'] as String?) ?? 'worker';
+    final itemTrade = item?['trade'] as String?;
+    final trade = (itemTrade != null && itemTrade.isNotEmpty)
+        ? itemTrade
+        : ((w?['trade'] as String?) ?? '');
+    const labels = <String, String>{
+      'llm': 'AI model',
+      'semantic': 'semantic match',
+      'rule': 'trade rules',
+    };
+    final source = (item?['decision_source'] as String?) ?? 'rule';
+    final label = labels[source] ?? source;
+    final conf = (item?['confidence'] as num?)?.toDouble();
+    final buffer = StringBuffer('Auto assigned to $name');
+    if (trade.isNotEmpty) buffer.write(' ($trade)');
+    buffer.write(' - decided by $label');
+    if (conf != null) buffer.write(' ${(conf * 100).round()}%');
+    return buffer.toString();
   }
 
   void _showAutoAssignSkipped(String reason) {

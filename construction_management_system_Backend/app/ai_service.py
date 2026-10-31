@@ -4,6 +4,8 @@ import logging
 import platform
 import re
 import time
+import urllib.error
+import urllib.request
 from collections import defaultdict
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
@@ -38,7 +40,83 @@ from app.worker_pool import get_project_workers
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+
+# Model rotation. Google retires model ids without notice (gemini-1.5-flash now
+# answers 404 for every key, and gemini-2.5-flash is closed to new users), so the
+# configured id is treated as the *first* candidate: the first 404 downstream
+# promotes the next one for the rest of the process instead of silently falling
+# back to keyword rules forever.
+GEMINI_MODEL_CANDIDATES: List[str] = []
+
+
+def _build_model_candidates() -> List[str]:
+    # Order matters: the first entry is tried first on a cold start.
+    #
+    # Measured against the free-tier key used for this project (2026-10): every
+    # full "flash" id (3.5/3.6/3.7/3.8, flash-latest) answers 429 for this key,
+    # while the *lite* ids still have quota and answer in ~1 s. Putting a lite id
+    # right after the configured model means the layer recovers on the same call
+    # instead of burning four 429s (and then opening the circuit for two minutes,
+    # which made every AI feature look broken). The full ids stay as a quality
+    # upgrade path for a billed key, just behind the lite ones.
+    raw = [
+        (GEMINI_MODEL or "").strip(),
+        "gemini-flash-lite-latest",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+        "gemini-flash-latest",
+    ]
+    seen: List[str] = []
+    for m in raw:
+        if m and m not in seen:
+            seen.append(m)
+    return seen
+
+
+GEMINI_MODEL_CANDIDATES.extend(_build_model_candidates())
+_ACTIVE_MODEL: Optional[str] = None
+_RETIRED_MODELS: set = set()
+
+# Gemini 3.x flash ships with thinking enabled, which costs 4-25s per call and
+# routinely blew past the caller timeouts (the trade LLM had 8s), so every AI
+# feature degraded to its rule-based path. Thinking is disabled by default here;
+# set GEMINI_THINKING_BUDGET=-1 to restore the provider default.
+GEMINI_THINKING_BUDGET = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
+# Ceiling for the non-trade Gemini calls (safety report, worker ranking and
+# progress prediction). They used to be unbounded, which made a slow model hang
+# an authenticated request well past the Flutter client's 30s receive timeout.
+GEMINI_TIMEOUT_SECONDS = float(os.getenv("GEMINI_TIMEOUT", "15"))
+
+# Batch budget. auto_assign walks every open task and used to fire a Gemini call
+# per task (one ranking call plus one trade verdict), so a project with 20 vague
+# tasks blocked the request for minutes. A budget caps the LLM work of one batch
+# run; whatever is left falls back to the local matcher, which is what the UI
+# already renders.
+_LLM_BUDGET: Dict[str, Any] = {"calls_left": None, "deadline": None}
+
+
+def start_llm_budget(max_calls: int, seconds: float) -> None:
+    _LLM_BUDGET["calls_left"] = max(0, int(max_calls))
+    _LLM_BUDGET["deadline"] = time.time() + max(0.0, float(seconds))
+
+
+def clear_llm_budget() -> None:
+    _LLM_BUDGET["calls_left"] = None
+    _LLM_BUDGET["deadline"] = None
+
+
+def _llm_budget_allows() -> bool:
+    calls_left = _LLM_BUDGET.get("calls_left")
+    if calls_left is None:
+        return True
+    deadline = _LLM_BUDGET.get("deadline") or 0.0
+    if calls_left <= 0 or time.time() >= deadline:
+        return False
+    _LLM_BUDGET["calls_left"] = calls_left - 1
+    return True
 
 # ── Trade decision thresholds ────────────────────────────────────────────────
 # The deterministic pipeline (keyword rules + semantic matcher) is trusted when
@@ -94,14 +172,14 @@ TRADE_ALIASES: Dict[str, List[str]] = {
     "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
     "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
     "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
-    "painting": ["painting", "paint", "plaster", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
-    "welding": ["welding", "weld", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
+    "painting": ["painting", "paint", "painter", "painters", "plaster", "plasterer", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
+    "welding": ["welding", "weld", "welder", "welders", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
     "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
     "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面", "bumbung", "atap"],
-    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "瓷砖", "地砖", "jubin", "mozek"],
-    "drywall": ["drywall", "sheetrock", "gypsum", "taper", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
+    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "tilesetter", "瓷砖", "地砖", "jubin", "mozek"],
+    "drywall": ["drywall", "drywaller", "sheetrock", "gypsum", "taper", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
     "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗", "kaca", "tingkap"],
-    "flooring": ["flooring", "floor", "linoleum", "carpet", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
+    "flooring": ["flooring", "floor", "floorer", "linoleum", "carpet", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
     "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
     "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan"],
     "insulation": ["insulation", "insulator", "insulate", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca"],
@@ -115,7 +193,7 @@ TRADE_ALIASES: Dict[str, List[str]] = {
 TASK_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai", "marquetry", "inlay", "cabinetmaker"],
     "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel", "wirer", "wireman"],
-    "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump"],
+    "plumbing": ["plumbing", "plumber", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump", "plumb", "piping", "drainage", "sink"],
     "masonry": ["masonry", "mason", "brick", "block", "concrete", "rebar", "stucco", "plaster", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforc", "post tension", "curbstone", "kiln", "cement patcher", "furnace mason", "refractory"],
     "painting": ["painting", "paint", "emulsion", "primer", "coat", "varnish", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "wallpaper", "wallpapering", "decorator"],
     "welding": ["welding", "weld", "steel", "metal", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli", "solder", "soldering", "brazing", "boilermaker", "sub arc", "arc weld", "spot weld", "boiler installer", "boiler mechanic"],
@@ -135,7 +213,7 @@ TASK_KEYWORDS: Dict[str, List[str]] = {
 SEED_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "cabinet", "joinery", "timber", "wood", "wooden", "plywood", "formwork", "framework", "carpentry", "hinge", "door lock", "partition wall", "sheathing", "stud", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai", "marquetry", "inlay", "cabinetmaker"],
     "electrical": ["electrician", "electrical", "electric", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel", "wirer", "wireman"],
-    "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump"],
+    "plumbing": ["plumber", "plumbing", "pipe", "water pipe", "sanitary", "chiller", "flush", "valve", "mixer", "tap", "shower", "faucet", "toilet", "drain", "sewer", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang", "sewage", "septic", "sump", "plumb", "piping", "drainage", "sink"],
     "masonry": ["mason", "masonry", "brick", "block", "concrete", "rebar", "stucco", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas", "terrazzo", "reinforcing", "post tension", "curbstone", "kiln", "granite", "cement patcher", "furnace mason", "refractory"],
     "painting": ["painter", "painting", "paint", "emulsion", "primer", "coat", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "stair rail", "handrail", "furniture", "trim", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
     "welding": ["welder", "welding", "weld", "steel", "metal", "ironworker", "railing", "column", "erect", "焊接", "钢结构", "kimpal", "pengimpal", "keluli", "solder", "soldering", "brazing", "boilermaker", "sub arc", "arc weld", "spot weld", "boiler installer", "boiler mechanic"],
@@ -181,6 +259,12 @@ TRADE_CLASSIFIER_SKIP_PROB = 0.25     # below this with no keyword hit -> "skip"
 # the probability says. Vague titles then take the historical low-confidence path
 # (LLM worker suggestion) instead of a coin-flip trade.
 TRADE_CLASSIFIER_MIN_COVERAGE = 0.34
+# The softmax multiclass bundle does not inflate unseen text the way One-vs-Rest
+# does, so it keeps the historical no-guard behaviour for any text that shares at
+# least a few in-vocabulary words. It still has to reject text that shares *no*
+# word with the training vocabulary at all: "test/test" scores 0.37 -> electrical
+# on coverage 0.00 and used to be auto-assigned to the first electrician.
+TRADE_CLASSIFIER_MIN_COVERAGE_SINGLE = 0.10
 
 # Multi-label decision rule (only used when the classifier artefact is a
 # One-vs-Rest model, i.e. ``label_mode == "multi"``). Kept in sync with
@@ -488,10 +572,20 @@ def _classifier_trade_decision(
 
     # The coverage guard exists for the One-vs-Rest model, whose balanced columns
     # score ~0.45 on out-of-vocabulary text. The historical multiclass model is
-    # softmax-normalised and never had this failure mode, so the guard stays off
-    # for ``label_mode == "single"`` - applying it there silently drops rows the
-    # pre-registered configuration used to get right (valid 92.8 % -> 89.2 %).
-    if label_mode == "multi" and not keyword_trades and coverage < TRADE_CLASSIFIER_MIN_COVERAGE:
+    # softmax-normalised and mostly immune, but not fully: text sharing no word
+    # with the vocabulary still lands on a trade (~0.37). Hence two floors - the
+    # strict one for One-vs-Rest, a near-zero one for softmax - so the
+    # pre-registered results are not disturbed (a strict floor on single-label
+    # takes valid 92.8 % -> 89.2 %).
+    if label_mode == "multi":
+        coverage_floor = TRADE_CLASSIFIER_MIN_COVERAGE
+    else:
+        # Single-label softmax: only reject text with (almost) no in-vocabulary
+        # word, so a placeholder like "test/test" cannot claim a real trade while
+        # ordinary tasks keep the pre-registered behaviour.
+        coverage_floor = TRADE_CLASSIFIER_MIN_COVERAGE_SINGLE
+
+    if not keyword_trades and coverage < coverage_floor:
         if trace is not None:
             trace.clear()
             trace.update({
@@ -715,8 +809,15 @@ def _resolve_detected_trades(
         # Low-confidence LLM verdict: do not guess, keep the task unassignable.
         return set()
 
-    # Degraded path (no key / timeout / parse failure): original behaviour.
-    _fill(source="rule", confidence=best_score, llm_used=False, llm_reason=None)
+    # Degraded path (no key / timeout / parse failure): original behaviour, but
+    # the reason is carried out so the UI and the report can tell "the rules were
+    # enough" apart from "the model was unavailable".
+    _fill(
+        source="rule",
+        confidence=best_score,
+        llm_used=False,
+        llm_reason=_llm_unavailable_reason(),
+    )
     return detected
 
 
@@ -740,13 +841,272 @@ def _worker_trade_group(trade: str) -> Optional[str]:
     return None
 
 
+def gemini_enabled() -> bool:
+    """True when a Gemini key is present (the SDK is only used for configuration)."""
+    return bool(GEMINI_AVAILABLE and GEMINI_API_KEY)
+
+
 def get_gemini_model():
-    if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
+    if not gemini_enabled():
         return None
     try:
-        return genai.GenerativeModel(GEMINI_MODEL)
+        return genai.GenerativeModel(_ACTIVE_MODEL or GEMINI_MODEL)
     except Exception:
         return None
+
+
+# HTTP codes that mean "this model, right now" rather than "this deployment is
+# misconfigured": 429 is the per-model quota, 5xx is transient overload. Both are
+# worth spending on the next candidate instead of dropping the LLM layer.
+_RETRYABLE_HTTP_CODES = {429, 500, 502, 503, 504}
+
+# A model that just answered 429 has spent its quota for a while; retrying it on
+# every request would add a wasted round-trip (and latency) to every AI call, so
+# it is moved behind its siblings for a few minutes instead of being dropped.
+_MODEL_COOLDOWN_SECONDS = 300
+_MODEL_COOLDOWN: Dict[str, float] = {}
+
+# Cap on one rotation pass. Without it, three dead candidates at the 15 s socket
+# timeout would turn a single AI request into a 45 s hang; the rule layer could
+# have answered in milliseconds.
+_LLM_TOTAL_BUDGET_SECONDS = 20.0
+
+# When every candidate fails, the provider is down for us (quota exhausted or
+# region-wide 503). Retrying on the next request would add ~10 s to *every* AI
+# call while the rule layer could answer instantly, so the LLM layer is skipped
+# for this long and the callers honestly report a rule-based answer instead.
+_LLM_CIRCUIT_SECONDS = 120
+_LLM_CIRCUIT_OPEN_UNTIL = 0.0
+
+# Last failure observed by :func:`_gemini_text` (``None`` after a success). Kept
+# so the API can report *why* the AI layer degraded instead of silently claiming
+# a rule-based answer came from the model.
+_LAST_LLM_ERROR: Optional[Dict[str, Any]] = None
+
+
+def _record_llm_error(model: Optional[str], code: Optional[int], message: str) -> None:
+    global _LAST_LLM_ERROR
+    _LAST_LLM_ERROR = {
+        "model": model,
+        "code": code,
+        "message": (message or "")[:300],
+        "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+def _cool_down(model: str) -> None:
+    _MODEL_COOLDOWN[model] = time.monotonic() + _MODEL_COOLDOWN_SECONDS
+
+
+def _cooling_down(model: str) -> bool:
+    return _MODEL_COOLDOWN.get(model, 0.0) > time.monotonic()
+
+
+def _open_circuit() -> None:
+    global _LLM_CIRCUIT_OPEN_UNTIL
+    _LLM_CIRCUIT_OPEN_UNTIL = time.monotonic() + _LLM_CIRCUIT_SECONDS
+
+
+def _circuit_seconds_left() -> float:
+    return max(0.0, _LLM_CIRCUIT_OPEN_UNTIL - time.monotonic())
+
+
+def _error_summary() -> str:
+    if not _LAST_LLM_ERROR:
+        return "unknown error"
+    code = _LAST_LLM_ERROR.get("code")
+    if code:
+        return f"HTTP {code}"
+    return (_LAST_LLM_ERROR.get("message") or "error")[:120]
+
+
+def _llm_unavailable_reason() -> str:
+    """One line explaining why the LLM layer was not consulted.
+
+    Callers only reach this after an ambiguous task, i.e. when the model *should*
+    have been asked. Reporting the reason keeps the degradation honest instead of
+    making a rule-based answer look like a model verdict.
+    """
+    if not gemini_enabled():
+        return "Gemini API key not configured - rule-based verdict kept"
+    if _circuit_seconds_left() > 0:
+        return f"Gemini temporarily unavailable ({_error_summary()}) - rule-based verdict kept"
+    if _LAST_LLM_ERROR:
+        return f"Gemini call failed ({_error_summary()}) - rule-based verdict kept"
+    return "Gemini returned no usable verdict - rule-based verdict kept"
+
+
+def llm_status() -> Dict[str, Any]:
+    """Snapshot of the LLM layer, safe to expose over HTTP (no key material)."""
+    now = time.monotonic()
+    return {
+        "enabled": gemini_enabled(),
+        "preferred_model": GEMINI_MODEL,
+        "active_model": _ACTIVE_MODEL,
+        "candidates": [m for m in GEMINI_MODEL_CANDIDATES if m not in _RETIRED_MODELS],
+        "retired_models": sorted(_RETIRED_MODELS),
+        "cooldown": {
+            model: round(until - now, 1)
+            for model, until in _MODEL_COOLDOWN.items()
+            if until > now
+        },
+        "circuit": {
+            "open": _circuit_seconds_left() > 0,
+            "seconds_left": round(_circuit_seconds_left(), 1),
+        },
+        "budget": {
+            "calls_left": _LLM_BUDGET.get("calls_left"),
+            "deadline": _LLM_BUDGET.get("deadline"),
+        },
+        "last_error": dict(_LAST_LLM_ERROR) if _LAST_LLM_ERROR else None,
+    }
+
+
+_THINKING_FREE_HINTS = ("lite", "-tts", "image", "embedding", "nano-banana", "omni")
+
+
+def _supports_thinking(model: str) -> bool:
+    """Whether ``thinkingConfig`` may be sent to this model.
+
+    Only the full Gemini 3 flash/pro ids accept it; the lite and image variants
+    answer 400 "Unknown name thinking_config". Sending it blindly is what made a
+    free-tier key look broken: the only ids with quota (the lite ones) were
+    rejected before they could answer.
+    """
+    name = (model or "").lower()
+    return not any(hint in name for hint in _THINKING_FREE_HINTS)
+
+
+def _gemini_request(
+    model: str,
+    prompt: str,
+    *,
+    timeout: float,
+    max_output_tokens: int,
+    temperature: float,
+) -> str:
+    """One blocking generateContent call over the REST API.
+
+    The official SDK pinned in requirements.txt (google-generativeai 0.8.3)
+    predates Gemini 3 and rejects ``thinking_config`` with a ValueError, so the
+    REST endpoint is called directly: it is the only way to turn thinking off and
+    to set a hard per-call deadline.
+    """
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{model}:generateContent?key={GEMINI_API_KEY}"
+    )
+    generation_config: Dict[str, Any] = {
+        "maxOutputTokens": int(max_output_tokens),
+        "temperature": float(temperature),
+    }
+    if GEMINI_THINKING_BUDGET >= 0 and _supports_thinking(model):
+        generation_config["thinkingConfig"] = {"thinkingBudget": GEMINI_THINKING_BUDGET}
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": generation_config,
+    }
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        payload = json.loads(response.read().decode("utf-8", "ignore"))
+    candidates = payload.get("candidates") or []
+    if not candidates:
+        return ""
+    parts = candidates[0].get("content", {}).get("parts") or []
+    return "".join(str(part.get("text") or "") for part in parts)
+
+
+def _gemini_text(
+    prompt: str,
+    *,
+    timeout: float = GEMINI_TIMEOUT_SECONDS,
+    max_output_tokens: int = 1024,
+    temperature: float = 0.2,
+) -> Optional[str]:
+    """Generate text, rotating to the next model when one has been retired.
+
+    Returns ``None`` on any failure (no key, timeout, unparsable envelope), which
+    is what every caller already treats as "keep the rule-based result".
+    """
+    global _ACTIVE_MODEL
+    global _LAST_LLM_ERROR
+    if not gemini_enabled():
+        return None
+    if _circuit_seconds_left() > 0:
+        # Provider is known to be down for us: fail fast so the caller falls back
+        # to the rule layer in milliseconds instead of after a 20 s rotation.
+        return None
+    if not _llm_budget_allows():
+        return None
+
+    ordered = []
+    if _ACTIVE_MODEL and _ACTIVE_MODEL not in _RETIRED_MODELS:
+        ordered.append(_ACTIVE_MODEL)
+    for name in GEMINI_MODEL_CANDIDATES:
+        if name not in ordered and name not in _RETIRED_MODELS:
+            ordered.append(name)
+    # Models that just hit their quota go last, keeping their relative order.
+    ordered.sort(key=_cooling_down)
+
+    deadline = time.monotonic() + _LLM_TOTAL_BUDGET_SECONDS
+    for model in ordered:
+        remaining = deadline - time.monotonic()
+        if remaining <= 1.0:
+            _record_llm_error(model, None, "LLM rotation budget exhausted")
+            logger.warning("Gemini rotation budget exhausted before trying %s", model)
+            break
+        try:
+            text = _gemini_request(
+                model,
+                prompt,
+                timeout=min(timeout, remaining),
+                max_output_tokens=max_output_tokens,
+                temperature=temperature,
+            )
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                # 404 = the id is gone or not enabled for this key: retire it and
+                # try the next candidate instead of degrading the feature.
+                _RETIRED_MODELS.add(model)
+                logger.warning("Gemini model %s rejected (%s), rotating", model, exc.code)
+                continue
+            _record_llm_error(model, exc.code, str(exc.reason or ""))
+            if exc.code == 429:
+                _cool_down(model)
+            if exc.code in _RETRYABLE_HTTP_CODES or exc.code == 400:
+                # 429 = this model's quota, 5xx = transient overload, 400 = the
+                # request body is not valid *for this model* (e.g. thinkingConfig
+                # on a lite id). None of those mean the model is gone, so rotate
+                # instead of giving up or retiring it.
+                logger.warning(
+                    "Gemini model %s HTTP %s (%s), trying next candidate",
+                    model,
+                    exc.code,
+                    exc.reason,
+                )
+                continue
+            logger.warning("Gemini model %s HTTP %s", model, exc.code)
+            return None
+        except Exception as exc:  # timeout / connection reset / bad JSON
+            # A timeout says nothing about the *other* models: rotate as well,
+            # otherwise one slow candidate silently disables the whole LLM layer.
+            _record_llm_error(model, None, str(exc))
+            logger.warning("Gemini model %s failed (%s), trying next candidate", model, exc)
+            continue
+        _ACTIVE_MODEL = model
+        _LAST_LLM_ERROR = None  # a success means the layer is healthy again
+        return text
+
+    # Every live candidate failed: stop paying the rotation latency on each call.
+    _open_circuit()
+    if _LAST_LLM_ERROR is None:
+        _record_llm_error(None, None, "all Gemini candidates unavailable")
+    return None
 
 
 # ──────────────────────────────────────────────────────────────
@@ -859,16 +1219,13 @@ def _llm_trade_decision(task_text: str, candidates: List[str]) -> Optional[Dict[
         candidates=", ".join(sorted(candidates)),
     )
     try:
-        try:
-            resp = model.generate_content(
-                prompt, request_options={"timeout": LLM_TRADE_TIMEOUT_SECONDS}
-            )
-        except TypeError:
-            # Older google-generativeai releases reject request_options; the
-            # call then runs without an explicit timeout (still guarded by the
-            # try/except below so a failure degrades gracefully).
-            resp = model.generate_content(prompt)
-        parsed = _extract_json(getattr(resp, "text", "") or "")
+        text = _gemini_text(
+            prompt,
+            timeout=LLM_TRADE_TIMEOUT_SECONDS,
+            max_output_tokens=256,
+            temperature=0.0,
+        )
+        parsed = _extract_json(text or "")
     except Exception:
         return None
     if not isinstance(parsed, dict):
@@ -909,6 +1266,10 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
     copy that can silently drift from production.
     """
     trace: Dict[str, Any] = {}
+    # Callers are expected to lowercase, but the keyword layer is a plain
+    # substring test: "Plumb the bathrooms" would silently miss "plumb" if any
+    # caller forgot. Normalise here so the contract cannot be broken by accident.
+    task_text = (task_text or "").lower()
     keyword_trades: set = set()
     raw_semantic_scores: Dict[str, float] = {}
     classifier_scores: Dict[str, float] = {}
@@ -943,6 +1304,35 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
                 classifier_scores = _classifier_trade_scores(task_text)
                 semantic_scores = raw_semantic_scores = classifier_scores
                 trade_source = "classifier"
+                # A single classifier label *below* the confidence floor is a
+                # guess, not a verdict: "handle the thing we discussed" came back
+                # as equipment @0.40 and was reported as a rule decision, which is
+                # exactly the "AI says it is smart but does something dumb" case.
+                # Spend one arbitration call on the full trade list instead of
+                # accepting a 40 % guess, and keep the label when the model is
+                # unavailable.
+                if detected_trades and len(detected_trades) == 1:
+                    best_cls = max(
+                        (classifier_scores.get(g, 0.0) for g in detected_trades), default=0.0
+                    )
+                    if best_cls < LLM_TRADE_MIN_SCORE:
+                        llm = _llm_trade_decision(task_text, sorted(TRADE_ALIASES))
+                        if llm:
+                            detected_trades = (
+                                {llm["trade"]}
+                                if llm["confidence"] >= SKIP_CONFIDENCE_THRESHOLD
+                                else set()
+                            )
+                            semantic_scores = raw_semantic_scores = {
+                                canonical: 1.0 for canonical in detected_trades
+                            }
+                            trade_source = "llm"
+                            trace = {
+                                "source": "llm",
+                                "confidence": llm["confidence"],
+                                "llm_used": True,
+                                "llm_reason": llm.get("reason") or None,
+                            }
                 # The classifier refused to guess, but the hand-checked keyword
                 # layer saw something: let the arbitration (keyword scores +
                 # optional LLM) take over rather than dropping the task.
@@ -1217,8 +1607,10 @@ Recommended actions: [Suggested measures]
 """
 
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        response_text = _gemini_text(prompt, max_output_tokens=512, temperature=0.2)
+        if not response_text:
+            return "Safety analysis is temporarily unavailable, please assess manually."
+        return response_text
     except Exception:
         return "Safety analysis is temporarily unavailable, please assess manually."
 
@@ -1328,12 +1720,14 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
             }
         }
         try:
-            resp = model.generate_content(
+            text = _gemini_text(
                 "Based on the following JSON input, recommend the most suitable workers for this task (up to {}). Output JSON only, no extra text.\n\n{}".format(
                     top_k, json.dumps(prompt, ensure_ascii=False)
-                )
+                ),
+                max_output_tokens=1024,
+                temperature=0.2,
             )
-            parsed = _extract_json(getattr(resp, "text", "") or "")
+            parsed = _extract_json(text or "")
             base_for_trades = analyze_task(db, task_info, project_id, same_project_only=same_project_only, log_decision=log_decision)
             if isinstance(parsed, dict) and isinstance(parsed.get("suggested_workers"), list):
                 out = parsed
@@ -1360,6 +1754,37 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
 
 
 def auto_assign_tasks(
+    db,
+    project_id: Optional[int] = None,
+    task_ids: Optional[List[int]] = None,
+    dry_run: bool = True,
+    top_k: int = 3,
+    same_project_only: bool = False
+) -> Dict[str, Any]:
+    """Run a batch auto-assignment with a bounded Gemini budget.
+
+    The budget is process-global, so it must be released even when the batch
+    raises: a leaked exhausted budget made every later LLM call in the same
+    worker silently degrade to the local matcher (and broke later tests).
+    """
+    start_llm_budget(
+        int(os.getenv("AUTO_ASSIGN_LLM_CALLS", "4")),
+        float(os.getenv("AUTO_ASSIGN_LLM_SECONDS", "25")),
+    )
+    try:
+        return _auto_assign_tasks_impl(
+            db,
+            project_id=project_id,
+            task_ids=task_ids,
+            dry_run=dry_run,
+            top_k=top_k,
+            same_project_only=same_project_only,
+        )
+    finally:
+        clear_llm_budget()
+
+
+def _auto_assign_tasks_impl(
     db,
     project_id: Optional[int] = None,
     task_ids: Optional[List[int]] = None,
@@ -1404,6 +1829,18 @@ def auto_assign_tasks(
         )
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])
+        # Verdict metadata repeated on every item (assigned *and* skipped): the
+        # client renders "how was this decided" instead of an unexplained name.
+        decision_meta = {
+            "trade": (sorted(matched_trades)[0] if matched_trades else (t.trade or None)),
+            "decision_source": str(
+                rec.get("decision_source")
+                or ("skip" if rec.get("low_confidence") else "rule")
+            ),
+            "confidence": round(float(rec.get("confidence") or 0.0), 3),
+            "llm_used": bool(rec.get("llm_used")),
+            "llm_reason": rec.get("llm_reason"),
+        }
 
         def _log(task=t, rec=rec, started=task_started, source=None, skip_reason=None,
                  chosen_ids=None, matched=None):
@@ -1447,9 +1884,10 @@ def auto_assign_tasks(
                 "assigned_worker_id": None,
                 "assigned_worker_ids": [],
                 "suggested_workers": [],
-                "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+                "ai_used": bool(rec.get("llm_used")) or bool(_load_trade_matcher()),
                 "skipped": True,
                 "skip_reason": skip_reason,
+                **decision_meta,
             })
             _log(skip_reason=skip_reason, source="skip")
             continue
@@ -1469,9 +1907,10 @@ def auto_assign_tasks(
                     "assigned_worker_id": None,
                     "assigned_worker_ids": [],
                     "suggested_workers": [],
-                    "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+                    "ai_used": bool(rec.get("llm_used")) or bool(_load_trade_matcher()),
                     "skipped": True,
                     "skip_reason": skip_reason,
+                    **decision_meta,
                 })
                 _log(skip_reason=skip_reason)
                 continue
@@ -1523,9 +1962,10 @@ def auto_assign_tasks(
             "assigned_worker_id": chosen_ids[0] if chosen_ids else None,
             "assigned_worker_ids": chosen_ids,
             "suggested_workers": suggested,
-            "ai_used": bool(get_gemini_model()) or bool(_load_trade_matcher()),
+            "ai_used": bool(rec.get("llm_used")) or bool(_load_trade_matcher()),
             "skipped": False,
             "skip_reason": None,
+            **decision_meta,
         })
         _log(chosen_ids=chosen_ids)
 
@@ -1726,6 +2166,7 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
 
     # ── AI-powered refinement ──
     model = get_gemini_model()
+    ai_llm_used = False
     ai_trend = rule_trend
     ai_confidence = 70.0
     ai_insights = ""
@@ -1786,9 +2227,10 @@ Output format (strict JSON):
   ]
 }}"""
         try:
-            resp = model.generate_content(prompt)
-            parsed = _extract_json(getattr(resp, "text", "") or "")
+            text = _gemini_text(prompt, max_output_tokens=2048, temperature=0.2)
+            parsed = _extract_json(text or "")
             if isinstance(parsed, dict):
+                ai_llm_used = True
                 ai_trend = str(parsed.get("trend", rule_trend)).lower()
                 ai_confidence = float(parsed.get("confidence", 70))
                 ai_insights = str(parsed.get("ai_insights", ""))
@@ -1844,7 +2286,7 @@ Output format (strict JSON):
         "trend": ai_trend,
         "confidence": round(ai_confidence, 1),
         "ai_insights": ai_insights,
-        "ai_used": bool(model),
+        "ai_used": ai_llm_used,
         "velocity": {
             "weekly_tasks_completed": round(weekly_velocity, 2),
             "remaining_tasks": remaining_tasks,

@@ -353,6 +353,14 @@ class AIAutoAssignItem(BaseModel):
     ai_used: bool = False
     skipped: bool = False
     skip_reason: Optional[str] = None
+    # Why this verdict was produced: "rule" / "semantic" / "llm" / "skip".
+    # Exposed so the app can show *how* the worker was chosen instead of a bare
+    # name, and so a degraded (rule-only) run is visible rather than hidden.
+    trade: Optional[str] = None
+    decision_source: Optional[str] = None
+    confidence: Optional[float] = None
+    llm_used: bool = False
+    llm_reason: Optional[str] = None
 
 class AIAutoAssignResponse(BaseModel):
     project_id: int
