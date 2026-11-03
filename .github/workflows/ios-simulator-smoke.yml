@@ -11,7 +11,7 @@ on:
       - '.github/workflows/ios-simulator-smoke.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   simulator:
@@ -72,6 +72,18 @@ jobs:
           xcrun simctl spawn "$SIM_UDID" log show --last 3m --predicate 'processImagePath CONTAINS "Runner"' > sim-shots/app.log 2>/dev/null || true
           grep -i -m 20 -E "flutter|exception|error" sim-shots/app.log || true
           ls -la sim-shots
+
+      - name: 💾 Commit screenshots as evidence
+        if: always()
+        run: |
+          set +e
+          mkdir -p docs/verification/ios-simulator
+          cp sim-shots/*.png docs/verification/ios-simulator/ 2>/dev/null
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f docs/verification/ios-simulator
+          git commit -m "chore(evidence): iOS simulator launch screenshots [skip ci]"
+          git push
 
       - name: 📤 Upload screenshots
         if: always()
