@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
 import '../services/gps_notification_service.dart';
+import '../services/photo_capture.dart';
 import '../l10n/app_strings.dart';
 import '../utils/date_helper.dart';
 import '../widgets/loading_skeleton.dart';
@@ -143,10 +144,17 @@ class _DashboardPageState extends State<DashboardPage> {
           return;
         }
       }
+      final photo = await _captureCheckInPhoto();
+      if (photo == null) {
+        setState(() { _supLoading = false; });
+        return;
+      }
       await ApiService().supervisorCheckIn(
         projectId: pid ?? 1,
         lat: pos['lat']!,
         lng: pos['lng']!,
+        photoBase64: photo.base64,
+        photoMimeType: photo.mimeType,
       );
       setState(() {
         _supCheckedIn = true;
@@ -189,6 +197,27 @@ class _DashboardPageState extends State<DashboardPage> {
       toast(e.message ?? 'Check-out failed');
     } catch (e) {
       setState(() { _supMsg = 'Error: $e'; _supLoading = false; });
+    }
+  }
+
+  /// Opens the camera for the mandatory supervisor check-in selfie.
+  ///
+  /// Returns null when the photo is cancelled or unavailable; the caller then
+  /// aborts the check-in instead of falling back to a photo-less request.
+  Future<CapturedPhoto?> _captureCheckInPhoto() async {
+    setState(() { _supMsg = 'Opening camera — take a photo of yourself on site...'; });
+    try {
+      final photo = await PhotoCapture.takeSelfie();
+      setState(() { _supMsg = 'Photo captured, submitting check-in...'; });
+      return photo;
+    } on PhotoCaptureException catch (e) {
+      if (!e.cancelled) toast(e.message);
+      setState(() {
+        _supMsg = e.cancelled
+            ? 'A photo of yourself is required to check in.'
+            : e.message;
+      });
+      return null;
     }
   }
 

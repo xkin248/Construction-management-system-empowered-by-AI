@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../l10n/app_strings.dart';
+import '../services/app_settings.dart';
+import '../constants/trade_levels.dart';
 import 'login_page.dart';
 
 class WorkerRegisterPage extends StatefulWidget {
@@ -43,10 +45,9 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
     begin: const Offset(0, 0.10), end: Offset.zero,
   ).animate(CurvedAnimation(parent: _anim, curve: Curves.easeOutCubic));
 
-  static const List<String> _skillOptions = [
-    'General', 'Carpenter', 'Electrical', 'Plumbing', 'Masonry',
-    'Steel', 'Painter', 'Welder', 'Tiler', 'Roofer',
-  ];
+  // Four skill levels only (see lib/constants/trade_levels.dart). The value
+  // sent to the backend is the lowercase level name; the label is localised.
+  static List<TradeLevel> get _skillOptions => TradeLevels.all;
 
   @override
   void initState() {
@@ -452,20 +453,36 @@ class _WorkerRegisterPageState extends State<WorkerRegisterPage>
 
   // ── Dropdown ──
   Widget _dropdownField() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedSkill,
-      isExpanded: true,
-      dropdownColor: AppColors.darkSurface,
-      decoration: _inputDecoration('Select your trade'),
-      style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent, fontWeight: FontWeight.w600),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.darkTextMuted),
-      items: _skillOptions
-          .map((t) => DropdownMenuItem(
-                value: t,
-                child: Text(t, style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent)),
-              ))
-          .toList(),
-      onChanged: (v) => setState(() => _selectedSkill = v),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: _selectedSkill,
+          isExpanded: true,
+          dropdownColor: AppColors.darkSurface,
+          decoration: _inputDecoration(AppSettings.t(
+            'Select your skill level',
+            '请选择技能等级',
+            'Pilih tahap kemahiran anda',
+          )),
+          style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent, fontWeight: FontWeight.w600),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.darkTextMuted),
+          items: _skillOptions
+              .map((l) => DropdownMenuItem(
+                    value: l.value,
+                    child: Text(l.label, style: GoogleFonts.inter(fontSize: 14, color: AppColors.onAccent)),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => _selectedSkill = v),
+        ),
+        if (_selectedSkill != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            TradeLevels.hint(_selectedSkill!),
+            style: GoogleFonts.inter(fontSize: 12, color: AppColors.darkTextMuted),
+          ),
+        ],
+      ],
     );
   }
 

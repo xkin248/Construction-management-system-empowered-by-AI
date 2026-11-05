@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
+import '../services/photo_capture.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
 import '../services/task_status_notifier.dart';
@@ -1169,10 +1170,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     // non-empty completion note (the backend enforces it too).
     if (newStatus == 'completed') {
       final noteCtrl = TextEditingController();
+      // Completion evidence captured in the dialog below; kept outside the
+      // builder so the preview survives rebuilds.
+      CapturedPhoto? photo;
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => StatefulBuilder(
-          builder: (ctx, _) => AlertDialog(
+          builder: (ctx, setLocal) => AlertDialog(
             title: Text(AppStrings.t('tasks.confirmCompleteTitle')),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1192,6 +1196,40 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     border: OutlineInputBorder(borderRadius: AppRadius.rMd),
                   ),
                 ),
+                const SizedBox(height: 12),
+                // The backend rejects completion without a site photo, so it is
+                // captured here rather than failing after the dialog closes.
+                Row(children: [
+                  Icon(
+                    photo == null
+                        ? Icons.camera_alt_outlined
+                        : Icons.check_circle_rounded,
+                    size: 18,
+                    color: photo == null ? AppColors.textMuted : AppColors.green,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      photo == null
+                          ? 'Site photo required'
+                          : 'Site photo captured',
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () async {
+                      try {
+                        final shot = await PhotoCapture.takeEvidencePhoto();
+                        setLocal(() => photo = shot);
+                      } on PhotoCaptureException catch (e) {
+                        if (!e.cancelled) toast(e.message);
+                      }
+                    },
+                    icon: const Icon(Icons.photo_camera_rounded, size: 18),
+                    label: Text(photo == null ? 'Take photo' : 'Retake'),
+                  ),
+                ]),
               ],
             ),
             actions: [
@@ -1205,6 +1243,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     toast(AppStrings.t('tasks.completionNoteRequired'));
                     return;
                   }
+                  if (photo == null) {
+                    toast('Take a site photo to complete this task');
+                    return;
+                  }
                   Navigator.pop(ctx, true);
                 },
                 style: TextButton.styleFrom(foregroundColor: AppColors.green),
@@ -1216,9 +1258,14 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       );
       if (ok != true || !mounted) return;
       try {
+        // Bind to a local so the null-check above is honoured by the analyzer
+        // and the two photo fields always describe the same capture.
+        final shot = photo!;
         await ApiService().updateTask(taskId, {
           'status': newStatus,
           'completion_note': noteCtrl.text.trim(),
+          'photo_base64': shot.base64,
+          'photo_mime_type': shot.mimeType,
         });
         t['status'] = newStatus;
         t['completion_note'] = noteCtrl.text.trim();

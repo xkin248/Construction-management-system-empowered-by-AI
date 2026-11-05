@@ -4,8 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../services/api_service.dart';
 import '../../services/task_status_notifier.dart';
+import '../../services/photo_capture.dart';
 import '../../utils/date_helper.dart';
 import '../../l10n/app_strings.dart';
+import '../../constants/trade_levels.dart';
 import '../../widgets/a11y.dart';
 import '../../screens/task_detail_page.dart';
 
@@ -144,6 +146,19 @@ class TaskCardState extends State<TaskCard> {
                     border: OutlineInputBorder(borderRadius: AppRadius.rMd),
                   ),
                 ),
+                const SizedBox(height: 12),
+                // The camera opens right after this dialog is confirmed; warn
+                // about it here so cancelling the shot is not a surprise.
+                Row(children: [
+                  Icon(Icons.photo_camera_outlined,
+                      size: 15, color: AppColors.textMuted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(AppStrings.t('tasks.photoRequired'),
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: AppColors.textMuted)),
+                  ),
+                ]),
               ],
             ),
             actions: [
@@ -167,10 +182,26 @@ class TaskCardState extends State<TaskCard> {
         ),
       );
       if (ok != true || !mounted) return;
+      // The site photo is the completion evidence, so it is captured BEFORE the
+      // request. A cancelled or failed capture aborts the whole submission —
+      // the task must never be marked done without a photo, and the backend
+      // rejects a completed task with no photo as well.
+      final CapturedPhoto shot;
+      try {
+        shot = await PhotoCapture.takeEvidencePhoto();
+      } on PhotoCaptureException catch (e) {
+        toast(e.cancelled
+            ? AppStrings.t('tasks.photoCancelled')
+            : AppStrings.t('tasks.photoFailed'));
+        return;
+      }
+      if (!mounted) return;
       try {
         await ApiService().updateTask(widget.task['task_id'], {
           'status': newStatus,
           'completion_note': noteCtrl.text.trim(),
+          'photo_base64': shot.base64,
+          'photo_mime_type': shot.mimeType,
         });
         setState(() => _status = newStatus);
         widget.task['status'] = newStatus;
@@ -422,8 +453,7 @@ class TaskCardState extends State<TaskCard> {
                     borderRadius: AppRadius.rMd,
                   ),
                   child: Text(
-                    (widget.task['trade'] as String)[0].toUpperCase() +
-                        (widget.task['trade'] as String).substring(1),
+                    TradeLevels.label(widget.task['trade'] as String),
                     style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

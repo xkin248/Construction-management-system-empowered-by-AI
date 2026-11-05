@@ -8,6 +8,7 @@ import '../services/project_cache.dart';
 import '../widgets/charts.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../l10n/app_strings.dart';
+import '../constants/trade_levels.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../widgets/app_scrollbar.dart';
@@ -426,7 +427,7 @@ class _WorkerAttCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = worker['status'] as String? ?? 'absent';
     final name = worker['name'] as String? ?? '?';
-    final trade = worker['trade'] as String? ?? 'Worker';
+    final trade = TradeLevels.label(worker['trade'] as String?);
     final project = worker['project']?['project_name'] as String? ?? '—';
     final checkIn = _fmtTime(worker['check_in_time'] as String?);
     final checkOut = _fmtTime(worker['check_out_time'] as String?);

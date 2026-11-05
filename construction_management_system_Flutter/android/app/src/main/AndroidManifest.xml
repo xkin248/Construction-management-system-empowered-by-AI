@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- FCM notifications (runtime permission required on Android 13+, see main.dart) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Attendance selfie / task completion photo (image_picker -> OS camera) -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="BuildSmart"
         android:name="${applicationName}"

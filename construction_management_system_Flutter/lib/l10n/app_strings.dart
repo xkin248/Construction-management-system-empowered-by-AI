@@ -189,6 +189,12 @@ class AppStrings {
     'tasks.completionNoteLabel': ['Completion note', 'Nota penyiapan'],
     'tasks.completionNoteHint': ['Describe what was completed...', 'Terangkan apa yang telah disiapkan...'],
     'tasks.completionNoteRequired': ['Completion note is required', 'Nota penyiapan diperlukan'],
+    'tasks.photoRequired': ['A site photo is required to complete this task', 'Gambar di tapak diperlukan untuk menyelesaikan tugasan ini'],
+    'tasks.photoCancelled': ['Photo cancelled — the task was not completed', 'Gambar dibatalkan — tugasan tidak diselesaikan'],
+    'tasks.photoFailed': ['Could not take the photo, please try again', 'Tidak dapat mengambil gambar, sila cuba lagi'],
+    'tasks.completionPhoto': ['Completion photo', 'Gambar penyiapan'],
+    'tasks.completionPhotoAt': ['Submitted at', 'Dihantar pada'],
+    'tasks.completionPhotoMissing': ['No completion photo', 'Tiada gambar penyiapan'],
     'tasks.reopen': ['Reopen', 'Buka semula'],
     'tasks.reopenTitle': ['Reopen this task?', 'Buka semula tugasan ini?'],
     'tasks.reopenBody': [
@@ -336,8 +342,11 @@ class AppStrings {
     'workers.addWorker': ['Add worker', 'Tambah pekerja'],
     'workers.fullName': ['Full Name', 'Nama Penuh'],
     'workers.fullNameHint': ['e.g. Ali Hassan', 'cth. Ali Hassan'],
-    'workers.tradeRole': ['Trade / Role', 'Kemahiran / Peranan'],
-    'workers.tradeRoleHint': ['e.g. Electrician', 'cth. Juruelektrik'],
+    'workers.tradeRole': ['Skill level', 'Tahap kemahiran'],
+    'workers.tradeRoleHint': [
+      'Select general / semi skilled / skilled / foreman',
+      'Pilih am / separuh mahir / mahir / mandor'
+    ],
     'workers.phone': ['Phone', 'Telefon'],
     'workers.phoneHint': ['+60 12-345 6789', '+60 12-345 6789'],
     'workers.emailForLogin': ['Email (for login)', 'E-mel (untuk log masuk)'],
@@ -380,8 +389,11 @@ class AppStrings {
     'worker.register.confirm': ['Confirm', 'Sahkan'],
     'worker.register.phone': ['Phone (required)', 'Telefon (wajib)'],
     'worker.register.ic': ['IC Number (optional)', 'No. IC (pilihan)'],
-    'worker.register.trade': ['Trade / Skill', 'Kepakaran / Kemahiran'],
-    'worker.register.selectTrade': ['Select your trade', 'Pilih kepakaran anda'],
+    'worker.register.trade': ['Skill Level', 'Tahap Kemahiran'],
+    'worker.register.selectTrade': [
+      'Select your skill level',
+      'Pilih tahap kemahiran anda'
+    ],
     'worker.register.submit': ['Create Worker Account', 'Buat Akaun Pekerja'],
     'worker.register.haveAccount': ['Already have an account?  ', 'Sudah ada akaun?  '],
     'worker.register.backToLogin': ['Back to Login', 'Kembali ke Log Masuk'],
@@ -556,6 +568,11 @@ class AppStrings {
   /// blocking the build. Any new key added for the beginner-friendly UI must be
   /// added here as well.
   static const Map<String, String> _zh = {
+    // Trade levels (four-level picker, see lib/constants/trade_levels.dart)
+    'workers.tradeRole': '技能等级',
+    'workers.tradeRoleHint': '选择 普工 / 半熟练工 / 熟练工 / 工头',
+    'worker.register.trade': '技能等级',
+    'worker.register.selectTrade': '选择你的技能等级',
     // Login / register
     'login.showPassword': '显示密码',
     'login.hidePassword': '隐藏密码',
@@ -629,6 +646,12 @@ class AppStrings {
     // Common list-page labels used on the redesigned screens
     'proj.noProjects': '还没有项目',
     'proj.newProject': '新建项目',
+    'tasks.photoRequired': '完成任务必须拍摄现场照片',
+    'tasks.photoCancelled': '已取消拍照，任务未标记完成',
+    'tasks.photoFailed': '拍照失败，请重试',
+    'tasks.completionPhoto': '完成照片',
+    'tasks.completionPhotoAt': '提交时间',
+    'tasks.completionPhotoMissing': '暂无完成照片',
     'tasks.noTasks': '还没有任务',
     'tasks.newTask': '新建任务',
     'workers.noWorkers': '还没有工人',

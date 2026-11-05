@@ -79,6 +79,12 @@ class AttendanceLog(Base):
     device_type = Column(String(50), nullable=True)    # android / ios / web / windows
     device_id = Column(String(255), nullable=True)     # Unique device identifier
     ip_address = Column(String(100), nullable=True)    # Client IP address at check-in
+    # On-site selfie evidence, mandatory at check-in for both workers and site
+    # supervisors. Path is relative to UPLOAD_DIR (see app/attendance_photo.py)
+    # so the row survives a change of storage root and the photo can always be
+    # replayed for review (anti proxy check-in).
+    in_photo_path = Column(String(500), nullable=True)
+    out_photo_path = Column(String(500), nullable=True)
     worker = relationship("Worker", back_populates="attendance_logs")
 
 class Task(Base):
@@ -97,6 +103,10 @@ class Task(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)  # time the task was marked completed
     progress = Column(Integer, nullable=True)  # supervisor-set 0-100 progress; None falls back to status-derived value
     completion_note = Column(Text, nullable=True)  # mandatory note captured when the task is completed
+    # Completion evidence: a site photo the worker must take before the task can
+    # be marked completed. The path is relative to UPLOAD_DIR (see task_photo.py).
+    completion_photo_path = Column(String(500), nullable=True)
+    completion_photo_at = Column(DateTime(timezone=True), nullable=True)  # when the photo was submitted
     assigned_worker = relationship("Worker", back_populates="tasks")
     task_workers = relationship("TaskWorker", back_populates="task", cascade="all, delete-orphan")
     project = relationship("Project", back_populates="tasks")
@@ -402,3 +412,67 @@ class WorkerNotification(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     read_at = Column(DateTime(timezone=True), nullable=True)
     worker = relationship("Worker")
+
+# ══════════════════════════════════════════════════════════════════════════
+# Common daily tasks (morning briefing / toolbox talk / housekeeping)
+# ══════════════════════════════════════════════════════════════════════════
+# Every site runs the same three jobs every single day. On paper nothing could
+# prove they happened, so they get a row per (project, kind, work_date): the day's
+# checklist is created on first access (no background scheduler to depend on) and
+# the unique constraint makes a concurrent double-create a no-op instead of a
+# duplicate. A row is only ever closed with a photo — the same evidence rule the
+# attendance selfie and task completion already follow.
+class CommonTaskInstance(Base):
+    __tablename__ = "common_task_instances"
+    instance_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_id = Column(
+        Integer, ForeignKey("projects.project_id"), nullable=False, index=True
+    )
+    # briefing | toolbox | housekeeping
+    task_kind = Column(String(20), nullable=False)
+    work_date = Column(Date, nullable=False, index=True)
+    # pending | done
+    status = Column(String(20), nullable=False, server_default="pending")
+    # Relative object key (see storage_service) — never image bytes, never a URL.
+    photo_path = Column(String(500), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_by = Column(
+        Integer, ForeignKey("workers.worker_id"), nullable=True
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "task_kind", "work_date",
+            name="uq_common_task_project_kind_date",
+        ),
+        Index("ix_common_task_project_date", "project_id", "work_date"),
+    )
+
+
+class ToolboxIssue(Base):
+    """One hand-over of tools, optionally closed by a later return.
+
+    A toolbox talk signs tools out and back in; both halves are photographed, and
+    several tools can share one photo (a worker takes a tray of tools at once).
+    Rows are therefore per tool line, all pointing at the same photo object, so
+    "what is still out there?" stays a simple query on ``status``.
+    """
+    __tablename__ = "toolbox_issues"
+    issue_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(
+        Integer, ForeignKey("workers.worker_id"), nullable=False, index=True
+    )
+    project_id = Column(
+        Integer, ForeignKey("projects.project_id"), nullable=True, index=True
+    )
+    tool_name = Column(String(200), nullable=False)
+    qty = Column(Integer, nullable=False, server_default="1")
+    taken_at = Column(DateTime(timezone=True), nullable=False)
+    take_photo_path = Column(String(500), nullable=True)
+    returned_at = Column(DateTime(timezone=True), nullable=True)
+    return_photo_path = Column(String(500), nullable=True)
+    # taken | returned
+    status = Column(String(20), nullable=False, server_default="taken", index=True)
+    __table_args__ = (
+        Index("ix_toolbox_worker_status", "worker_id", "status"),
+    )

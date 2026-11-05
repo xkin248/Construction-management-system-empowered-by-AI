@@ -330,3 +330,73 @@ def ensure_task_progress_log_audit_columns(engine) -> list:
             )
             added.append(f"task_progress_logs.{col}")
     return added
+
+
+# ────────────────── Common daily tasks / toolbox issues ──────────────────
+def ensure_common_task_tables(engine) -> None:
+    """Create ``common_task_instances`` and ``toolbox_issues`` if they are absent.
+
+    ``Base.metadata.create_all`` already builds both on a fresh database. This
+    migration exists for the deployed ones: it is written as
+    ``CREATE TABLE/INDEX IF NOT EXISTS`` so it can run on every boot, side by side
+    with existing tables, without dropping, truncating or rewriting a single row.
+
+    DDL is dialect-specific only where identifiers differ (auto-increment column),
+    because the service runs on SQLite locally and on Postgres when deployed.
+    """
+    dialect = engine.dialect.name
+    if dialect == "postgresql":
+        id_col = "SERIAL PRIMARY KEY"
+        ts = "TIMESTAMP"
+    else:
+        id_col = "INTEGER PRIMARY KEY AUTOINCREMENT"
+        ts = "DATETIME"
+
+    statements = [
+        f"""
+        CREATE TABLE IF NOT EXISTS common_task_instances (
+            instance_id {id_col},
+            project_id INTEGER NOT NULL REFERENCES projects(project_id),
+            task_kind VARCHAR(20) NOT NULL,
+            work_date DATE NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            photo_path VARCHAR(500),
+            completed_at {ts},
+            completed_by INTEGER REFERENCES workers(worker_id),
+            created_at {ts} DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_common_task_project_kind_date
+            ON common_task_instances (project_id, task_kind, work_date)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS ix_common_task_project_date
+            ON common_task_instances (project_id, work_date)
+        """,
+        f"""
+        CREATE TABLE IF NOT EXISTS toolbox_issues (
+            issue_id {id_col},
+            worker_id INTEGER NOT NULL REFERENCES workers(worker_id),
+            project_id INTEGER REFERENCES projects(project_id),
+            tool_name VARCHAR(200) NOT NULL,
+            qty INTEGER NOT NULL DEFAULT 1,
+            taken_at {ts} NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            take_photo_path VARCHAR(500),
+            returned_at {ts},
+            return_photo_path VARCHAR(500),
+            status VARCHAR(20) NOT NULL DEFAULT 'taken'
+        )
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS ix_toolbox_worker_status
+            ON toolbox_issues (worker_id, status)
+        """,
+        """
+        CREATE INDEX IF NOT EXISTS ix_toolbox_project_status
+            ON toolbox_issues (project_id, status)
+        """,
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))

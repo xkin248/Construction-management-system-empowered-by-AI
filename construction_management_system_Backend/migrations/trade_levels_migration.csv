@@ -1,0 +1,9 @@
+table,raw_value,target_level,rows,reason,note
+workers,Electrical,skilled worker,1,,
+workers,electrician,skilled worker,2,,
+workers,scaffolder,semi skilled worker,1,,
+workers,welder,skilled worker,1,,
+tasks,(NULL),(left as NULL),2,,
+tasks,electrical,skilled worker,1,,
+tasks,plumbing,skilled worker,1,,
+workers,426788,,1,manual review,

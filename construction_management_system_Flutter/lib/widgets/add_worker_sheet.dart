@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../l10n/app_strings.dart';
+import '../constants/trade_levels.dart';
 
 /// Shared "Add Worker" bottom sheet.
 ///
@@ -11,12 +12,16 @@ import '../l10n/app_strings.dart';
 /// Team Overview (Attendance) page can add workers through the same flow.
 /// [onAdded] is invoked after a worker is successfully created / registered
 /// so the caller can refresh its own list.
+///
+/// The trade field is a four-level picker ([TradeLevels.all]) instead of free
+/// text: the backend now rejects anything that is not one of the four levels.
 Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
   final name = TextEditingController();
-  final role = TextEditingController();
   final phone = TextEditingController();
   final email = TextEditingController();
   final password = TextEditingController();
+  // Default to the lowest level so a supervisor never has to guess.
+  String? level = TradeLevels.generalWorker;
 
   return showModalBottomSheet(
     context: context,
@@ -48,8 +53,18 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
               TextField(controller: name,
                   decoration: InputDecoration(labelText: AppStrings.t('workers.fullName'), hintText: AppStrings.t('workers.fullNameHint'))),
               const SizedBox(height: 12),
-              TextField(controller: role,
-                  decoration: InputDecoration(labelText: AppStrings.t('workers.tradeRole'), hintText: AppStrings.t('workers.tradeRoleHint'))),
+              DropdownButtonFormField<String>(
+                initialValue: level,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: AppStrings.t('workers.tradeRole'),
+                  hintText: AppStrings.t('workers.tradeRoleHint'),
+                ),
+                items: TradeLevels.all
+                    .map((l) => DropdownMenuItem(value: l.value, child: Text(l.label)))
+                    .toList(),
+                onChanged: (v) => setD(() => level = v),
+              ),
               const SizedBox(height: 12),
               TextField(controller: phone, keyboardType: TextInputType.phone,
                   decoration: InputDecoration(labelText: AppStrings.t('workers.phone'), hintText: AppStrings.t('workers.phoneHint'))),
@@ -66,6 +81,10 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
                     toast(AppStrings.t('workers.nameRequired'));
                     return;
                   }
+                  if (level == null || level!.isEmpty) {
+                    toast(AppStrings.t('worker.register.trade'));
+                    return;
+                  }
                   try {
                     if (email.text.trim().isNotEmpty && password.text.isNotEmpty) {
                       // Register as authenticated worker (project auto-assigned by backend)
@@ -74,11 +93,11 @@ Future<void> showAddWorkerSheet(BuildContext context, {VoidCallback? onAdded}) {
                         email: email.text.trim().toLowerCase(),
                         password: password.text,
                         phone: phone.text.trim().isEmpty ? null : phone.text.trim(),
-                        trade: role.text.trim().isEmpty ? null : role.text.trim(),
+                        trade: level,
                       );
                     } else {
                       await ApiService().createWorker({
-                        'name': name.text.trim(), 'trade': role.text.trim(),
+                        'name': name.text.trim(), 'trade': level,
                         'phone': phone.text.trim(),
                       });
                     }

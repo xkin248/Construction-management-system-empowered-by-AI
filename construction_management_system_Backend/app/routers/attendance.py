@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, date, time, timezone, timedelta
 from typing import Optional
@@ -14,11 +15,26 @@ from app.schemas import (
     CurrentUser,
 )
 from app.geofence import is_within_fence
+from app.attendance_photo import (
+    PhotoError,
+    open_photo,
+    photo_owner,
+    photo_url,
+    save_photo,
+)
+from app.storage_service import DEFAULT_SIGNED_URL_TTL
 from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
 
 router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
 
 OUT_OF_FENCE_LIMIT = 2
+
+# A check-in without a live camera photo is refused. The message is reused by
+# both role endpoints so the client can show one consistent explanation.
+PHOTO_REQUIRED_MSG = (
+    "A live site photo of yourself is required to check in. "
+    "Take the photo with the device camera while you are on site and try again."
+)
 
 
 def _notify_supervisor_attendance_alert(
@@ -122,7 +138,35 @@ def _to_out(a: AttendanceLog) -> AttendanceOut:
     o.check_in_time = _to_local(a.check_in_time)
     o.check_out_time = _to_local(a.check_out_time)
     o.last_heartbeat_time = _to_local(a.last_heartbeat_time)
+    # Evidence photos are served by an authorised endpoint, never as a public
+    # static path, so only the relative URLs are exposed here.
+    o.in_photo_url = photo_url(a.in_photo_path)
+    o.out_photo_url = photo_url(a.out_photo_path)
     return o
+
+
+def _store_check_in_photo(
+    d: WorkerCheckInReq, user_type: str, user_id: int, project_id: int
+) -> str:
+    """Persist the mandatory check-in selfie and return its relative path.
+
+    Raises 422 when the photo is missing or unreadable: this is the hard gate
+    that makes "GPS inside the fence + a photo of yourself on site" the only
+    way to complete a check-in, for workers and site supervisors alike.
+    """
+    if not d.photo_base64:
+        raise HTTPException(422, PHOTO_REQUIRED_MSG)
+    try:
+        return save_photo(
+            d.photo_base64,
+            user_type=user_type,
+            user_id=user_id,
+            project_id=project_id,
+            kind="in",
+            taken_at=datetime.utcnow(),
+        )
+    except PhotoError as exc:
+        raise HTTPException(422, f"{PHOTO_REQUIRED_MSG} ({exc})")
 
 def _format_hhmm(dt: Optional[datetime]) -> str:
     return dt.strftime("%H:%M") if dt else "-"
@@ -164,53 +208,45 @@ def _client_ip(request: Request) -> str:
         return ""
 
 # ──────────────────────────────────────────────────────────────────
-# Legacy / supervisor-facing endpoints (keep backwards compatibility)
+# Legacy endpoints — retired (kept as explicit 410 responses)
 # ──────────────────────────────────────────────────────────────────
+# These endpoints accepted a bare worker_id / attendance_id with no
+# authentication at all, so anyone could clock in or out for somebody else.
+# The new rules (inside the geofence + a live on-site photo of yourself) cannot
+# be enforced on a request that carries neither an identity nor a photo, and
+# leaving them alive would let a client bypass both rules. They are therefore
+# closed instead of patched; clients must use the authenticated endpoints
+# /attendance/worker/* and /attendance/supervisor/*.
 
-@router.post("/check-in", response_model=AttendanceOut)
+_LEGACY_GONE = (
+    "This endpoint has been retired: check-in and check-out now require an "
+    "authenticated session, a location inside the site geofence and a live "
+    "photo of yourself taken on site. Use /attendance/worker/* or "
+    "/attendance/supervisor/*."
+)
+
+
+@router.post("/check-in", response_model=AttendanceOut, deprecated=True)
 def check_in(d: CheckInReq, db: Session = Depends(get_db)):
-    w = db.query(Worker).get(d.worker_id)
-    if not w:
-        raise HTTPException(404, "Worker does not exist")
-    p = db.query(Project).get(d.project_id)
-    if not p:
-        raise HTTPException(404, "Project does not exist")
-
-    existing = db.query(AttendanceLog).filter(
-        AttendanceLog.worker_id == d.worker_id,
-        AttendanceLog.project_id == d.project_id,
-        AttendanceLog.check_in_time >= _today_start(),
-        AttendanceLog.status.in_(["checked_in", "checked_out"]),
-    ).first()
-    if existing:
-        raise HTTPException(400, "Already checked in today, please do not check in again")
-
-    verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
-
-    a = AttendanceLog(
-        worker_id=d.worker_id, project_id=d.project_id,
-        check_in_time=datetime.utcnow(),
-        in_lat=d.lat, in_lng=d.lng, in_distance_m=dist,
-        status="checked_in" if verified else "rejected",
-        last_heartbeat_time=datetime.utcnow() if verified else None,
-        last_heartbeat_lat=d.lat if verified else None,
-        last_heartbeat_lng=d.lng if verified else None,
-        out_of_fence_count=0,
-    )
-    db.add(a)
-    db.commit()
-    db.refresh(a)
-
-    if not verified:
-        raise HTTPException(
-            400,
-            f"Check-in failed: outside the site geofence (distance from center {int(dist)}m, allowed range {int(p.fence_radius)}m)",
-        )
-    return _to_out(a)
+    raise HTTPException(410, _LEGACY_GONE)
 
 
-@router.post("/heartbeat", response_model=AttendanceOut)
+@router.post("/heartbeat", response_model=AttendanceOut, deprecated=True)
 def heartbeat(d: HeartbeatReq, db: Session = Depends(get_db)):
+    raise HTTPException(410, _LEGACY_GONE)
+
+
+@router.post("/check-out", response_model=AttendanceOut, deprecated=True)
+def check_out(d: CheckOutReq, db: Session = Depends(get_db)):
+    raise HTTPException(410, _LEGACY_GONE)
+
+
+def _apply_heartbeat(d: HeartbeatReq, db: Session) -> AttendanceOut:
+    """Shared heartbeat body: re-check the geofence and auto-cancel on repeat misses.
+
+    Only reachable through the authenticated role endpoints, which first prove
+    that the attendance record belongs to the caller.
+    """
     a = db.query(AttendanceLog).get(d.attendance_id)
     if not a:
         raise HTTPException(404, "Attendance record does not exist")
@@ -240,27 +276,6 @@ def heartbeat(d: HeartbeatReq, db: Session = Depends(get_db)):
         )
         raise HTTPException(410, "Left the site geofence too many times in a row, check-in auto-cancelled")
 
-    db.commit()
-    db.refresh(a)
-    return _to_out(a)
-
-
-@router.post("/check-out", response_model=AttendanceOut)
-def check_out(d: CheckOutReq, db: Session = Depends(get_db)):
-    a = db.query(AttendanceLog).get(d.attendance_id)
-    if not a:
-        raise HTTPException(404, "Attendance record does not exist")
-    if a.status != "checked_in":
-        raise HTTPException(400, "Cannot check out from the current status")
-
-    p = db.query(Project).get(a.project_id)
-    _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
-
-    a.check_out_time = datetime.utcnow()
-    a.out_lat = d.lat
-    a.out_lng = d.lng
-    a.out_distance_m = dist
-    a.status = "checked_out"
     db.commit()
     db.refresh(a)
     return _to_out(a)
@@ -359,6 +374,11 @@ def worker_self_check_in(
 
     # ── Time window & break checks removed: attendance allowed at any time ──
 
+    # ── Mandatory on-site selfie: no photo, no check-in ──
+    # Stored before the geofence verdict so the picture is on record even for a
+    # rejected attempt (a supervisor can then see who tried from where).
+    photo_path = _store_check_in_photo(d, "worker", user.id, d.project_id)
+
     # ── Geofence validation (skipped when the project has no fence configured) ──
     if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
         verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
@@ -372,6 +392,8 @@ def worker_self_check_in(
         in_lat=d.lat,
         in_lng=d.lng,
         in_distance_m=dist,
+        in_verified=verified,
+        in_photo_path=photo_path,
         status="checked_in" if verified else "rejected",
         last_heartbeat_time=datetime.utcnow() if verified else None,
         last_heartbeat_lat=d.lat if verified else None,
@@ -423,14 +445,30 @@ def worker_self_check_out(
     # ── Check-out time window & break checks removed: allowed at any time ──
 
     if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
-        _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+        out_verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
     else:
-        dist = 0.0
+        out_verified, dist = True, 0.0
 
     attendance.check_out_time = datetime.utcnow()
     attendance.out_lat = d.lat
     attendance.out_lng = d.lng
     attendance.out_distance_m = dist
+    attendance.out_verified = out_verified
+    # The check-out photo is optional (the geofence still applies): stored as
+    # extra evidence when sent, and a malformed picture must never trap the
+    # worker in an open check-in, so a decode failure is ignored here.
+    if d.photo_base64:
+        try:
+            attendance.out_photo_path = save_photo(
+                d.photo_base64,
+                user_type="worker",
+                user_id=user.id,
+                project_id=attendance.project_id,
+                kind="out",
+                taken_at=datetime.utcnow(),
+            )
+        except PhotoError:
+            pass
     attendance.status = "checked_out"
 
     if d.device_info:
@@ -496,7 +534,7 @@ def worker_self_heartbeat(
         raise HTTPException(404, "Attendance record does not exist")
     if a.worker_id != user.id:
         raise HTTPException(403, "This attendance record does not belong to you")
-    return heartbeat(d, db)
+    return _apply_heartbeat(d, db)
 
 
 @router.get("/weekly-stats")
@@ -602,6 +640,11 @@ def supervisor_self_check_in(
             f"Duplicate check-in is not allowed.",
         )
 
+    # ── Mandatory on-site selfie: the same rule as for workers ──
+    # A supervisor can otherwise clock in for the whole crew from anywhere, so
+    # the photo requirement is deliberately not relaxed for this role.
+    photo_path = _store_check_in_photo(d, "supervisor", user.id, d.project_id)
+
     if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
         verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
     else:
@@ -614,6 +657,8 @@ def supervisor_self_check_in(
         in_lat=d.lat,
         in_lng=d.lng,
         in_distance_m=dist,
+        in_verified=verified,
+        in_photo_path=photo_path,
         status="checked_in" if verified else "rejected",
         last_heartbeat_time=datetime.utcnow() if verified else None,
         last_heartbeat_lat=d.lat if verified else None,
@@ -664,14 +709,28 @@ def supervisor_self_check_out(
         raise HTTPException(404, "Project not found")
 
     if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
-        _, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+        out_verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
     else:
-        dist = 0.0
+        out_verified, dist = True, 0.0
 
     attendance.check_out_time = datetime.utcnow()
     attendance.out_lat = d.lat
     attendance.out_lng = d.lng
     attendance.out_distance_m = dist
+    attendance.out_verified = out_verified
+    # Same optional-evidence rule as the worker endpoint.
+    if d.photo_base64:
+        try:
+            attendance.out_photo_path = save_photo(
+                d.photo_base64,
+                user_type="supervisor",
+                user_id=user.id,
+                project_id=attendance.project_id,
+                kind="out",
+                taken_at=datetime.utcnow(),
+            )
+        except PhotoError:
+            pass
     attendance.status = "checked_out"
 
     if d.device_info:
@@ -712,3 +771,74 @@ def supervisor_today_authenticated(
         "attendance": _to_out(a),
         **base,
     }
+
+
+# ──────────────────────────────────────────────────────────────────
+# Attendance photo replay (authenticated evidence trail)
+# ──────────────────────────────────────────────────────────────────
+
+_PHOTO_MEDIA_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
+
+
+def _may_view_attendance_photo(
+    db: Session, user: CurrentUser, owner_type: str, owner_id: int
+) -> bool:
+    """Who is allowed to look at a stored evidence photo.
+
+    * the owner always can (a worker sees their own pictures),
+    * a site supervisor sees pictures taken on the projects they run,
+    * nobody else, since these are personal images.
+    """
+    if user.user_type == "worker":
+        return owner_type == "worker" and user.id == owner_id
+    if owner_type == "supervisor":
+        return user.id == owner_id
+    return db.query(AttendanceLog).join(
+        Project, Project.project_id == AttendanceLog.project_id
+    ).filter(
+        Project.supervisor_id == user.id,
+        AttendanceLog.worker_id == owner_id,
+    ).first() is not None
+
+
+@router.get("/photos/{photo_path:path}")
+def get_attendance_photo(
+    photo_path: str,
+    redirect: bool = True,
+    user: CurrentUser = Depends(require_any_authorized),
+    db: Session = Depends(get_db),
+):
+    """Stream one check-in / check-out photo.
+
+    Photos are deliberately not served as static files: every read is
+    authenticated and authorised, so the evidence can be replayed in a dispute
+    (who was on site, when, and what they looked like) without exposing personal
+    images of the whole crew to anyone with a link.
+
+    This URL is unchanged by the move to Supabase Storage. When the object lives
+    in the bucket, the endpoint answers with a 307 to a short-lived signed URL
+    (``redirect=false`` returns ``{"url": ..., "expires_in": ...}`` instead, for
+    clients that prefer to cache the link themselves). A local copy — including
+    every photo taken before the switch — is still streamed directly.
+    """
+    owner_type, owner_id = photo_owner(photo_path)
+    if owner_type is None or owner_id is None:
+        raise HTTPException(404, "Photo not found")
+    try:
+        source_kind, target = open_photo(photo_path)
+    except PhotoError:
+        raise HTTPException(404, "Photo not found")
+
+    if not _may_view_attendance_photo(db, user, owner_type, owner_id):
+        raise HTTPException(403, "You are not allowed to view this photo")
+
+    if source_kind == "local":
+        ext = target.rsplit(".", 1)[-1].lower()
+        return FileResponse(
+            target,
+            media_type=_PHOTO_MEDIA_TYPES.get(ext, "application/octet-stream"),
+        )
+
+    if redirect:
+        return RedirectResponse(target, status_code=307)
+    return JSONResponse({"url": target, "expires_in": DEFAULT_SIGNED_URL_TTL})

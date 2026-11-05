@@ -5,6 +5,7 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../l10n/app_strings.dart';
+import '../constants/trade_levels.dart';
 import '../widgets/add_worker_sheet.dart';
 import '../widgets/guided_empty_state.dart';
 import '../widgets/loading_skeleton.dart';
@@ -62,10 +63,15 @@ class _WorkersPageState extends State<WorkersPage> {
 
   List get _filtered => workers.where((w) {
         final name = (w['name'] as String? ?? '').toLowerCase();
-        final trade = (w['trade'] as String? ?? '').toLowerCase();
+        final rawTrade = (w['trade'] as String? ?? '').toLowerCase();
+        // Search by the level label too, so "skilled" finds workers whose
+        // stored value is still a legacy fine-grained trade.
+        final levelTrade = TradeLevels.label(w['trade'] as String?).toLowerCase();
+        final q = _searchQuery.toLowerCase();
         return _searchQuery.isEmpty ||
-            name.contains(_searchQuery.toLowerCase()) ||
-            trade.contains(_searchQuery.toLowerCase());
+            name.contains(q) ||
+            rawTrade.contains(q) ||
+            levelTrade.contains(q);
       }).toList();
 
   void _openAddWorker() {

@@ -36,6 +36,14 @@ from app.models import (
     PredictionHistory, AIDecisionLog,
 )
 from app.worker_pool import get_project_workers
+from app import trade_levels
+from app.trade_levels import (
+    TRADE_LEVELS,
+    TRADE_LEVEL_DURATION,
+    DEFAULT_LEVEL,
+    level_duration,
+    trade_level,
+)
 
 load_dotenv()
 
@@ -163,33 +171,25 @@ Your areas of expertise include:
 Please respond in concise, professional, and practical language, in English or Malay (English preferred). If specific data is involved, base your analysis on the provided context information."""
 
 
-# Trade synonyms: canonical group -> keywords matched against worker trade strings.
-# Used ONLY for mapping a worker's stored trade label to a canonical group.
+# Legacy fine-grained trade vocabulary: canonical fine trade -> keywords matched
+# against worker trade strings / task text.
+#
+# IMPORTANT: this is a *recognition* layer, not the stored value space. Since the
+# switch to the four Malaysian skill levels (see ``app/trade_levels.py``) the only
+# values ever written to the database are general worker / semi skilled worker /
+# skilled worker / foreman. The fine grain is kept because it still carries the
+# useful semantic signal (a site manager types "tukang kayu", not "skilled
+# worker"); every fine trade is collapsed to a level with
+# ``trade_levels.MIGRATION_MAP`` by ``_collapse_to_levels`` before it leaves this
+# module.
 # (Task text detection uses TASK_KEYWORDS below — narrower, avoids false positives
 # like "wall"/"water"/"floor" matching the wrong trade.)
-TRADE_ALIASES: Dict[str, List[str]] = {
-    "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "wood", "formwork", "framework", "木工", "橱柜", "木", "tukang kayu", "pertukangan", "kabinet", "bingkai"],
-    "electrical": ["electrical", "electric", "electrician", "wiring", "cable", "lighting", "db panel", "电工", "电线", "电缆", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel"],
-    "plumbing": ["plumbing", "plumber", "pipe", "water", "sanitary", "chiller", "水管", "管道", "给排水", "paip", "tukang paip", "pili", "longkang"],
-    "masonry": ["masonry", "mason", "brick", "block", "wall", "concrete", "砌砖", "砖墙", "混凝土", "bata", "tembok", "konkrit", "simen", "bancuh", "asas"],
-    "painting": ["painting", "paint", "painter", "painters", "plaster", "plasterer", "emulsion", "primer", "varnish", "stain", "lacquer", "sealer", "topcoat", "polyurethane", "gloss", "油漆", "粉刷", "涂料", "mengecat", "pengecat", "cat dinding", "wallpaper", "wallpapering", "decorator"],
-    "welding": ["welding", "weld", "welder", "welders", "steel", "metal", "ironworker", "焊接", "钢结构", "金属", "kimpal", "pengimpal", "keluli", "besi"],
-    "hvac": ["hvac", "air balance", "ahu", "ventilation", "air conditioning", "暖通", "空调", "通风", "penghawa dingin", "penyaman udara", "pengudaraan"],
-    "roofing": ["roofing", "roofer", "roof", "shingle", "屋顶", "屋面", "bumbung", "atap"],
-    "tiling": ["tiling", "tile", "tiler", "terrazzo", "ceramic", "tilesetter", "瓷砖", "地砖", "jubin", "mozek"],
-    "drywall": ["drywall", "drywaller", "sheetrock", "gypsum", "taper", "隔墙", "石膏板", "dinding kering", "gipsum", "papan gypsum"],
-    "glazing": ["glazing", "glazier", "glass", "window", "玻璃", "门窗", "kaca", "tingkap"],
-    "flooring": ["flooring", "floor", "floorer", "linoleum", "carpet", "地板", "地毯", "lantai", "vinil", "lamina", "permaidani"],
-    "equipment": ["equipment", "operator", "excavator", "bulldozer", "backhoe", "crane", "grader", "shovel", "dozer", "pile", "挖掘机", "推土机", "jengkaut", "kren", "jentera", "operator jentera"],
-    "laborer": ["laborer", "labourer", "helper", "trench", "digger", "craft", "搬运", "杂工", "普工", "buruh", "pekerja kasar", "pembantu", "perancah", "perobohan"],
-    "insulation": ["insulation", "insulator", "insulate", "保温", "隔热", "penebat", "penebat haba", "busa", "gentian kaca"],
-    "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
-}
+# Fine-grained vocabulary (the abolished 16 groups) lives in
+# ``app/trade_levels.py`` as ``LEGACY_FINE_ALIASES`` so there is exactly one
+# copy. The keyword matcher still needs the 16 groups to recognise free text,
+# then ``_collapse_to_levels`` maps every hit onto a four-level value.
+TRADE_ALIASES: Dict[str, List[str]] = dict(trade_levels.LEGACY_FINE_ALIASES)
 
-# Strict keywords for TASK text detection (title+description). Deliberately
-# narrower than TRADE_ALIASES: generic words like "wall"/"floor"/"water" alone
-# must NOT decide a trade, otherwise "paint walls" -> masonry or "tile floor" ->
-# flooring. Ambiguous multi-hit cases are resolved by the semantic matcher.
 TASK_KEYWORDS: Dict[str, List[str]] = {
     "carpenter": ["carpenter", "carpentry", "cabinet", "joinery", "timber", "formwork", "framework", "hinge", "door lock", "wooden", "plywood", "木工", "橱柜", "tukang kayu", "pertukangan", "kabinet", "bingkai", "marquetry", "inlay", "cabinetmaker"],
     "electrical": ["electrical", "electrician", "wiring", "cable", "lighting", "db panel", "cctv", "camera", "network cable", "socket", "breaker", "conduit", "switch", "ceiling fan", "电工", "电线", "照明", "elektrik", "pendawaian", "juruelektrik", "lampu", "kabel", "wirer", "wireman"],
@@ -229,14 +229,12 @@ SEED_KEYWORDS: Dict[str, List[str]] = {
     "supervision": ["superintendent", "supervisor", "foreman", "coordinator", "manager", "inspection", "inspector", "inspect", "fire extinguisher", "compliance", "sampling", "工地主任", "监工", "巡查", "penyelia", "penyelia tapak", "pemeriksa", "pemantauan", "mandor"],
 }
 
-# Standard estimated task duration (workdays) per canonical trade, used by
-# dataset-augmented progress prediction.
-TRADE_DURATION: Dict[str, float] = {
-    "carpenter": 2.0, "electrical": 1.5, "plumbing": 1.5, "masonry": 2.0,
-    "painting": 1.5, "welding": 2.0, "hvac": 1.5, "roofing": 2.0,
-    "tiling": 1.5, "drywall": 1.5, "glazing": 1.5, "flooring": 1.5,
-    "equipment": 1.0, "laborer": 1.0, "insulation": 1.0, "supervision": 0.5,
-}
+# Standard estimated task duration (workdays) per trade level, used by
+# dataset-augmented progress prediction. Keyed by the four skill levels; the
+# values themselves live in app/trade_levels.py so there is a single table.
+# (The old 16 fine trades are gone: ``level_duration()`` still accepts a legacy
+# value and resolves it through the migration map, so old rows keep estimating.)
+TRADE_DURATION: Dict[str, float] = dict(TRADE_LEVEL_DURATION)
 
 _SEMANTIC_STOP = (
     set("the a an and or for with of to in on at by from into onto under over install installing new fix apply lay test check do make set up build construction project work task done ready please need want using use".split())
@@ -821,11 +819,16 @@ def _resolve_detected_trades(
     return detected
 
 
-def _worker_trade_group(trade: str) -> Optional[str]:
-    """Map a worker trade string to its canonical group, if any."""
-    if not trade:
+def _legacy_fine_trade(value: str) -> Optional[str]:
+    """Match *value* against the legacy 16-trade keyword table (recognition only).
+
+    Unchanged behaviour of the old ``_worker_trade_group`` minus the level
+    collapse, kept separate because the fine grain is what carries the Malay
+    installer/operator prefix information.
+    """
+    if not value:
         return None
-    t = trade.lower().strip()
+    t = value.lower().strip()
     for group, keywords in TRADE_ALIASES.items():
         if t in keywords or t == group:
             return group
@@ -838,6 +841,53 @@ def _worker_trade_group(trade: str) -> Optional[str]:
                 for group, keywords in TRADE_ALIASES.items():
                     if stripped in keywords or stripped == group:
                         return group
+    return None
+
+
+def _collapse_to_levels(trades) -> set:
+    """Collapse any mix of fine trades / level aliases into the four levels.
+
+    Unknown values are dropped rather than guessed: an empty set means "no trade
+    identified", which the callers already handle as "do not auto-assign".
+    """
+    levels = set()
+    for trade in trades or ():
+        level = trade_level(trade)
+        if level:
+            levels.add(level)
+    return levels
+
+
+def _collapse_scores(scores: Dict[str, float]) -> Dict[str, float]:
+    """Collapse a fine-trade score map onto the four levels, keeping the max."""
+    collapsed: Dict[str, float] = {}
+    for trade, score in (scores or {}).items():
+        level = trade_level(trade)
+        if not level:
+            continue
+        if score > collapsed.get(level, 0.0):
+            collapsed[level] = score
+    return collapsed
+
+
+def _worker_trade_group(trade: str) -> Optional[str]:
+    """Map a stored worker trade string to one of the four skill levels.
+
+    Accepts the four levels themselves, their aliases, a legacy fine trade
+    ("Carpenter", "tukang paip") and the Malay installer prefixes. Returns None
+    when the value cannot be interpreted, so the callers keep their existing
+    "unknown trade" behaviour.
+    """
+    if not trade:
+        return None
+    level = trade_level(trade)
+    if level:
+        return level
+    # Fall back to the legacy fine table: some of its entries ("tukang kayu",
+    # "pemasang jubin") are more specific than the level alias list.
+    fine = _legacy_fine_trade(trade)
+    if fine:
+        return trade_levels.MIGRATION_MAP.get(fine)
     return None
 
 
@@ -1316,7 +1366,7 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
                         (classifier_scores.get(g, 0.0) for g in detected_trades), default=0.0
                     )
                     if best_cls < LLM_TRADE_MIN_SCORE:
-                        llm = _llm_trade_decision(task_text, sorted(TRADE_ALIASES))
+                        llm = _llm_trade_decision(task_text, sorted(TRADE_LEVELS))
                         if llm:
                             detected_trades = (
                                 {llm["trade"]}
@@ -1360,6 +1410,17 @@ def resolve_trade_decision(task_text: str, explicit_trade: str = "") -> Dict[str
                              "llm_used": False, "llm_reason": None}
         elif detected_trades:
             semantic_scores = {canonical: 1.0 for canonical in detected_trades}
+
+    # ── Collapse the fine-grained verdict onto the four stored levels ──
+    # The detection layers above deliberately work at the fine grain (that is
+    # where the semantic signal is), but everything downstream -- auto-assign
+    # scoring, ``task.trade``, AIDecisionLog -- must agree with the database, which
+    # only accepts the four levels. Collapsing here keeps one exit point.
+    detected_trades = _collapse_to_levels(detected_trades)
+    semantic_scores = _collapse_scores(semantic_scores)
+    raw_semantic_scores = _collapse_scores(raw_semantic_scores)
+    keyword_trades = _collapse_to_levels(keyword_trades)
+    classifier_scores = _collapse_scores(classifier_scores)
 
     if explicit_group:
         confidence = 1.0
@@ -1479,9 +1540,9 @@ def analyze_task(
     elif any(keyword in task_text_low for keyword in ["清洁", "整理", "cleaning"]):
         priority = "low"
 
-    # Dataset-informed duration estimate: sum standard duration of detected trades.
+    # Dataset-informed duration estimate: standard duration of detected levels.
     if detected_trades:
-        est_days = max(TRADE_DURATION.get(g, 1.5) for g in detected_trades)
+        est_days = max(level_duration(g, 1.5) for g in detected_trades)
         duration_estimate = "Based on industry standard man-hours for task type ({}), estimated {:.0f}-{:.0f} days".format(
             "/".join(sorted(detected_trades)), max(1, est_days - 0.5), est_days + 1
         )
@@ -2071,8 +2132,11 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
             continue
         tt = f"{t.task_name} {t.description or ''}".lower()
         scores = _semantic_trade_scores(tt)
-        trade = max(scores, key=scores.get) if scores else None
-        semantic_remaining_days += TRADE_DURATION.get(trade, 1.5)
+        best = max(scores, key=scores.get) if scores else None
+        # Report the remaining mix at level granularity -- the fine-grained key
+        # would no longer match anything the UI knows how to display.
+        trade = trade_level(best) if best else None
+        semantic_remaining_days += level_duration(trade, 1.5) if trade else 1.5
         if trade:
             remaining_trade_mix[trade] += 1
     if total_workers_sem > 0:

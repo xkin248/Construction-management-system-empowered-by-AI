@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/task_status_notifier.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
+import '../constants/trade_levels.dart';
 import '../widgets/tasks/assign_worker_tile.dart';
 import '../widgets/tasks/timeline_tile.dart';
 
@@ -26,6 +27,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
   bool _logsLoading = true;      // timeline fetch in flight
   double _progressInput = 50;    // progress slider draft
   final _progressNoteCtrl = TextEditingController();
+  // Completion evidence (worker's site photo). Kept in separate fields because
+  // they are refreshed from the API: the list row this page is opened from can
+  // be stale once the worker submits the photo from their phone.
+  String? _completionPhotoUrl;
+  String? _completionPhotoAt;
+  String? _completionNote;
 
   @override
   void initState() {
@@ -40,8 +47,42 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     }
     final p = (_task['progress'] as num?)?.toDouble();
     if (p != null) _progressInput = p.clamp(0, 100).toDouble();
+    _readEvidence(_task);
     _loadWorkers();
     _loadLogs();
+    // The list row this page is opened from may predate the worker's photo
+    // submission, so pull the fresh row to show the latest evidence.
+    _refreshTaskFromServer();
+  }
+
+  /// Copy the completion-evidence fields out of a task payload.
+  void _readEvidence(Map task) {
+    _completionPhotoUrl = task['completion_photo_url'] as String?;
+    _completionPhotoAt = task['completion_photo_at'] as String?;
+    _completionNote = task['completion_note'] as String?;
+  }
+
+  /// Full-screen review of the completion photo (pinch to zoom).
+  void _openEvidencePhoto() {
+    final tid = (_task['task_id'] as num?)?.toInt();
+    if (tid == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: InteractiveViewer(
+          maxScale: 4,
+          child: Image.network(
+            ApiService().taskCompletionPhotoUrl(tid),
+            headers: ApiService().authHeaders,
+            fit: BoxFit.contain,
+            errorBuilder: (c, e, s) => Text('Photo unavailable',
+                style: GoogleFonts.inter(color: Colors.white)),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -159,6 +200,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
       setState(() {
         _task = fresh!;
         _assignedWorkers = assigned;
+        _readEvidence(_task);
       });
     } catch (_) {
       // Refresh is best-effort; keep showing the current (possibly stale) data.
@@ -264,9 +306,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     final w = _assignedWorkers.isNotEmpty ? _assignedWorkers.first : null;
     final name = (w?['name'] as String?) ?? 'worker';
     final itemTrade = item?['trade'] as String?;
-    final trade = (itemTrade != null && itemTrade.isNotEmpty)
+    final rawTrade = (itemTrade != null && itemTrade.isNotEmpty)
         ? itemTrade
-        : ((w?['trade'] as String?) ?? '');
+        : (w?['trade'] as String?);
+    // Always show the resolved four-level label, never a legacy trade name.
+    final trade = (rawTrade == null || rawTrade.trim().isEmpty)
+        ? ''
+        : TradeLevels.label(rawTrade);
     const labels = <String, String>{
       'llm': 'AI model',
       'semantic': 'semantic match',
@@ -453,6 +499,64 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           )),
         ])),
 
+        // Completion evidence: the site photo the worker had to take before the
+        // task could be marked done, plus its submission time. This is the
+        // supervisor's review surface — without it the photo would be stored
+        // but invisible.
+        if (_completionPhotoUrl != null && _completionPhotoUrl!.isNotEmpty)
+          sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Icon(Icons.photo_camera_outlined, size: 16, color: AppColors.green),
+              const SizedBox(width: 8),
+              Text('Completion Photo',
+                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Text(DateHelper.tryFormatShort(_completionPhotoAt),
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+            ]),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _openEvidencePhoto,
+              child: ClipRRect(
+                borderRadius: AppRadius.rMd,
+                child: Image.network(
+                  ApiService().taskCompletionPhotoUrl(
+                      (_task['task_id'] as num).toInt()),
+                  headers: ApiService().authHeaders,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (c, child, progress) => progress == null
+                      ? child
+                      : Container(
+                          height: 200,
+                          alignment: Alignment.center,
+                          color: AppColors.border,
+                          child: const SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                        ),
+                  errorBuilder: (c, e, s) => Container(
+                    height: 120,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                        color: AppColors.border, borderRadius: AppRadius.rMd),
+                    child: Text('Photo unavailable',
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: AppColors.textMuted)),
+                  ),
+                ),
+              ),
+            ),
+            if (_completionNote != null && _completionNote!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(_completionNote!,
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: AppColors.textSecondary, height: 1.4)),
+            ],
+          ])),
+
         // Progress update entry (only while the task is in progress)
         if (status == 'in_progress')
           sectionCard(margin: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -550,7 +654,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(w['name'] ?? '-', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 15)),
-                  Text(w['trade'] ?? 'General Worker', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
+                  Text(TradeLevels.label(w['trade'] as String?), style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
                 ])),
                 Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
               ]),

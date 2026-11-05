@@ -1,6 +1,16 @@
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, BeforeValidator
+from typing import Annotated, Optional, List, Dict, Any
 from datetime import date, datetime
+
+from app.trade_levels import normalise_trade
+
+# Trade / skill level accepted on write. Only the four stored levels pass
+# (general worker / semi skilled worker / skilled worker / foreman); legacy
+# fine-grained values and their aliases are normalised on the way in, unknown
+# values are rejected with a readable 422 instead of being stored.
+# Deliberately NOT used on the *Out models: read paths must stay tolerant of
+# historical rows that still hold an old fine-grained trade string.
+TradeLevel = Annotated[Optional[str], BeforeValidator(normalise_trade)]
 
 # 1. Supervisor
 class SupervisorBase(BaseModel):
@@ -40,7 +50,11 @@ class WorkerBase(BaseModel):
     project_id: Optional[int] = None
     has_safety_training: Optional[bool] = False
     is_safety_officer: Optional[bool] = False
-class WorkerCreate(WorkerBase): pass
+class WorkerCreate(WorkerBase):
+    # Redeclared so every write path (POST /workers, PUT /workers/{id}) goes
+    # through the four-level validation. WorkerBase keeps a plain string because
+    # WorkerOut inherits it and must still read historical fine-grained values.
+    trade: TradeLevel = None
 class WorkerOut(WorkerBase):
     worker_id: int; project: Optional[ProjectOut] = None
     email: Optional[str] = None
@@ -59,6 +73,8 @@ class WorkerAuthBase(BaseModel):
     role: str = "worker"
 class WorkerAuthCreate(WorkerAuthBase):
     password: str = Field(..., min_length=6, max_length=100)
+    # Registration is the third trade write path (POST /auth/register/worker).
+    trade: TradeLevel = None
 class WorkerAuthOut(WorkerAuthBase):
     worker_id: int
     created_at: Optional[datetime] = None
@@ -97,6 +113,10 @@ class AttendanceOut(BaseModel):
     device_info: Optional[str] = None
     device_type: Optional[str] = None
     ip_address: Optional[str] = None
+    # On-site selfie evidence (filled by the router from the stored path so the
+    # client can review the picture without knowing the storage layout).
+    in_photo_url: Optional[str] = None
+    out_photo_url: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 # Worker check-in with device info
@@ -107,11 +127,20 @@ class WorkerCheckInReq(BaseModel):
     device_info: Optional[str] = None
     device_type: Optional[str] = None
     device_id: Optional[str] = None
+    # Live camera capture, base64 (raw or data-URL). Mandatory: the router
+    # rejects the request when it is missing, for workers and site supervisors
+    # alike, so a check-in always carries proof of presence on site.
+    photo_base64: Optional[str] = None
+    photo_mime_type: Optional[str] = None
 class WorkerCheckOutReq(BaseModel):
     lat: float
     lng: float
     device_info: Optional[str] = None
     device_type: Optional[str] = None
+    # Optional at check-out: the geofence still applies, the photo is stored as
+    # extra evidence when the client can take one.
+    photo_base64: Optional[str] = None
+    photo_mime_type: Optional[str] = None
 
 # Worker Task Board (AI-assigned tasks for a specific worker)
 class WorkerTaskItem(BaseModel):
@@ -161,7 +190,10 @@ class TaskBase(BaseModel):
     completed_at: Optional[datetime] = None
     progress: Optional[int] = Field(None, ge=0, le=100)  # supervisor-set 0-100; None falls back to status-derived value
     completion_note: Optional[str] = None  # mandatory note captured when the task is completed
-class TaskCreate(TaskBase): pass
+class TaskCreate(TaskBase):
+    # Task trade is the required skill level of the task; validated so the AI
+    # matcher never receives a value outside the four levels.
+    trade: TradeLevel = None
 class TaskOut(TaskBase):
     task_id: int; assigned_worker: Optional[WorkerOut] = None; project: Optional[ProjectOut] = None
     assigned_workers: List[WorkerRef] = []      # full multi-worker list (worker_id/name/trade)
@@ -465,3 +497,65 @@ class SiteProgressPrediction(BaseModel):
     recommendations: List[str] = []
     milestones: List[ProgressMilestone] = []
 
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Common daily tasks (briefing / toolbox talk / housekeeping) + toolbox issues
+# ══════════════════════════════════════════════════════════════════════════
+class CommonTaskOut(BaseModel):
+    """One day's common task for one project (read model)."""
+    instance_id: int
+    project_id: int
+    task_kind: str                      # briefing | toolbox | housekeeping
+    work_date: date
+    status: str                         # pending | done
+    photo_path: Optional[str] = None    # relative object key (not a public URL)
+    photo_url: Optional[str] = None     # authenticated endpoint to replay it
+    completed_at: Optional[datetime] = None
+    completed_by: Optional[int] = None
+    completed_by_name: Optional[str] = None
+
+
+class CommonTaskCompleteIn(BaseModel):
+    """Completion payload for a daily common task.
+
+    ``photo_base64`` is deliberately mandatory with no fallback: the point of the
+    digital checklist is that the briefing/housekeeping actually happened, and a
+    camera photo is the only evidence the API is able to check.
+    """
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxItemIn(BaseModel):
+    tool_name: str = Field(..., min_length=1, max_length=200)
+    qty: int = Field(1, ge=1, le=100)
+
+
+class ToolboxTakeIn(BaseModel):
+    """Take several tools out at once, backed by a single shared photo."""
+    project_id: Optional[int] = None
+    items: List[ToolboxItemIn] = Field(..., min_length=1, max_length=50)
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxReturnIn(BaseModel):
+    """Return one or more previously taken tools, backed by one shared photo."""
+    issue_ids: List[int] = Field(..., min_length=1, max_length=100)
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxIssueOut(BaseModel):
+    issue_id: int
+    worker_id: int
+    worker_name: Optional[str] = None
+    project_id: Optional[int] = None
+    tool_name: str
+    qty: int
+    status: str                          # taken | returned
+    taken_at: Optional[datetime] = None
+    returned_at: Optional[datetime] = None
+    take_photo_url: Optional[str] = None
+    return_photo_url: Optional[str] = None

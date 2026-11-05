@@ -6,11 +6,12 @@ import os
 
 from app.database import engine, Base, SessionLocal, settings
 from app import models
+from app import storage_service
 from app.db_migrate import (
     ensure_settings_columns, ensure_fcm_columns, ensure_attendance_columns,
     ensure_task_timestamp_columns, ensure_task_progress_columns,
     ensure_ai_decision_log_table, ensure_ai_decision_log_indexes,
-    ensure_task_progress_log_audit_columns,
+    ensure_task_progress_log_audit_columns, ensure_common_task_tables,
 )
 
 logger = logging.getLogger("buildsmart.startup")
@@ -40,6 +41,9 @@ def _bootstrap_database() -> None:
         ensure_ai_decision_log_indexes(engine)
         # Reopen audit columns (who / when / from -> to / why).
         ensure_task_progress_log_audit_columns(engine)
+        # Daily common tasks + toolbox issues (CREATE TABLE IF NOT EXISTS, so an
+        # existing database gains the two tables without touching its rows).
+        ensure_common_task_tables(engine)
         # Ensure the single-row settings table exists with default values on startup.
         with SessionLocal() as db:
             if db.query(models.Settings).count() == 0:
@@ -125,6 +129,10 @@ def health():
         models = _ai_service.model_status()
     except Exception as exc:  # health must still answer
         models = {"all_loaded": False, "error": f"{type(exc).__name__}: {exc}"}
+    # Photo storage is reported too: when the Supabase variables are missing the
+    # upload path silently falls back to local disk, and without this field that
+    # degradation is invisible from the outside.
+    storage = storage_service.status()
     return {
         "status": "ok",
         "database": "ok" if DB_READY else "unavailable",
@@ -132,6 +140,7 @@ def health():
         "models": models,
         "models_ok": bool(models.get("all_loaded"))
         and not models.get("version_mismatch"),
+        "photo_storage": storage,
     }
 
 # ✅ Register routers
@@ -147,3 +156,5 @@ from app.routers.safety import router as sr; app.include_router(sr, prefix="/api
 from app.routers.files import router as fr; app.include_router(fr, prefix="/api")
 from app.routers.ai import router as ai_r; app.include_router(ai_r, prefix="/api")
 from app.routers.notifications import router as notif_r; app.include_router(notif_r, prefix="/api")
+from app.routers.common_task import router as ctr, toolbox_router as tbr
+app.include_router(ctr, prefix="/api"); app.include_router(tbr, prefix="/api")

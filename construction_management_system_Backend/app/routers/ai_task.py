@@ -2,6 +2,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -13,6 +14,21 @@ from app.schemas import (
     WorkerTaskItem, WorkerTaskBoardResponse, CurrentUser,
 )
 from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
+from app.task_photo import (
+    PhotoError,
+    delete_task_photo,
+    open_task_photo,
+    save_task_photo,
+    task_photo_url,
+)
+from app.storage_service import DEFAULT_SIGNED_URL_TTL
+from app.trade_levels import (
+    DEFAULT_LEVEL,
+    TRADE_LEVEL_RANK,
+    level_label,
+    level_rank,
+    trade_level,
+)
 
 router = APIRouter(tags=["🤖 Tasks & AI Assignment"])
 
@@ -269,15 +285,72 @@ def _serialize_task(task: Task) -> Dict[str, Any]:
         else STATUS_TO_PROGRESS.get(task.status or "pending", 0)
     )
     data["project_name"] = task.project.project_name if task.project else None
+    # Completion evidence: expose the review URL (never the raw storage path) so
+    # the worker and the supervisor can open the photo but cannot guess at other
+    # tasks' files on disk.
+    data["completion_photo_url"] = task_photo_url(task.task_id, task.completion_photo_path)
+    data["completion_photo_at"] = (
+        task.completion_photo_at.isoformat() if task.completion_photo_at else None
+    )
     return data
 
 
+def _attach_completion_photo(task: Task, payload: Dict[str, Any], *, worker_id: Optional[int]) -> None:
+    """Store the completion photo carried by the request, or reject completion.
+
+    A task may only reach ``completed`` with photographic evidence: either this
+    request carries one, or the task already has one stored (the normal case
+    when a worker closed the task and a supervisor is only touching metadata).
+    This is the backend half of the rule the worker app enforces in its UI, so
+    the rule cannot be skipped by calling the API directly.
+
+    Replacement rule: a task keeps exactly one completion photo — the latest
+    submission. When a new photo arrives the previous file is deleted from
+    ``uploads/task_completion`` and ``completion_photo_at`` is refreshed, so the
+    row always points at the most recent evidence and its submission time.
+    """
+    photo_b64 = str(payload.get("photo_base64") or "").strip()
+    if photo_b64:
+        try:
+            rel_path = save_task_photo(
+                photo_b64,
+                task_id=task.task_id,
+                worker_id=worker_id,
+            )
+        except PhotoError as exc:
+            raise HTTPException(400, str(exc))
+        previous = task.completion_photo_path
+        task.completion_photo_path = rel_path
+        task.completion_photo_at = datetime.utcnow()
+        if previous and previous != rel_path:
+            delete_task_photo(previous)
+        return
+
+    if not task.completion_photo_path:
+        raise HTTPException(
+            400,
+            "A site photo is required when completing a task "
+            "(send photo_base64, camera capture only)",
+        )
 
 
 
-@router.get("/projects/{pid}/tasks", response_model=List[TaskOut])
+
+
+@router.get("/projects/{pid}/tasks")
 def list_tasks(pid: int, db: Session = Depends(get_db)):
-    return db.query(Task).options(*_task_load_options()).filter(Task.project_id == pid).order_by(Task.task_id.desc()).all()
+    # Serialised through _serialize_task (not TaskOut) so the list carries the
+    # completion evidence fields too — the supervisor opens the task detail page
+    # straight from a list row, and would otherwise land on a card without the
+    # photo URL until it refetched.
+    tasks = (
+        db.query(Task)
+        .options(*_task_load_options())
+        .filter(Task.project_id == pid)
+        .order_by(Task.task_id.desc())
+        .all()
+    )
+    return [_serialize_task(task) for task in tasks]
 
 
 @router.post("/tasks")
@@ -317,6 +390,145 @@ def create_task(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return _serialize_task(task)
 
 
+@router.post("/tasks/{task_id}/complete")
+def complete_task_with_photo(
+    task_id: int,
+    payload: Dict[str, Any] = Body(default_factory=dict),
+    user: CurrentUser = Depends(require_worker),
+    db: Session = Depends(get_db),
+):
+    """Worker endpoint: close a task with the mandatory site photo.
+
+    Kept separate from the generic update endpoint so the worker path is
+    validated in one place: the caller must be assigned to the task, the task
+    must already be in progress, and a fresh camera photo is required. The
+    photo is stored on the task row and replayed through the authenticated
+    ``GET /tasks/{id}/completion-photo`` endpoint.
+    """
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+
+    worker = db.query(Worker).get(user.id)
+    if not worker:
+        raise HTTPException(404, "Worker account not found")
+
+    assigned = task.assigned_worker_id == worker.worker_id or any(
+        link.worker_id == worker.worker_id for link in task.task_workers
+    )
+    if not assigned:
+        raise HTTPException(403, "This task is not assigned to you")
+
+    old_status = task.status or "pending"
+    is_resubmission = old_status == "completed"
+    if is_resubmission:
+        # Repeat-submission rule: the assigned worker may resubmit a completed
+        # task, but only together with a fresh site photo. The newest evidence
+        # wins — the old file is deleted and completion_photo_at is refreshed —
+        # so the row never accumulates photos and always shows the latest one.
+        if not str(payload.get("photo_base64") or "").strip():
+            raise HTTPException(
+                400,
+                "This task is already completed; send a new photo_base64 to "
+                "replace the completion evidence",
+            )
+    else:
+        _validate_status_transition(old_status, "completed")
+
+    note = str(payload.get("completion_note") or "").strip() or None
+    if not note and is_resubmission:
+        # A resubmission without a new note keeps the original one instead of
+        # failing: the photo, not the wording, is the evidence being updated.
+        note = (task.completion_note or "").strip() or None
+    if not note:
+        raise HTTPException(
+            400, "completion_note is required when completing a task"
+        )
+
+    # Photo first: if it is missing or unreadable the task stays untouched, so a
+    # rejected upload never leaves a half-completed task behind.
+    _attach_completion_photo(task, payload, worker_id=worker.worker_id)
+
+    task.completion_note = note
+    task.status = "completed"
+    task.progress = 100
+    # completed_at keeps the FIRST completion moment (audit), while
+    # completion_photo_at always tracks the latest evidence submission.
+    if not is_resubmission:
+        task.completed_at = datetime.utcnow()
+
+    db.add(TaskProgressLog(
+        task_id=task.task_id,
+        from_status=old_status,
+        to_status="completed",
+        note=(f"Completion evidence updated: {note}" if is_resubmission else note),
+        action="status",
+    ))
+    db.flush()
+    _recalc_project_progress(db, task.project_id)
+    _recalc_project_status(db, task.project_id)
+    db.commit()
+
+    task = db.query(Task).options(*_task_load_options()).get(task.task_id)
+    return _serialize_task(task)
+
+
+@router.get("/tasks/{task_id}/completion-photo")
+def get_task_completion_photo(
+    task_id: int,
+    redirect: bool = True,
+    user: CurrentUser = Depends(require_any_authorized),
+    db: Session = Depends(get_db),
+):
+    """Serve the stored completion photo to any authorised account.
+
+    Workers may only open photos of tasks assigned to them; supervisors can
+    review every task of the projects they own (the assignment itself is already
+    project-scoped by the task API). Paths are re-validated here so a tampered
+    database value cannot escape ``uploads/task_completion`` or reach another
+    prefix inside the bucket.
+
+    Where the object lives in Supabase Storage the response is a 307 to a
+    short-lived signed URL; ``redirect=false`` returns
+    ``{"url": ..., "expires_in": ...}`` instead. Local files (including evidence
+    uploaded before the switch) are streamed exactly as before.
+    """
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+    if not task.completion_photo_path:
+        raise HTTPException(404, "No completion photo for this task")
+
+    if getattr(user, "user_type", None) == "worker":
+        worker = db.query(Worker).get(user.id)
+        assigned = worker is not None and (
+            task.assigned_worker_id == worker.worker_id
+            or any(link.worker_id == worker.worker_id for link in task.task_workers)
+        )
+        if not assigned:
+            raise HTTPException(403, "This task is not assigned to you")
+    elif getattr(user, "user_type", None) == "supervisor":
+        # A supervisor may review evidence only for tasks of the projects they
+        # own; otherwise every supervisor account could open every site photo.
+        project = task.project or db.query(Project).get(task.project_id)
+        if project is None or project.supervisor_id != user.id:
+            raise HTTPException(
+                403, "This task does not belong to one of your projects"
+            )
+
+    try:
+        source_kind, target = open_task_photo(task.completion_photo_path)
+    except PhotoError as exc:
+        raise HTTPException(404, str(exc))
+
+    if source_kind == "local":
+        return FileResponse(target)
+
+    if redirect:
+        return RedirectResponse(target, status_code=307)
+    return JSONResponse({"url": target, "expires_in": DEFAULT_SIGNED_URL_TTL})
+
+
 @router.get("/tasks/{task_id}")
 def get_task(task_id: int, db: Session = Depends(get_db)):
     """Single-task detail — used by the worker task detail page, which needs
@@ -330,7 +542,20 @@ def get_task(task_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/tasks/{task_id}")
-def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)):
+def update_task(
+    task_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_any_authorized),
+):
+    """Generic task update (supervisor console and worker task page).
+
+    Authentication is now required: the endpoint used to be anonymous, which
+    made every rule enforced here (completion note, completion photo) optional
+    for anyone who skipped the UI. Workers close tasks through
+    ``POST /tasks/{id}/complete`` instead, so the photo gate lives on both
+    paths.
+    """
     task = db.query(Task).options(*_task_load_options()).get(task_id)
     if not task:
         raise HTTPException(404, "Task does not exist")
@@ -383,6 +608,13 @@ def update_task(task_id: int, payload: Dict[str, Any], db: Session = Depends(get
                     400, "completion_note is required when completing a task"
                 )
             task.completion_note = completion_note
+            # Same anti-bypass rule for the evidence photo: whatever route the
+            # client takes into "completed", a stored site photo must exist.
+            _attach_completion_photo(
+                task,
+                payload,
+                worker_id=task.assigned_worker_id,
+            )
 
         # Record lifecycle timestamps: first time entering in_progress, and
         # the moment the task is completed. started_at is kept on later
@@ -515,6 +747,15 @@ def reopen_task(
     # pull progress back out of the 100% bucket. in_progress keeps whatever
     # partial progress was recorded, or starts at 50 when it is still 0/100.
     task.completed_at = None
+    # The voided submission must not keep its evidence: a task that is no
+    # longer completed cannot advertise a completion photo (the supervisor
+    # review card would otherwise show the photo of an undone completion).
+    # The file is removed through the guarded helper, and the audit row below
+    # records that this happened.
+    if task.completion_photo_path:
+        delete_task_photo(task.completion_photo_path)
+        task.completion_photo_path = None
+        task.completion_photo_at = None
     if target_status == "pending":
         task.progress = 0
     elif not task.progress or task.progress >= 100:
@@ -593,26 +834,41 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
 
 @router.post("/ai/tasks/match", response_model=List[AIMatchResult])
 def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)):
+    """Rank workers against a required trade level.
+
+    Scoring runs on the four skill levels. Because the granularity is now
+    coarse (four values instead of sixteen), exact matches alone would leave
+    most candidates tied, so seniority is used as a tiebreaker: a worker whose
+    level is above the requirement can still perform the task (ranked below an
+    exact match), while a lower level is treated as a mismatch.
+    """
     workers = db.query(Worker).all()
     if not workers:
         raise HTTPException(404, "No workers found")
 
-    trade = required_trade.strip().lower()
+    requested_level = trade_level(required_trade) or DEFAULT_LEVEL
+    requested_rank = TRADE_LEVEL_RANK.get(requested_level, 1)
     results = []
     for worker in workers:
-        worker_trade = (worker.trade or "").strip().lower()
-        if worker_trade == trade:
-            score, reason = 1.0, f"Exact trade match: {worker.trade}"
-        elif trade and (trade in worker_trade or worker_trade in trade):
-            score, reason = 0.6, f"Partial trade match: {worker.trade}"
+        worker_level = trade_level(worker.trade)
+        worker_rank = level_rank(worker.trade)
+        if worker_level == requested_level:
+            score, reason = 1.0, f"Exact skill level match: {worker_level}"
+        elif worker_level and worker_rank > requested_rank:
+            # Over-qualified but capable: keep it above pure availability.
+            score = 0.8 - 0.1 * (worker_rank - requested_rank - 1)
+            reason = f"Higher skill level ({worker_level}) covers the requirement ({requested_level})"
+        elif worker_level:
+            score = 0.3
+            reason = f"Skill level below requirement (current: {worker_level}, required: {requested_level})"
         else:
-            score, reason = 0.2, f"Trade mismatch (current: {worker.trade or 'not set'}), recommended by availability only"
+            score, reason = 0.2, f"Skill level not set (current: {worker.trade or 'not set'}), recommended by availability only"
         results.append(
             AIMatchResult(
                 worker_id=worker.worker_id,
                 worker_name=worker.name,
                 trade=worker.trade or "-",
-                match_score=score,
+                match_score=round(score, 2),
                 reason=reason,
             )
         )
@@ -627,30 +883,30 @@ def ai_match(required_trade: str, project_id: int, db: Session = Depends(get_db)
 # Worker-specific AI Task Board (Worker-only endpoints)
 # ══════════════════════════════════════════════════════════════════
 
-# AI-part inference helpers for the worker's personal task board
+# AI-part inference helpers for the worker's personal task board.
+# Keyed by the four skill levels (see app.trade_levels). Workers whose stored
+# trade is still a legacy fine-grained value are resolved through trade_level()
+# before the lookup, so the templates never miss on historical rows.
 TRADE_TO_PARTS: Dict[str, List[str]] = {
-    "carpenter": ["Formwork Section", "Timber Frame Section", "Finish Carpentry Section"],
-    "electrical": ["Conduit & Wiring Section", "Switchboard Section", "Lighting Fixture Section"],
-    "plumbing": ["Drainage & Piping Section", "Water Supply Section", "Sanitary Fixture Section"],
-    "masonry": ["Brickwork Section", "Plastering Section", "Tiling Section"],
-    "steel": ["Steel Reinforcement Section", "Structural Steel Section", "Metal Fabrication Section"],
-    "painter": ["Interior Painting Section", "Exterior Facade Section", "Protective Coating Section"],
-    "general": ["General Work Section", "Site Logistics Section", "Housekeeping Section"],
+    "general worker": ["General Work Section", "Site Logistics Section", "Housekeeping Section"],
+    "semi skilled worker": ["Finishing Section", "Drywall & Insulation Section", "Blockwork Support Section"],
+    "skilled worker": ["Structural Section", "MEP Rough-in Section", "Fit-out Section"],
+    "foreman": ["Workfront Supervision Section", "Quality Check Section", "Coordination Section"],
 }
 
 TRADE_INSTRUCTIONS: Dict[str, str] = {
-    "carpenter": "Use calibrated tools; verify formwork dimensions against shop drawings prior to pour.",
-    "electrical": "Follow single-line diagrams; tag all circuits; wear insulated gloves.",
-    "plumbing": "Pressure-test all joints; verify gradient on drainage runs before covering.",
-    "masonry": "Keep mortar mix consistent; use plumb line every 3 courses.",
-    "steel": "Inspect rebar spacing and cover; use tie-wire all intersections.",
-    "painter": "Apply primer coat coverage ≥80 microns; ensure surface preparation before topcoat.",
-    "general": "Cooperate with trades; maintain housekeeping; use PPE at all times.",
+    "general worker": "Cooperate with trades; maintain housekeeping; use PPE at all times.",
+    "semi skilled worker": "Prepare surfaces before finishing; keep material batch consistent; check level every 3 courses.",
+    "skilled worker": "Work to approved drawings; verify dimensions and setting-out before covering any work; test before handover.",
+    "foreman": "Confirm today's workfront and manpower; inspect completed work before sign-off; record any defect found.",
 }
 
+def _level_of(worker: Worker) -> str:
+    """Skill level used as template key, falling back to the default level."""
+    return trade_level(worker.trade) or DEFAULT_LEVEL
+
 def _ai_infer_part_section(task: Task, worker: Worker, used: Optional[set] = None) -> str:
-    trade = (worker.trade or "general").strip().lower()
-    parts = TRADE_TO_PARTS.get(trade, TRADE_TO_PARTS["general"])
+    parts = TRADE_TO_PARTS.get(_level_of(worker), TRADE_TO_PARTS[DEFAULT_LEVEL])
     n = max(len(parts), 1)
     idx = (task.task_id or 0) % n
     tname = task.task_name.lower()
@@ -677,8 +933,7 @@ def _ai_infer_part_section(task: Task, worker: Worker, used: Optional[set] = Non
     return section
 
 def _ai_work_instructions(task: Task, worker: Worker) -> str:
-    trade = (worker.trade or "general").strip().lower()
-    base = TRADE_INSTRUCTIONS.get(trade, TRADE_INSTRUCTIONS["general"])
+    base = TRADE_INSTRUCTIONS.get(_level_of(worker), TRADE_INSTRUCTIONS[DEFAULT_LEVEL])
     if task.priority == "high":
         base = base + " PRIORITY: Accelerate this section — supervisor flagged as high impact."
     if task.due_date:
@@ -691,7 +946,7 @@ def _ai_build_summary(worker: Worker, tasks: List[Task]) -> str:
     in_progress = sum(1 for t in tasks if t.status == "in_progress")
     completed = sum(1 for t in tasks if t.status == "completed")
     high = sum(1 for t in tasks if t.priority == "high")
-    trade = (worker.trade or "general worker").title()
+    trade = level_label(worker.trade) or "General Worker"
     return (
         f"Good day, {worker.name.split()[0]}! As {trade}, today you have {total} assigned task(s): "
         f"{pending} pending, {in_progress} in progress, {completed} completed. "

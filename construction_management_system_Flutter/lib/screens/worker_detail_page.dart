@@ -5,6 +5,7 @@ import '../theme/responsive.dart';
 import '../widgets/loading_skeleton.dart';
 import '../widgets/failure_state.dart';
 import '../services/api_service.dart';
+import '../constants/trade_levels.dart';
 import '../widgets/a11y.dart';
 
 /// Read-only worker profile, opened by tapping a card on the Workers page.
@@ -115,8 +116,7 @@ class _WorkerDetailPageState extends State<WorkerDetailPage> {
                                         color: AppColors.textMuted),
                                     const SizedBox(width: 4),
                                     Text(
-                                        (w?['trade'] as String?) ??
-                                            'General Worker',
+                                        TradeLevels.label(w?['trade'] as String?),
                                         style: GoogleFonts.inter(
                                             fontSize: 13.5,
                                             color: AppColors.textMuted)),

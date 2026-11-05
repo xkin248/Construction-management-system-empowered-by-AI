@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
+import '../constants/trade_levels.dart';
 import 'a11y.dart';
 
 /// A single worker row/card, extracted out of [WorkersPage] so the lazy list
@@ -56,7 +57,7 @@ class WorkerListCard extends StatelessWidget {
               Row(children: [
                 Icon(Icons.handyman_outlined, size: 13, color: AppColors.textMuted),
                 const SizedBox(width: 4),
-                Expanded(child: Text(w['trade'] ?? 'General Worker',
+                Expanded(child: Text(TradeLevels.label(w['trade'] as String?),
                     style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13.5),
                     overflow: TextOverflow.ellipsis)),
               ]),

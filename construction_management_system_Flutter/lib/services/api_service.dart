@@ -22,6 +22,16 @@ class ApiService {
 
   String get htmlRoot => '$baseUrl/html';
 
+  /// Bearer header for requests that bypass Dio (e.g. Image.network loading the
+  /// authenticated task completion photo). Empty when no token is set.
+  Map<String, String> get authHeaders =>
+      (_t?.isNotEmpty == true) ? {'Authorization': 'Bearer $_t'} : const {};
+
+  /// Absolute URL of the task completion photo endpoint. The endpoint requires
+  /// the Bearer token, so callers must pass [authHeaders] alongside.
+  String taskCompletionPhotoUrl(int taskId) =>
+      '$baseUrl$p/tasks/$taskId/completion-photo';
+
   void init({String? token, VoidCallback? onUnauthorized}) {
     _t = token;
     _out = onUnauthorized;
@@ -175,6 +185,8 @@ class ApiService {
     String? deviceInfo,
     String? deviceType,
     String? deviceId,
+    String? photoBase64,
+    String? photoMimeType,
   }) async =>
       Map.from((await dio.post('/attendance/worker/check-in', data: {
         'project_id': projectId,
@@ -183,6 +195,8 @@ class ApiService {
         if (deviceInfo != null) 'device_info': deviceInfo,
         if (deviceType != null) 'device_type': deviceType,
         if (deviceId != null) 'device_id': deviceId,
+        if (photoBase64 != null) 'photo_base64': photoBase64,
+        if (photoMimeType != null) 'photo_mime_type': photoMimeType,
       })).data);
 
   Future<Map> workerCheckOut({
@@ -190,12 +204,16 @@ class ApiService {
     required double lng,
     String? deviceInfo,
     String? deviceType,
+    String? photoBase64,
+    String? photoMimeType,
   }) async =>
       Map.from((await dio.post('/attendance/worker/check-out', data: {
         'lat': lat,
         'lng': lng,
         if (deviceInfo != null) 'device_info': deviceInfo,
         if (deviceType != null) 'device_type': deviceType,
+        if (photoBase64 != null) 'photo_base64': photoBase64,
+        if (photoMimeType != null) 'photo_mime_type': photoMimeType,
       })).data);
 
   Future<Map> workerTodayAttendance() async =>
@@ -209,6 +227,8 @@ class ApiService {
     String? deviceInfo,
     String? deviceType,
     String? deviceId,
+    String? photoBase64,
+    String? photoMimeType,
   }) async =>
       Map.from((await dio.post('/attendance/supervisor/check-in', data: {
         'project_id': projectId,
@@ -217,6 +237,8 @@ class ApiService {
         if (deviceInfo != null) 'device_info': deviceInfo,
         if (deviceType != null) 'device_type': deviceType,
         if (deviceId != null) 'device_id': deviceId,
+        if (photoBase64 != null) 'photo_base64': photoBase64,
+        if (photoMimeType != null) 'photo_mime_type': photoMimeType,
       })).data);
 
   Future<Map> supervisorCheckOut({
@@ -224,12 +246,16 @@ class ApiService {
     required double lng,
     String? deviceInfo,
     String? deviceType,
+    String? photoBase64,
+    String? photoMimeType,
   }) async =>
       Map.from((await dio.post('/attendance/supervisor/check-out', data: {
         'lat': lat,
         'lng': lng,
         if (deviceInfo != null) 'device_info': deviceInfo,
         if (deviceType != null) 'device_type': deviceType,
+        if (photoBase64 != null) 'photo_base64': photoBase64,
+        if (photoMimeType != null) 'photo_mime_type': photoMimeType,
       })).data);
 
   Future<Map> supervisorTodayAttendance() async =>
@@ -256,6 +282,69 @@ class ApiService {
       Map.from((await dio.get('/worker/tasks/sync', queryParameters: {
         if (sinceLastUpdated != null) 'since_last_updated': sinceLastUpdated,
       })).data);
+
+  // ───────── Daily common tasks (briefing / toolbox / housekeeping) ─────────
+
+  /// The three jobs every site repeats daily. Reading this endpoint is also
+  /// what creates today's rows on the server (lazy generation, no scheduler),
+  /// so the worker always sees exactly three cards.
+  Future<Map> commonTasksToday({int? projectId, String? workDate}) async =>
+      Map.from((await dio.get('/common-tasks/today', queryParameters: {
+        if (projectId != null) 'project_id': projectId,
+        if (workDate != null) 'work_date': workDate,
+      })).data);
+
+  /// Close one daily job with the mandatory site photo.
+  ///
+  /// The backend refuses the call without `photo_base64`, so the photo is a
+  /// required argument here too — callers cannot forget the evidence.
+  Future<Map> completeCommonTask(
+    int instanceId, {
+    required String photoBase64,
+    String photoMimeType = 'image/jpeg',
+  }) async =>
+      Map.from((await dio.post('/common-tasks/$instanceId/complete', data: {
+        'photo_base64': photoBase64,
+        'photo_mime_type': photoMimeType,
+      })).data);
+
+  /// Authenticated URL of a daily-job photo. The endpoint needs the Bearer
+  /// token, so pair it with [authHeaders] (or use the Dio client instead).
+  String commonTaskPhotoUrl(int instanceId) =>
+      '$baseUrl$p/common-tasks/$instanceId/photo';
+
+  // ───────── Toolbox: tools out / tools back ─────────
+
+  /// Sign out one or more tools under a single shared photo of the tray.
+  Future<Map> toolboxTake({
+    required List<Map<String, dynamic>> items,
+    required String photoBase64,
+    String photoMimeType = 'image/jpeg',
+    int? projectId,
+  }) async =>
+      Map.from((await dio.post('/toolbox/take', data: {
+        'items': items,
+        'photo_base64': photoBase64,
+        'photo_mime_type': photoMimeType,
+        if (projectId != null) 'project_id': projectId,
+      })).data);
+
+  /// Bring one or more tools back under a single shared photo.
+  Future<Map> toolboxReturn({
+    required List<int> issueIds,
+    required String photoBase64,
+    String photoMimeType = 'image/jpeg',
+  }) async =>
+      Map.from((await dio.post('/toolbox/return', data: {
+        'issue_ids': issueIds,
+        'photo_base64': photoBase64,
+        'photo_mime_type': photoMimeType,
+      })).data);
+
+  /// Everything this worker has not brought back yet — the digital replacement
+  /// for the paper toolbox register.
+  Future<List> toolboxOutstanding() async =>
+      (await dio.get('/toolbox/outstanding')).data as List;
 
   Future<List> getProjects() async => (await dio.get('/projects')).data as List;
   Future<Map> createProject(Map d) async =>
@@ -315,6 +404,23 @@ class ApiService {
       Map.from((await dio.post('/tasks', data: d)).data);
   Future<Map> updateTask(int taskId, Map d) async =>
       Map.from((await dio.put('/tasks/$taskId', data: d)).data);
+
+  /// Worker-only: close a task with the mandatory site photo.
+  ///
+  /// The backend rejects completion without photo evidence, so the photo is a
+  /// required argument rather than an optional one — callers cannot forget it.
+  /// [photoBase64] is the raw base64 body (no data URL prefix required).
+  Future<Map> completeTaskWithPhoto(
+    int taskId, {
+    required String photoBase64,
+    required String completionNote,
+    String photoMimeType = 'image/jpeg',
+  }) async =>
+      Map.from((await dio.post('/tasks/$taskId/complete', data: {
+        'photo_base64': photoBase64,
+        'photo_mime_type': photoMimeType,
+        'completion_note': completionNote,
+      })).data);
   Future<Map> deleteTask(int taskId) async =>
       Map.from((await dio.delete('/tasks/$taskId')).data);
   Future<List> getTaskLogs(int taskId) async =>

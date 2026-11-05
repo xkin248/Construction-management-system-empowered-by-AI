@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../theme/app_theme.dart';
 import '../../l10n/app_strings.dart';
+import '../../constants/trade_levels.dart';
 
 // ── Worker tile used in the assign bottom sheet ──
 class WorkerTile extends StatelessWidget {
@@ -18,7 +19,10 @@ class WorkerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = worker['name'] as String? ?? '?';
-    final trade = worker['trade'] as String? ?? AppStrings.t('tasks.generalWorker');
+    final rawTrade = worker['trade'] as String?;
+    final trade = (rawTrade == null || rawTrade.trim().isEmpty)
+        ? AppStrings.t('tasks.generalWorker')
+        : TradeLevels.label(rawTrade);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

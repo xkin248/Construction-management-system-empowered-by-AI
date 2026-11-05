@@ -5,6 +5,8 @@ import '../services/api_service.dart';
 import '../services/project_cache.dart';
 import '../utils/date_helper.dart';
 import '../l10n/app_strings.dart';
+import '../services/app_settings.dart';
+import '../constants/trade_levels.dart';
 
 class TaskForm extends StatefulWidget {
   /// Pre-filled task data for edit mode; null for create mode.
@@ -198,23 +200,31 @@ class _TaskFormState extends State<TaskForm> {
                         ),
                   const SizedBox(height: 16),
                   // ── Required Trade ──
-                  _fieldLabel('Required Trade'),
+                  _fieldLabel(AppSettings.t(
+                    'Required Skill Level',
+                    '所需技能等级',
+                    'Tahap Kemahiran Diperlukan',
+                  )),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    initialValue: _trade ?? '',
+                    // Legacy tasks may still hold a fine-grained trade
+                    // ("carpenter"); fold it onto a level so the initial value
+                    // always exists among the items below.
+                    initialValue: TradeLevels.normalise(_trade) ?? '',
                     isExpanded: true,
                     decoration: _inputDeco(null),
                     items: [
                       DropdownMenuItem(
                         value: '',
-                        child: Text('None / Not sure',
-                            style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: AppColors.textMuted)),
+                        child: Text(AppSettings.t(
+                          'None / Not sure',
+                          '不限 / 不确定',
+                          'Tiada / Tidak pasti',
+                        ), style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
                       ),
-                      ..._kTrades.map((t) => DropdownMenuItem(
-                            value: t.$1,
-                            child: Text(t.$2,
+                      ...TradeLevels.all.map((l) => DropdownMenuItem(
+                            value: l.value,
+                            child: Text(l.label,
                                 style:
                                     GoogleFonts.inter(fontSize: 13)),
                           )),
@@ -224,8 +234,11 @@ class _TaskFormState extends State<TaskForm> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tip: selecting a trade lets AI Auto-Assign match workers by '
-                    'trade instead of guessing from the task title.',
+                    AppSettings.t(
+                      'Tip: selecting a skill level lets AI Auto-Assign match workers by level instead of guessing from the task title.',
+                      '提示：选择技能等级后，AI 自动分配会按等级匹配工人，而不是从任务标题猜测。',
+                      'Tip: memilih tahap kemahiran membolehkan AI Auto-Assign memadankan pekerja mengikut tahap, bukan meneka dari tajuk tugas.',
+                    ),
                     style: GoogleFonts.inter(
                         fontSize: 11, color: AppColors.textMuted),
                   ),
@@ -401,22 +414,4 @@ class _TaskFormState extends State<TaskForm> {
   }
 }
 
-/// Canonical trade values consumed by AI Auto-Assign (value = canonical lowercase).
-const List<(String, String)> _kTrades = [
-  ('carpenter', 'Carpenter'),
-  ('electrical', 'Electrician'),
-  ('plumbing', 'Plumber'),
-  ('masonry', 'Mason'),
-  ('painting', 'Painter'),
-  ('welding', 'Welder'),
-  ('hvac', 'HVAC Technician'),
-  ('roofing', 'Roofer'),
-  ('tiling', 'Tiler'),
-  ('drywall', 'Drywall Installer'),
-  ('glazing', 'Glazier'),
-  ('flooring', 'Flooring Installer'),
-  ('equipment', 'Equipment Operator'),
-  ('laborer', 'General Laborer'),
-  ('insulation', 'Insulation Installer'),
-  ('supervision', 'Site Supervisor'),
-];
+// Trade values now come from lib/constants/trade_levels.dart (four levels).

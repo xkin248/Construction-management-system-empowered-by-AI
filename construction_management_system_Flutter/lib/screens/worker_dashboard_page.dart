@@ -5,23 +5,19 @@ import 'package:dio/dio.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
+import '../widgets/worker_ui.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
-import '../l10n/app_strings.dart';
 import '../services/gps_notification_service.dart';
-import '../utils/date_helper.dart';
-import '../widgets/guided_empty_state.dart';
-import '../widgets/worker_task_tile.dart';
-import '../widgets/loading_skeleton.dart';
-import '../widgets/failure_state.dart';
+import '../services/photo_capture.dart';
 import '../widgets/app_scrollbar.dart';
+import '../widgets/worker_common_task_card.dart';
 import 'attendance_geo_helper.dart';
-import 'notifications_page.dart';
+import 'worker_common_task_page.dart';
 import 'worker_task_detail_page.dart';
-import 'worker_tasks_page.dart';
-import '../widgets/a11y.dart';
+import 'worker_toolbox_page.dart';
 
 class WorkerDashboardPage extends StatefulWidget {
   /// Lets the shell switch tabs from the dashboard shortcuts (0=Home,
@@ -51,6 +47,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String _workHours = '08:00 - 17:00';
   bool _windowEnforced = false;
   String _statusMsg = 'Tap the button below to check in with GPS geofencing';
+  String? _inAt;
+  String? _outAt;
   String _deviceType = 'web';
   String _deviceInfo = 'BuildSmart Web Client';
   String _deviceId = 'web-client';
@@ -66,8 +64,12 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   bool _syncingNow = false;
   bool _checkInError = false; // true when last check-in was rejected (outside fence)
 
+  /// The three daily jobs (briefing / toolbox / housekeeping) for today.
+  List<Map<String, dynamic>> _commonTasks = [];
+  bool _loadingCommonTasks = true;
+  Object? _commonTasksError;
+
   /// Collapse state for the secondary blocks (attendance detail, task list).
-  final Map<String, bool> _expandedSections = {};
 
   @override
   void initState() {
@@ -123,7 +125,46 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   }
 
   Future<void> _loadAll() async {
-    await Future.wait([_loadAttendance(), _loadProjects(), _loadMe(), _loadTaskBoard()]);
+    await Future.wait([
+      _loadAttendance(),
+      _loadProjects(),
+      _loadMe(),
+      _loadTaskBoard(),
+      _loadCommonTasks(),
+    ]);
+  }
+
+  /// Today's three jobs. Opening this endpoint is also what creates the rows on
+  /// the server, so the checklist exists even on a fresh install.
+  Future<void> _loadCommonTasks() async {
+    if (mounted) setState(() => _loadingCommonTasks = true);
+    try {
+      final r = await ApiService().commonTasksToday();
+      final raw = r['tasks'];
+      final list = <Map<String, dynamic>>[];
+      if (raw is List) {
+        for (final e in raw) {
+          if (e is Map) list.add(Map<String, dynamic>.from(e));
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _commonTasks = list;
+        _commonTasksError = null;
+        _loadingCommonTasks = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _commonTasksError = e;
+        _loadingCommonTasks = false;
+      });
+    }
+  }
+
+  bool _isCommonDone(Map<String, dynamic> t) {
+    final s = (t['status'] ?? '').toString().toLowerCase();
+    return s == 'done' || s == 'completed';
   }
 
   Future<void> _loadMe() async {
@@ -183,6 +224,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             _attendanceId = att['attendance_id'] as int?;
             final ci = att['check_in_time'];
             final co = att['check_out_time'] ?? att['checked_out_time'];
+            _inAt = ci == null ? null : _fmtTime(ci);
+            _outAt = co == null ? null : _fmtTime(co);
             final t = _checkedOut ? (co ?? ci) : ci;
             if (t != null) {
               final tt = _fmtTime(t);
@@ -280,10 +323,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       toast('Please select a project first');
       return;
     }
-    if (kIsWeb) {
-      _simulateGpsCheckIn();
-      return;
-    }
+    // No web fallback on purpose: the browser build used to fake the GPS
+    // position with the project centre, which defeated the geofence entirely.
+    // Both conditions (inside the fence + a live selfie) are enforced now.
     setState(() {
       _checkInLoading = true;
       _statusMsg = 'Getting your location...';
@@ -300,9 +342,18 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       final pos = await GeoHelper.getCurrentPosition();
       if (pos == null) {
         setState(() {
-          _statusMsg = 'Location permission denied or GPS unavailable';
+          _statusMsg = kIsWeb
+              ? 'Location is unavailable in this browser. Use the BuildSmart app on your phone to check in.'
+              : 'Location permission denied or GPS unavailable';
           _checkInLoading = false;
         });
+        return;
+      }
+      // Photo comes after a usable position: there is no point making the
+      // worker take a selfie for a check-in that cannot be submitted.
+      final photo = await _captureCheckInPhoto();
+      if (photo == null) {
+        setState(() => _checkInLoading = false);
         return;
       }
       final r = await ApiService().workerCheckIn(
@@ -312,6 +363,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         deviceInfo: _deviceInfo,
         deviceType: _deviceType,
         deviceId: _deviceId,
+        photoBase64: photo.base64,
+        photoMimeType: photo.mimeType,
       );
       // The backend also answers 200 with status=rejected on some deployments,
       // so never trust the HTTP code alone — check what was really recorded.
@@ -341,6 +394,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         _checkedIn = true;
         _checkInError = false;
         _attendanceId = r['attendance_id'] as int?;
+        _inAt = _fmtTime(r['check_in_time']);
         _statusMsg = 'Checked in successfully at ${_fmtTime(r['check_in_time'])}';
         _checkInLoading = false;
       });
@@ -367,78 +421,24 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     }
   }
 
-  /// Returns [lat, lng] of the currently selected project, falling back to
-  /// the first project, then to the default site center.
-  List<double> _projectCenter() {
-    if (_projects.isEmpty) return [3.1390, 101.6869];
-    var proj = _projects.first;
-    if (_selectedProjectId != null) {
-      final idx =
-          _projects.indexWhere((p) => p['project_id'] == _selectedProjectId);
-      if (idx >= 0) proj = _projects[idx];
-    }
-    return [
-      (proj['center_lat'] as num? ?? 3.1390).toDouble(),
-      (proj['center_lng'] as num? ?? 101.6869).toDouble(),
-    ];
-  }
-
-  void _simulateGpsCheckIn() async {
-    setState(() {
-      _checkInLoading = true;
-      _statusMsg = 'Using simulated location for web (demo mode)...';
-    });
-    await Future.delayed(const Duration(milliseconds: 500));
+  /// Opens the camera for the mandatory check-in selfie.
+  ///
+  /// Returns null when the worker cancels or the camera is unavailable, after
+  /// showing the reason — the caller then aborts the check-in.
+  Future<CapturedPhoto?> _captureCheckInPhoto() async {
+    setState(() => _statusMsg = 'Opening camera — take a photo of yourself on site...');
     try {
-      final c = _projectCenter();
-      final defaultLat = c[0];
-      final defaultLng = c[1];
-      final r = await ApiService().workerCheckIn(
-        projectId: _selectedProjectId!,
-        lat: defaultLat,
-        lng: defaultLng,
-        deviceInfo: _deviceInfo,
-        deviceType: _deviceType,
-        deviceId: _deviceId,
-      );
-      final webStatus = (r['status'] ?? '').toString().toLowerCase();
-      if (webStatus != 'checked_in') {
-        setState(() {
-          _checkedIn = false;
-          _checkedOut = false;
-          _attendanceId = null;
-          _checkInError = true;
-          _statusMsg = '❌ Check-in rejected — outside the site geofence.';
-          _checkInLoading = false;
-        });
-        toast('Check-in rejected — you are outside the site geofence');
-        await _loadAttendance();
-        return;
-      }
+      final photo = await PhotoCapture.takeSelfie();
+      setState(() => _statusMsg = 'Photo captured, submitting check-in...');
+      return photo;
+    } on PhotoCaptureException catch (e) {
+      if (!e.cancelled) toast(e.message);
       setState(() {
-        _checkedIn = true;
-        _checkInError = false;
-        _attendanceId = r['attendance_id'] as int?;
-        _statusMsg = '✅ Checked in (simulated GPS) at ${_fmtTime(r['check_in_time'])}';
-        _checkInLoading = false;
+        _statusMsg = e.cancelled
+            ? '❌ A photo of yourself is required to check in.'
+            : '❌ ${e.message}';
       });
-      toast('✅ Web demo: Checked in successfully!');
-      await _loadAttendance();
-    } on DioException catch (e) {
-      setState(() {
-        _checkedIn = false;
-        _attendanceId = null;
-        _checkInError = true;
-        _statusMsg = '❌ Check-in failed — ${_apiError(e)}';
-        _checkInLoading = false;
-      });
-      toast('Check-in failed: ${_apiError(e)}');
-      await _loadAttendance();
-    } catch (e) {
-      setState(() {
-        _statusMsg = '❌ Error: $e';
-        _checkInLoading = false;
-      });
+      return null;
     }
   }
 
@@ -458,11 +458,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
       // worker as checked out while they are nowhere near the site.
       double outLat;
       double outLng;
-      if (kIsWeb) {
-        final c = _projectCenter();
-        outLat = c[0];
-        outLng = c[1];
-      } else {
+      {
         final pos = await GeoHelper.getCurrentPosition();
         if (pos == null) {
           setState(() {
@@ -498,6 +494,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         _checkedOut = true;
         _checkInError = false;
         _attendanceId = null;
+        _outAt = _fmtTime(r['check_out_time']);
         _statusMsg = '👋 Checked out at ${_fmtTime(r['check_out_time'])}. Thank you for today!';
         _checkInLoading = false;
       });
@@ -544,652 +541,436 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   }
 
   @override
+
+  @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (ctx, constraints) {
-      final isWide = constraints.maxWidth >= AppBreakpoints.phone;
-      return Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
-          child: SizedBox(
-            width: double.infinity,
-            child: RefreshIndicator(
-              onRefresh: _loadAll,
-              child: AppScrollbar(
-                controller: _scrollCtrl,
-                child: ListView(
-                controller: _scrollCtrl,
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                children: [
-                  const SizedBox(height: AppSpacing.xs),
-                  _buildWelcomeCard(),
-                  const SizedBox(height: AppSpacing.lg),
-                  // First screen mirrors the supervisor dashboard density:
-                  // welcome → three headline numbers → the three daily steps.
-                  _buildKpiRow(isWide),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildTodayThreeThings(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _collapsibleSection(
-                    icon: Icons.fact_check_outlined,
-                    title: AppStrings.t('worker.attDetails'),
-                    subtitle: AppStrings.t('worker.attDetailsSub'),
-                    children: [_buildAttendanceDetailsCard()],
-                  ),
-                  _collapsibleSection(
-                    icon: Icons.assignment_outlined,
-                    title: AppStrings.t('worker.tasks'),
-                    subtitle: AppStrings.t('worker.tasksSectionSub'),
-                    children: [_buildTaskBoardBody(isWide: isWide)],
-                  ),
-                ],
-              ),
+    return Align(
+      alignment: Alignment.topCenter,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+        child: SizedBox(
+          width: double.infinity,
+          child: RefreshIndicator(onRefresh: _loadAll, child: _content()),
+        ),
+      ),
+    );
+  }
+
+  Widget _content() {
+    return AppScrollbar(
+      controller: _scrollCtrl,
+      child: ListView(
+        controller: _scrollCtrl,
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 28),
+        children: [
+          _greeting(),
+          _checkCard(),
+          const SizedBox(height: 14),
+          _commonTasksSection(),
+          const SizedBox(height: 14),
+          _numbersRow(),
+          const SizedBox(height: 16),
+          _tasksSection(),
+        ],
+      ),
+    );
+  }
+
+  // ──────────────── greeting (one short line) ────────────────
+  Widget _greeting() {
+    final name = (_workerName ?? '').trim();
+    if (name.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 2, bottom: 8),
+      child: Text(
+        name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.inter(
+            fontSize: 19, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+      ),
+    );
+  }
+
+  // ──────────────── 0. today's three jobs (big icon cards) ────────────────
+  Widget _commonTasksSection() {
+    final doneCount = _commonTasks.where(_isCommonDone).length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Row(children: [
+            Expanded(
+              child: Text(
+                wT(en: 'TODAY', ms: 'HARI INI', zh: '今日任务'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary),
               ),
             ),
-          ),
-        ),
-      );
-    });
-  }
-
-  Widget _buildWelcomeCard() {
-    final name = _workerName ?? 'Worker';
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? AppStrings.t('common.goodMorning')
-        : hour < 18
-            ? AppStrings.t('common.goodAfternoon')
-            : AppStrings.t('common.goodEvening');
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.green, AppColors.green.withValues(alpha: 0.75)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: AppRadius.rLg,
-        boxShadow: [BoxShadow(color: AppColors.green.withValues(alpha: 0.18), blurRadius: 18, offset: Offset(0, 6))],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: AppColors.onAccentVeryFaint,
-            child: initialsAvatar(name, radius: 24, seed: 'worker-$name'),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('$greeting, ${name.split(' ').first}!',
-                  style: GoogleFonts.inter(color: AppColors.onAccent, fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              Text(AppStrings.t('worker.portal'),
-                  style: GoogleFonts.inter(color: AppColors.onAccentSoft, fontSize: 14)),
-              const SizedBox(height: 12),
-              Wrap(spacing: 6, runSpacing: 4, children: [
-                _welcomeChip(Icons.badge_rounded, AppStrings.t('worker.portal')),
-                if (_checkedIn) _welcomeChip(Icons.gps_fixed, AppStrings.t('dash.onSite'), bg: AppColors.onAccentStrong, fg: AppColors.green),
-              ]),
-            ]),
-          ),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(_fmtNow(),
-                style: GoogleFonts.inter(color: AppColors.onAccent, fontSize: 24, fontWeight: FontWeight.w800)),
-            Text(DateHelper.formatShort(DateTime.now()),
-                style: GoogleFonts.inter(color: AppColors.onAccentSoft, fontSize: 13)),
+            if (_commonTasks.isNotEmpty)
+              Text(
+                '$doneCount/${_commonTasks.length}',
+                style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: doneCount == _commonTasks.length
+                        ? AppColors.green
+                        : AppColors.textSecondary),
+              ),
+            IconButton(
+              iconSize: 24,
+              color: AppColors.textSecondary,
+              tooltip: wT(en: 'REFRESH', ms: 'MUAT SEMULA', zh: '刷新'),
+              onPressed: _loadingCommonTasks ? null : _loadCommonTasks,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
           ]),
-        ],
-      ),
-    );
-  }
-
-  Widget _welcomeChip(IconData icon, String label, {Color? bg, Color? fg}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: bg ?? AppColors.onAccentWash, borderRadius: AppRadius.rMd),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 11, color: fg ?? AppColors.onAccent),
-        const SizedBox(width: 4),
-        Text(label, style: GoogleFonts.inter(color: fg ?? AppColors.onAccent, fontSize: 14, fontWeight: FontWeight.w700)),
-      ]),
-    );
-  }
-
-  // ───────────────────────── Beginner-friendly first screen ─────────────────
-
-  /// Section header — same rhythm as the supervisor dashboard.
-  Widget _sectionHeader(String title, {String? sub}) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          if (sub != null) ...[
-            const SizedBox(height: 2),
-            Text(sub, style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted)),
+        ),
+        if (_loadingCommonTasks && _commonTasks.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_commonTasks.isEmpty)
+          WErrorHint(
+            title: wT(en: 'NO JOBS', ms: 'TIADA KERJA', zh: '暂无任务'),
+            hint: _commonTasksError != null
+                ? wT(
+                    en: 'Could not load. Check network.',
+                    ms: 'Gagal muat. Semak rangkaian.',
+                    zh: '加载失败，请检查网络',
+                  )
+                : wT(
+                    en: 'Tap to load today again.',
+                    ms: 'Tekan untuk muat semula.',
+                    zh: '点击重新加载今日任务',
+                  ),
+            onRetry: _loadCommonTasks,
+          )
+        else
+          for (final t in _commonTasks) ...[
+            WCommonTaskCard(
+              kind: (t['task_kind'] ?? '').toString(),
+              done: _isCommonDone(t),
+              onTap: () => _openCommonTask(t),
+            ),
+            const SizedBox(height: 10),
           ],
-        ],
-      );
-
-  String get _statusLabel => _checkedOut
-      ? AppStrings.t('worker.statusDone')
-      : _checkedIn
-          ? AppStrings.t('worker.statusOnSite')
-          : AppStrings.t('worker.statusNotIn');
-
-  /// Three headline numbers, mirroring the supervisor dashboard KPI row.
-  Widget _buildKpiRow(bool isWide) {
-    final tasks = (_taskBoard?['tasks'] as List?) ?? [];
-    final pending = tasks.where((t) {
-      final s = ((t as Map)['status'] ?? '').toString().toLowerCase().replaceAll(' ', '_');
-      return s != 'completed';
-    }).length;
-    final hours = _hoursToday.toStringAsFixed(1);
-    final cards = <Widget>[
-      _kpiCard(AppStrings.t('worker.kpiPending'),
-          _loadingTasks ? '—' : '$pending', Icons.playlist_add_check_rounded, AppColors.yellow),
-      _kpiCard(AppStrings.t('worker.kpiHours'), '${hours}h', Icons.schedule_rounded,
-          AppColors.accent),
-      _kpiCard(
-          AppStrings.t('worker.kpiStatus'),
-          _statusLabel,
-          _checkedOut
-              ? Icons.logout_rounded
-              : _checkedIn
-                  ? Icons.gps_fixed_rounded
-                  : Icons.fingerprint_rounded,
-          _checkedOut
-              ? AppColors.blue
-              : _checkedIn
-                  ? AppColors.green
-                  : AppColors.textMuted),
-    ];
-    return Row(
-      children: [
-        for (var i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
-          Expanded(child: cards[i]),
-        ],
       ],
     );
   }
 
-  Widget _kpiCard(String label, String value, IconData icon, Color color) {
+  /// Tapping a card opens its own page. The toolbox job goes to the toolbox hub
+  /// (take / return), the other two go straight to the one-photo page.
+  Future<void> _openCommonTask(Map<String, dynamic> t) async {
+    final id = (t['instance_id'] as num?)?.toInt();
+    if (id == null) return;
+    final kind = (t['task_kind'] ?? '').toString();
+    final done = _isCommonDone(t);
+
+    if (kind == 'toolbox') {
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => WorkerToolboxPage(dailyInstanceId: id, dailyDone: done),
+      ));
+    } else {
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => WorkerCommonTaskPage(
+          instanceId: id,
+          kind: kind,
+          initialStatus: (t['status'] ?? 'pending').toString(),
+        ),
+      ));
+    }
+    if (!mounted) return;
+    await Future.wait([_loadCommonTasks(), _loadTaskBoard()]);
+  }
+
+  // ──────────────── 1. one big check-in / check-out action ────────────────
+  Widget _checkCard() {
+    final working = _checkedIn && !_checkedOut;
+    final done = _checkedOut;
+    final color = done
+        ? AppColors.green
+        : working
+            ? AppColors.accent
+            : AppColors.green;
+    final icon = done
+        ? Icons.check_rounded
+        : working
+            ? Icons.logout_rounded
+            : Icons.login_rounded;
+    final label = done
+        ? wT(en: 'DONE', ms: 'SIAP', zh: '已完成')
+        : working
+            ? wT(en: 'CHECK OUT', ms: 'KELUAR', zh: '下班打卡')
+            : wT(en: 'CHECK IN', ms: 'MASUK', zh: '上班打卡');
+    final VoidCallback? onTap = done ? null : (working ? _doCheckOut : _doCheckIn);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: AppRadius.rLg,
         border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(height: 8),
-        Text(value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-        const SizedBox(height: 2),
-        Text(label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(
-                fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+      child: Column(children: [
+        WBigAction(
+          icon: icon,
+          label: label,
+          color: color,
+          height: 112,
+          busy: _checkInLoading || _loadingAtt,
+          onTap: onTap,
+        ),
+        const SizedBox(height: 12),
+        Tooltip(
+          message: _statusMsg,
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              WChip(
+                icon: Icons.schedule_rounded,
+                label: (_outAt ?? _inAt ?? _fmtNow()),
+                color: AppColors.blue,
+              ),
+              WChip(
+                icon: Icons.timelapse_rounded,
+                label: '${_hoursToday.toStringAsFixed(1)}h',
+                color: AppColors.accent,
+              ),
+              if (working)
+                WChip(
+                  icon: Icons.gps_fixed_rounded,
+                  label: 'GPS',
+                  color: AppColors.green,
+                ),
+              if (_windowEnforced && _workHours.isNotEmpty)
+                WChip(
+                  icon: Icons.access_time_rounded,
+                  label: _workHours,
+                  color: AppColors.textSecondary,
+                ),
+            ],
+          ),
+        ),
+        if (_checkInError) ...[
+          const SizedBox(height: 12),
+          WErrorHint(
+            title: wT(en: 'OUTSIDE SITE', ms: 'LUAR TAPAK', zh: '不在工地范围'),
+            hint: wT(
+                en: 'Move to the site. Tap again.',
+                ms: 'Pergi ke tapak. Tekan lagi.',
+                zh: '走到工地范围内再按一次'),
+            onRetry: _checkInLoading ? null : onTap,
+          ),
+        ],
+        const SizedBox(height: 12),
+        _siteRow(),
       ]),
     );
   }
 
-  /// "Today's three things": tasks → clock in → report a problem.
-  Widget _buildTodayThreeThings() {
-    final tasks = (_taskBoard?['tasks'] as List?) ?? [];
-    final Map<String, dynamic>? nextTask =
-        tasks.isEmpty ? null : Map<String, dynamic>.from(tasks.first as Map);
-    final nextLabel = nextTask == null
-        ? AppStrings.t('worker.noTaskToday')
-        : '${AppStrings.t('worker.nextUp')}: '
-            '${(nextTask['part_section'] ?? nextTask['task_name'] ?? '').toString()}';
+  String? get _selectedProjectName {
+    if (_selectedProjectId == null) return null;
+    for (final p in _projects) {
+      final m = Map<String, dynamic>.from(p as Map);
+      if (m['project_id'] == _selectedProjectId) {
+        return m['project_name']?.toString();
+      }
+    }
+    return null;
+  }
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionHeader(AppStrings.t('worker.todayThree'),
-          sub: AppStrings.t('worker.todayThreeSub')),
-      const SizedBox(height: 10),
-      _thingCard(
-        icon: Icons.assignment_rounded,
-        color: AppColors.accent,
-        title: AppStrings.t('worker.thingTasks'),
-        subtitle: nextLabel,
-        trailing: _thingAction(AppStrings.t('worker.viewAll'), _openTasksTab),
-        onTap: _openTasksTab,
-        step: 1,
+  Widget _siteRow() {
+    final name = _selectedProjectName ??
+        wT(en: 'SELECT SITE', ms: 'PILIH TAPAK', zh: '选择工地');
+    return Material(
+      color: AppColors.bgMain,
+      borderRadius: AppRadius.rMd,
+      child: InkWell(
+        borderRadius: AppRadius.rMd,
+        onTap: _pickSite,
+        child: Container(
+          height: kWRowTap,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(children: [
+            Icon(Icons.apartment_rounded, size: 26, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                    fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+            ),
+            Icon(Icons.swap_horiz_rounded, size: 24, color: AppColors.textMuted),
+          ]),
+        ),
       ),
-      const SizedBox(height: 10),
-      _thingCard(
-        icon: _checkedOut
-            ? Icons.logout_rounded
-            : _checkedIn
-                ? Icons.check_circle_rounded
-                : Icons.fingerprint_rounded,
-        color: _checkedOut
-            ? AppColors.blue
-            : _checkedIn
-                ? AppColors.green
-                : AppColors.yellow,
-        title: AppStrings.t('worker.thingCheckIn'),
-        subtitle: _statusMsg,
-        subtitleIsError: _checkInError,
-        trailing: _checkInButton(),
-        step: 2,
+    );
+  }
+
+  /// A dropdown is a literacy test; a list of big names is not.
+  Future<void> _pickSite() async {
+    if (_projects.isEmpty) {
+      toast(wT(en: 'NO SITE', ms: 'TIADA TAPAK', zh: '暂无工地'));
+      return;
+    }
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppColors.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      const SizedBox(height: 10),
-      _thingCard(
-        icon: Icons.report_problem_rounded,
-        color: AppColors.red,
-        title: AppStrings.t('worker.thingIssue'),
-        subtitle: AppStrings.t('worker.thingIssueSub'),
-        trailing: _thingAction(AppStrings.t('worker.reportNow'), _openIssuesTab),
-        onTap: _openIssuesTab,
-        step: 3,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Text(wT(en: 'MY SITE', ms: 'TAPAK SAYA', zh: '我的工地'),
+                style: GoogleFonts.inter(
+                    fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: _projects.map((p) {
+                final m = Map<String, dynamic>.from(p as Map);
+                final id = m['project_id'] as int;
+                final selected = id == _selectedProjectId;
+                return InkWell(
+                  onTap: () => Navigator.pop(ctx, id),
+                  child: Container(
+                    height: kWRowTap,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(children: [
+                      Icon(Icons.apartment_rounded,
+                          size: 26,
+                          color: selected ? AppColors.accent : AppColors.textMuted),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          m['project_name']?.toString() ?? 'Project $id',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                              fontSize: 17,
+                              fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                              color: AppColors.textPrimary),
+                        ),
+                      ),
+                      if (selected)
+                        Icon(Icons.check_circle_rounded, size: 24, color: AppColors.green),
+                    ]),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() => _selectedProjectId = picked);
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt('project_id', picked);
+  }
+
+  // ──────────────── 2. two big numbers ────────────────
+  int get _tasksLeft {
+    final board = _taskBoard;
+    if (board == null) return 0;
+    final tasks = (board['tasks'] as List?) ?? [];
+    return tasks
+        .where((e) => wStatusKey((e as Map)['status']) != 'completed')
+        .length;
+  }
+
+  Widget _numbersRow() {
+    return Row(children: [
+      Expanded(
+        child: WNumberTile(
+          icon: Icons.checklist_rounded,
+          value: '$_tasksLeft',
+          label: wT(en: 'LEFT', ms: 'BAKI', zh: '剩余'),
+          color: AppColors.accent,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: WNumberTile(
+          icon: Icons.schedule_rounded,
+          value: '${_hoursToday.toStringAsFixed(1)}h',
+          label: wT(en: 'HOURS', ms: 'JAM', zh: '工时'),
+          color: AppColors.blue,
+        ),
       ),
     ]);
   }
 
-  Widget _thingCard({
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required int step,
-    Widget? trailing,
-    VoidCallback? onTap,
-    bool subtitleIsError = false,
-  }) {
-    return semanticTapTarget(
-      label: title,
-      hint: subtitle,
-      child: Material(
-      color: AppColors.bgCard,
-      borderRadius: AppRadius.rLg,
-      child: InkWell(
-        borderRadius: AppRadius.rLg,
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.rLg,
-            border: Border.all(color: AppColors.border),
-            boxShadow: AppShadows.sm,
-          ),
-          child: Row(children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
-              child: Icon(icon, size: 20, color: color),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.16), borderRadius: AppRadius.rSm),
-                    child: Text('$step',
-                        style: GoogleFonts.inter(
-                            fontSize: 10.5, fontWeight: FontWeight.w800, color: color)),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary)),
-                  ),
-                ]),
-                const SizedBox(height: 3),
-                Text(subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        height: 1.35,
-                        color: subtitleIsError ? AppColors.red : AppColors.textSecondary,
-                        fontWeight: subtitleIsError ? FontWeight.w600 : FontWeight.normal)),
-              ]),
-            ),
-            if (trailing != null) ...[const SizedBox(width: 8), trailing],
-          ]),
-        ),
-      ),
-    ));
-  }
-
-  Widget _thingAction(String label, VoidCallback onTap) {
-    return Material(
-      color: AppColors.accentLight,
-      borderRadius: AppRadius.rSm,
-      child: semanticTapTarget(
-        label: label,
-        child: InkWell(
-        borderRadius: AppRadius.rSm,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text(label,
-                style: GoogleFonts.inter(
-                    fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.accent)),
-            const SizedBox(width: 2),
-            Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.accent),
-          ]),
-        ),
-      )),
-    );
-  }
-
-  /// Compact clock in / out button that lives inside the second step card.
-  Widget _checkInButton() {
-    final showCheckOut = _checkedIn && !_checkedOut;
-    if (_checkInLoading) {
-      return const SizedBox(
-          width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4));
-    }
-    if (_checkedOut) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-            color: AppColors.bgMain, borderRadius: AppRadius.rSm),
-        child: Text(AppStrings.t('worker.statusDone'),
-            style: GoogleFonts.inter(
-                fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-      );
-    }
-    return ElevatedButton(
-      onPressed: showCheckOut ? _doCheckOut : _doCheckIn,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: showCheckOut ? AppColors.red : AppColors.green,
-        foregroundColor: AppColors.onAccent,
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.rSm),
-      ),
-      child: Text(
-          showCheckOut ? AppStrings.t('att.checkOut') : AppStrings.t('att.checkIn'),
-          style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w800)),
-    );
-  }
-
-  void _openTasksTab() {
-    if (widget.onNavigate != null) {
-      widget.onNavigate!(1, 0);
-      return;
-    }
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const WorkerTasksPage()));
-  }
-
-  void _openIssuesTab() {
-    if (widget.onNavigate != null) {
-      widget.onNavigate!(3, 1);
-      return;
-    }
-    Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => const NotificationsPage(initialTab: 1)));
-  }
-
-  /// Collapsible block, same interaction as the supervisor dashboard.
-  Widget _collapsibleSection({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required List<Widget> children,
-  }) {
-    final expanded = _expandedSections[title] ?? false;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: AppRadius.rLg,
-        border: Border.all(color: AppColors.border),
-        boxShadow: AppShadows.sm,
-      ),
-      child: Column(children: [
-        semanticTapTarget(
-          label: title,
-          hint: expanded ? 'Expanded' : 'Collapsed',
-          child: InkWell(
-          borderRadius: AppRadius.rLg,
-          onTap: () => setState(() => _expandedSections[title] = !expanded),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            child: Row(children: [
-              Icon(icon, size: 16, color: AppColors.accent),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(title,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimary)),
-                  const SizedBox(height: 1),
-                  Text(subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
-                ]),
-              ),
-              AnimatedRotation(
-                turns: expanded ? 0.5 : 0,
-                duration: const Duration(milliseconds: 180),
-                child: Icon(Icons.expand_more_rounded,
-                    size: 20, color: AppColors.textMuted),
-              ),
-            ]),
-          ),
-        )),
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity),
-          secondChild: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: Column(children: children),
-          ),
-          crossFadeState:
-              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 180),
-        ),
-      ]),
-    );
-  }
-
-  /// Attendance detail block — project, fence, hours, device. The clock in/out
-  /// button now lives in the "three things" card, so this stays a read-only
-  /// detail area that is collapsed by default.
-  Widget _buildAttendanceDetailsCard() {
-    return sectionCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('📍 Daily Attendance Check-In',
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-          if (!_loadingAtt)
-            statusPill(_checkedOut ? 'checked_out' : _checkedIn ? 'checked_in' : 'absent',
-                label: _checkedOut ? 'DONE' : _checkedIn ? 'ON SITE' : 'NOT IN'),
-        ]),
-        const SizedBox(height: 16),
-
-        if (_projects.isNotEmpty)
-          DropdownButtonFormField<int>(
-            initialValue: _selectedProjectId,
-            decoration: InputDecoration(
-              labelText: 'Select Your Project',
-              prefixIcon: const Icon(Icons.apartment_rounded, size: 18),
-            ),
-            items: _projects.map<DropdownMenuItem<int>>((p) => DropdownMenuItem(
-                  value: p['project_id'] as int,
-                  child: Text(
-                    p['project_name']?.toString() ?? 'Project ${p['project_id']}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                )).toList(),
-            onChanged: _checkInLoading || _checkedIn
-                ? null
-                : (v) => setState(() => _selectedProjectId = v),
-          ),
-        if (_projects.isNotEmpty) ...[  
-          const SizedBox(height: 16),
-          // Show fence radius for selected project
-          if (_selectedProjectId != null) Builder(builder: (ctx) {
-            final sel = _projects.firstWhere(
-              (p) => p['project_id'] == _selectedProjectId,
-              orElse: () => {},
-            );
-            final r = (sel['fence_radius'] as num?)?.toInt() ?? 0;
-            if (r == 0) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(children: [
-                Icon(Icons.radar_rounded, size: 13, color: AppColors.green),
-                const SizedBox(width: 4),
-                Text(
-                  'You must be within ${r}m of the site to check in',
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w600),
-                ),
-              ]),
-            );
-          }),
-        ],
-
-        Row(children: [
-          const SizedBox(width: 4),
-          Text(_windowEnforced ? 'Check-in: $_checkInWindow' : 'Check-in: Anytime',
-              style: GoogleFonts.inter(fontSize: 13, color: AppColors.green, fontWeight: FontWeight.w700)),
-          const Spacer(),
-          Text(_windowEnforced ? 'Check-out: $_checkOutWindow' : 'Check-out: Anytime',
-              style: GoogleFonts.inter(fontSize: 13, color: AppColors.blue, fontWeight: FontWeight.w700)),
-          const SizedBox(width: 4),
-        ]),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.bgMain,
-            borderRadius: AppRadius.rMd,
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Column(children: [
-                Text(AppStrings.t('worker.workHours'),
-                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(_windowEnforced ? _workHours : AppStrings.t('worker.anytime'),
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w800)),
-              ]),
-              Container(width: 1, height: 30, color: AppColors.border),
-              Column(children: [
-                Text(AppStrings.t('worker.breakNoCheckin'),
-                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(_breakWindow,
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.yellow, fontWeight: FontWeight.w800)),
-              ]),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        const SizedBox(height: 14),
-        Text(
-          'Device: $_deviceType • $_deviceInfo',
-          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
-        ),
-      ]),
-    );
-  }
-
-  /// Task board contents (used inside the collapsed "My tasks" section).
-  Widget _buildTaskBoardBody({bool isWide = false}) {
-    if (_loadingTasks) {
-      return sectionCard(
-        padding: const EdgeInsets.all(12),
-        child: const SkeletonSection(lines: 4),
+  // ──────────────── 3. three task rows + one big "all tasks" ────────────────
+  Widget _tasksSection() {
+    if (_loadingTasks && _taskBoard == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
     if (_taskBoardError != null && _taskBoard == null) {
-      return sectionCard(
-        padding: EdgeInsets.zero,
-        child: FailureInline(
-          error: _taskBoardError,
-          onRetry: _loadTaskBoard,
+      return WErrorHint(
+        title: wT(en: 'NO SIGNAL', ms: 'TIADA ISYARAT', zh: '网络不通'),
+        hint: wT(en: 'Check internet. Try again.', ms: 'Semak internet. Cuba lagi.', zh: '检查网络后再试'),
+        onRetry: _loadTaskBoard,
+      );
+    }
+    final tasks = ((_taskBoard?['tasks'] as List?) ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    if (tasks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: AppColors.bgCard,
+          borderRadius: AppRadius.rLg,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: WEmpty(
+          icon: Icons.check_circle_outline_rounded,
+          title: wT(en: 'NO TASKS', ms: 'TIADA TUGASAN', zh: '暂无任务'),
+          actionLabel: wT(en: 'REFRESH', ms: 'MUAT SEMULA', zh: '刷新'),
+          onAction: _loadTaskBoard,
         ),
       );
     }
-    final tasks = (_taskBoard?['tasks'] as List?) ?? [];
-    return sectionCard(
-      padding: const EdgeInsets.all(4),
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          child: Row(children: [
-            Expanded(
-              child: Text(AppStrings.t('worker.tasks'),
-                  style: GoogleFonts.inter(
-                      fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-            ),
-            if (_lastUpdated.length >= 16)
-              Text(_lastUpdated.substring(11, 16),
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-            IconButton(
-              icon: Icon(Icons.refresh_rounded, size: 17, color: AppColors.accent),
-              tooltip: AppStrings.t('worker.emptyTasksAction'),
-              onPressed: _loadTaskBoard,
-            ),
-          ]),
-        ),
-        if (tasks.isEmpty)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-            child: GuidedEmptyState(
-              icon: Icons.assignment_outlined,
-              title: AppStrings.t('worker.emptyTasksTitle'),
-              description: AppStrings.t('worker.emptyTasksDesc'),
-              primaryLabel: AppStrings.t('worker.viewAll'),
-              primaryIcon: Icons.arrow_forward_rounded,
-              onPrimary: _openTasksTab,
-              secondaryHint: AppStrings.t('worker.noTasksHint'),
-            ),
-          )
-        else
-          LayoutBuilder(builder: (ctx, c) {
-            final tiles = tasks.map((e) {
-              final task = Map<String, dynamic>.from(e as Map);
-              return WorkerTaskTile(
-                task: task,
-                inGrid: isWide,
-                onTap: () => _openTask(task),
-              );
-            }).toList();
-            if (!isWide) return Column(children: tiles);
-            final w = c.maxWidth;
-            return Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.sm,
-              children: tiles
-                  .map((t) => SizedBox(width: (w - AppSpacing.md) / 2, child: t))
-                  .toList(),
-            );
-          }),
-      ]),
-    );
+    final preview = tasks.take(3).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      ...preview.map((t) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: WTaskRow(task: t, onTap: () => _openTask(t)),
+          )),
+      WBigAction(
+        icon: Icons.list_alt_rounded,
+        label: wT(en: 'ALL TASKS', ms: 'SEMUA', zh: '全部任务'),
+        color: AppColors.blue,
+        height: kWPrimaryTap,
+        onTap: _openTasksTab,
+      ),
+    ]);
+  }
+
+  void _openTasksTab() {
+    widget.onNavigate?.call(1, 0);
   }
 }
