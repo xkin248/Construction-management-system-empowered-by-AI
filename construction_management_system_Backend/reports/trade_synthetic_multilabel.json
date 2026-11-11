@@ -1,0 +1,1824 @@
+{
+  "pipeline": {
+    "valid_rows": 83,
+    "valid_multi_label_rows": 2,
+    "valid_titles": 83,
+    "synthetic_rows": 3074,
+    "synthetic_from_valid_titles": 496,
+    "synthetic_used_per_variant": {
+      "V0 prev_registered": 0,
+      "A single_tuned": 0,
+      "B single_synth": 2578,
+      "C multi_base": 0,
+      "D multi_synth": 2578,
+      "E multi_synth_rules": 2578,
+      "F single_synth_rules": 2578
+    },
+    "train_samples": {
+      "V0 prev_registered": 1236,
+      "A single_tuned": 1236,
+      "B single_synth": 3814,
+      "C multi_base": 1223,
+      "D multi_synth": 3801,
+      "E multi_synth_rules": 3801,
+      "F single_synth_rules": 3814
+    },
+    "dev_tuned_rule": {
+      "C": 4.0,
+      "threshold": 0.35,
+      "margin": 0.25,
+      "exact_acc": 0.9711538461538461,
+      "top1_acc": 0.9807692307692307,
+      "macro_recall": 0.976461038961039,
+      "row_recall": 0.9807692307692307,
+      "multi_pred_rows": 5
+    },
+    "dev_grid": [
+      {
+        "C": 2.0,
+        "threshold": 0.15,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.15,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.15,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.15,
+        "margin": 0.4,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.15,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9461038961038961,
+        "row_recall": 0.9615384615384616,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.2,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.2,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.2,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.2,
+        "margin": 0.4,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.2,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9461038961038961,
+        "row_recall": 0.9615384615384616,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.25,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.25,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.25,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.25,
+        "margin": 0.4,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.25,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9461038961038961,
+        "row_recall": 0.9615384615384616,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.3,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.3,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.3,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.3,
+        "margin": 0.4,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.3,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9461038961038961,
+        "row_recall": 0.9615384615384616,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.35,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.35,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9711538461538461,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.35,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.35,
+        "margin": 0.4,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9639610389610389,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 2.0,
+        "threshold": 0.35,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9461038961038961,
+        "row_recall": 0.9615384615384616,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.15,
+        "margin": 0.25,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.15,
+        "margin": 0.3,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.15,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.15,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.15,
+        "margin": 0.5,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.2,
+        "margin": 0.25,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.2,
+        "margin": 0.3,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.2,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.2,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.2,
+        "margin": 0.5,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.25,
+        "margin": 0.25,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.25,
+        "margin": 0.3,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.25,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.25,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.25,
+        "margin": 0.5,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.3,
+        "margin": 0.25,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.3,
+        "margin": 0.3,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.3,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.3,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.3,
+        "margin": 0.5,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.35,
+        "margin": 0.25,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.35,
+        "margin": 0.3,
+        "exact_acc": 0.9711538461538461,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.976461038961039,
+        "row_recall": 0.9807692307692307,
+        "multi_pred_rows": 5
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.35,
+        "margin": 0.35,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.35,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 4.0,
+        "threshold": 0.35,
+        "margin": 0.5,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.15,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.15,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.15,
+        "margin": 0.35,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 3
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.15,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.15,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9496753246753247,
+        "row_recall": 0.9663461538461539,
+        "multi_pred_rows": 1
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.2,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.2,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.2,
+        "margin": 0.35,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 3
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.2,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.2,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9496753246753247,
+        "row_recall": 0.9663461538461539,
+        "multi_pred_rows": 1
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.25,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.25,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.25,
+        "margin": 0.35,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 3
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.25,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.25,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9496753246753247,
+        "row_recall": 0.9663461538461539,
+        "multi_pred_rows": 1
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.3,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.3,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.3,
+        "margin": 0.35,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 3
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.3,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.3,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9496753246753247,
+        "row_recall": 0.9663461538461539,
+        "multi_pred_rows": 1
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.35,
+        "margin": 0.25,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.35,
+        "margin": 0.3,
+        "exact_acc": 0.9615384615384616,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9675324675324676,
+        "row_recall": 0.9759615384615384,
+        "multi_pred_rows": 4
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.35,
+        "margin": 0.35,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9807692307692307,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 3
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.35,
+        "margin": 0.4,
+        "exact_acc": 0.9519230769230769,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9586038961038961,
+        "row_recall": 0.9711538461538461,
+        "multi_pred_rows": 2
+      },
+      {
+        "C": 8.0,
+        "threshold": 0.35,
+        "margin": 0.5,
+        "exact_acc": 0.9423076923076923,
+        "top1_acc": 0.9903846153846154,
+        "macro_recall": 0.9496753246753247,
+        "row_recall": 0.9663461538461539,
+        "multi_pred_rows": 1
+      }
+    ],
+    "variant_config": {
+      "V0 prev_registered": {
+        "synthetic": false,
+        "label_mode": "single",
+        "tuned": false,
+        "rules": true,
+        "C": 50.0
+      },
+      "A single_tuned": {
+        "synthetic": false,
+        "label_mode": "single",
+        "tuned": true,
+        "rules": false,
+        "C": 4.0
+      },
+      "B single_synth": {
+        "synthetic": true,
+        "label_mode": "single",
+        "tuned": true,
+        "rules": false,
+        "C": 4.0
+      },
+      "C multi_base": {
+        "synthetic": false,
+        "label_mode": "multi",
+        "tuned": true,
+        "rules": false,
+        "C": 4.0
+      },
+      "D multi_synth": {
+        "synthetic": true,
+        "label_mode": "multi",
+        "tuned": true,
+        "rules": false,
+        "C": 4.0
+      },
+      "E multi_synth_rules": {
+        "synthetic": true,
+        "label_mode": "multi",
+        "tuned": true,
+        "rules": true,
+        "C": 4.0
+      },
+      "F single_synth_rules": {
+        "synthetic": true,
+        "label_mode": "single",
+        "tuned": true,
+        "rules": true,
+        "C": 4.0
+      }
+    }
+  },
+  "metrics": {
+    "V0 prev_registered": {
+      "n": 83,
+      "top1_correct": 77,
+      "top1_acc": 0.927710843373494,
+      "strict_n": 81,
+      "strict_correct": 76,
+      "strict_acc": 0.9382716049382716,
+      "exact_match": 76,
+      "exact_acc": 0.9156626506024096,
+      "macro_recall": 0.8337797619047619,
+      "row_recall": 0.9216867469879518,
+      "skipped": 2,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 0.9,
+        "plumbing": 0.6666666666666666,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 1.0,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 0.5,
+        "equipment": 1.0,
+        "laborer": 0.8571428571428571,
+        "insulation": 0.6666666666666666,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "A single_tuned": {
+      "n": 83,
+      "top1_correct": 76,
+      "top1_acc": 0.9156626506024096,
+      "strict_n": 81,
+      "strict_correct": 75,
+      "strict_acc": 0.9259259259259259,
+      "exact_match": 75,
+      "exact_acc": 0.9036144578313253,
+      "macro_recall": 0.8285714285714285,
+      "row_recall": 0.9096385542168675,
+      "skipped": 2,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 0.9,
+        "plumbing": 0.6666666666666666,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 0.9166666666666666,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 0.5,
+        "equipment": 1.0,
+        "laborer": 0.8571428571428571,
+        "insulation": 0.6666666666666666,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "B single_synth": {
+      "n": 83,
+      "top1_correct": 79,
+      "top1_acc": 0.9518072289156626,
+      "strict_n": 81,
+      "strict_correct": 77,
+      "strict_acc": 0.9506172839506173,
+      "exact_match": 77,
+      "exact_acc": 0.927710843373494,
+      "macro_recall": 0.8988095238095238,
+      "row_recall": 0.9397590361445783,
+      "skipped": 1,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 1.0,
+        "plumbing": 1.0,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 0.9166666666666666,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 1.0,
+        "equipment": 1.0,
+        "laborer": 0.7142857142857143,
+        "insulation": 1.0,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "C multi_base": {
+      "n": 83,
+      "top1_correct": 75,
+      "top1_acc": 0.9036144578313253,
+      "strict_n": 81,
+      "strict_correct": 73,
+      "strict_acc": 0.9012345679012346,
+      "exact_match": 73,
+      "exact_acc": 0.8795180722891566,
+      "macro_recall": 0.8456845238095239,
+      "row_recall": 0.891566265060241,
+      "skipped": 4,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 0.9,
+        "plumbing": 0.6666666666666666,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 0.9166666666666666,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 1.0,
+        "equipment": 0.9166666666666666,
+        "laborer": 0.7142857142857143,
+        "insulation": 0.6666666666666666,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "D multi_synth": {
+      "n": 83,
+      "top1_correct": 77,
+      "top1_acc": 0.927710843373494,
+      "strict_n": 81,
+      "strict_correct": 75,
+      "strict_acc": 0.9259259259259259,
+      "exact_match": 75,
+      "exact_acc": 0.9036144578313253,
+      "macro_recall": 0.8690476190476191,
+      "row_recall": 0.9156626506024096,
+      "skipped": 2,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 1.0,
+        "plumbing": 0.6666666666666666,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 0.9166666666666666,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 1.0,
+        "equipment": 1.0,
+        "laborer": 0.5714285714285714,
+        "insulation": 1.0,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "E multi_synth_rules": {
+      "n": 83,
+      "top1_correct": 78,
+      "top1_acc": 0.9397590361445783,
+      "strict_n": 81,
+      "strict_correct": 76,
+      "strict_acc": 0.9382716049382716,
+      "exact_match": 76,
+      "exact_acc": 0.9156626506024096,
+      "macro_recall": 0.8742559523809523,
+      "row_recall": 0.927710843373494,
+      "skipped": 2,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 1.0,
+        "plumbing": 0.6666666666666666,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 1.0,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 1.0,
+        "equipment": 1.0,
+        "laborer": 0.5714285714285714,
+        "insulation": 1.0,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    },
+    "F single_synth_rules": {
+      "n": 83,
+      "top1_correct": 80,
+      "top1_acc": 0.963855421686747,
+      "strict_n": 81,
+      "strict_correct": 78,
+      "strict_acc": 0.9629629629629629,
+      "exact_match": 78,
+      "exact_acc": 0.9397590361445783,
+      "macro_recall": 0.9040178571428571,
+      "row_recall": 0.9518072289156626,
+      "skipped": 1,
+      "multi_pred_rows": 0,
+      "per_trade": {
+        "carpenter": 1.0,
+        "electrical": 1.0,
+        "plumbing": 1.0,
+        "masonry": 1.0,
+        "painting": 1.0,
+        "welding": 1.0,
+        "hvac": 1.0,
+        "roofing": 0.75,
+        "tiling": 0.0,
+        "drywall": 1.0,
+        "glazing": 1.0,
+        "flooring": 1.0,
+        "equipment": 1.0,
+        "laborer": 0.7142857142857143,
+        "insulation": 1.0,
+        "supervision": 1.0
+      },
+      "per_trade_support": {
+        "carpenter": 4,
+        "electrical": 10,
+        "plumbing": 3,
+        "masonry": 9,
+        "painting": 4,
+        "welding": 12,
+        "hvac": 1,
+        "roofing": 4,
+        "tiling": 2,
+        "drywall": 4,
+        "glazing": 3,
+        "flooring": 2,
+        "equipment": 12,
+        "laborer": 7,
+        "insulation": 3,
+        "supervision": 5
+      }
+    }
+  },
+  "comparisons_vs_baseline": {
+    "A single_tuned": {
+      "top1": {
+        "fixed": 0,
+        "broken": 1,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 0,
+        "broken": 1,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 0,
+        "broken": 1,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "B single_synth": {
+      "top1": {
+        "fixed": 4,
+        "broken": 2,
+        "p": 0.6875,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 2,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 2,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "C multi_base": {
+      "top1": {
+        "fixed": 2,
+        "broken": 4,
+        "p": 0.6875,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 1,
+        "broken": 4,
+        "p": 0.375,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 1,
+        "broken": 4,
+        "p": 0.375,
+        "p_holm": 1.0
+      }
+    },
+    "D multi_synth": {
+      "top1": {
+        "fixed": 4,
+        "broken": 4,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 4,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 4,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "E multi_synth_rules": {
+      "top1": {
+        "fixed": 4,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "F single_synth_rules": {
+      "top1": {
+        "fixed": 4,
+        "broken": 1,
+        "p": 0.375,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 1,
+        "p": 0.625,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 1,
+        "p": 0.625,
+        "p_holm": 1.0
+      }
+    }
+  },
+  "attribution_vs_tuned_single": {
+    "B single_synth": {
+      "top1": {
+        "fixed": 4,
+        "broken": 1,
+        "p": 0.375,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 1,
+        "p": 0.625,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 1,
+        "p": 0.625,
+        "p_holm": 1.0
+      }
+    },
+    "C multi_base": {
+      "top1": {
+        "fixed": 2,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 1,
+        "broken": 3,
+        "p": 0.625,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 1,
+        "broken": 3,
+        "p": 0.625,
+        "p_holm": 1.0
+      }
+    },
+    "D multi_synth": {
+      "top1": {
+        "fixed": 4,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 3,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 3,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "E multi_synth_rules": {
+      "top1": {
+        "fixed": 5,
+        "broken": 3,
+        "p": 0.7265625,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 4,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 4,
+        "broken": 3,
+        "p": 1.0,
+        "p_holm": 1.0
+      }
+    },
+    "F single_synth_rules": {
+      "top1": {
+        "fixed": 5,
+        "broken": 1,
+        "p": 0.21875,
+        "p_holm": 1.0
+      },
+      "exact": {
+        "fixed": 4,
+        "broken": 1,
+        "p": 0.375,
+        "p_holm": 1.0
+      },
+      "strict": {
+        "fixed": 4,
+        "broken": 1,
+        "p": 0.375,
+        "p_holm": 1.0
+      }
+    }
+  },
+  "multi_label_probe": {
+    "V0 prev_registered": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.033,
+          "drywall": 0.0064,
+          "electrical": 0.014,
+          "equipment": 0.0033,
+          "flooring": 0.8072,
+          "glazing": 0.0097,
+          "hvac": 0.0086,
+          "insulation": 0.0085,
+          "laborer": 0.0069,
+          "masonry": 0.0088,
+          "painting": 0.008,
+          "plumbing": 0.0097,
+          "roofing": 0.0026,
+          "supervision": 0.0042,
+          "tiling": 0.0313,
+          "welding": 0.0379
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "carpenter"
+        ],
+        "raw_scores": {
+          "carpenter": 0.7558,
+          "drywall": 0.0041,
+          "electrical": 0.0082,
+          "equipment": 0.0025,
+          "flooring": 0.0965,
+          "glazing": 0.0075,
+          "hvac": 0.0041,
+          "insulation": 0.0038,
+          "laborer": 0.0062,
+          "masonry": 0.0047,
+          "painting": 0.0641,
+          "plumbing": 0.0073,
+          "roofing": 0.0021,
+          "supervision": 0.0028,
+          "tiling": 0.0151,
+          "welding": 0.0151
+        }
+      }
+    ],
+    "A single_tuned": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.033,
+          "drywall": 0.0064,
+          "electrical": 0.014,
+          "equipment": 0.0033,
+          "flooring": 0.8072,
+          "glazing": 0.0097,
+          "hvac": 0.0086,
+          "insulation": 0.0085,
+          "laborer": 0.0069,
+          "masonry": 0.0088,
+          "painting": 0.008,
+          "plumbing": 0.0097,
+          "roofing": 0.0026,
+          "supervision": 0.0042,
+          "tiling": 0.0313,
+          "welding": 0.0379
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "carpenter"
+        ],
+        "raw_scores": {
+          "carpenter": 0.7558,
+          "drywall": 0.0041,
+          "electrical": 0.0082,
+          "equipment": 0.0025,
+          "flooring": 0.0965,
+          "glazing": 0.0075,
+          "hvac": 0.0041,
+          "insulation": 0.0038,
+          "laborer": 0.0062,
+          "masonry": 0.0047,
+          "painting": 0.0641,
+          "plumbing": 0.0073,
+          "roofing": 0.0021,
+          "supervision": 0.0028,
+          "tiling": 0.0151,
+          "welding": 0.0151
+        }
+      }
+    ],
+    "B single_synth": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0153,
+          "drywall": 0.0017,
+          "electrical": 0.0066,
+          "equipment": 0.0005,
+          "flooring": 0.9408,
+          "glazing": 0.0021,
+          "hvac": 0.0037,
+          "insulation": 0.0027,
+          "laborer": 0.0021,
+          "masonry": 0.0042,
+          "painting": 0.0019,
+          "plumbing": 0.0082,
+          "roofing": 0.001,
+          "supervision": 0.0014,
+          "tiling": 0.0016,
+          "welding": 0.0062
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0577,
+          "drywall": 0.0109,
+          "electrical": 0.0018,
+          "equipment": 0.0001,
+          "flooring": 0.9163,
+          "glazing": 0.0011,
+          "hvac": 0.0004,
+          "insulation": 0.0017,
+          "laborer": 0.0012,
+          "masonry": 0.0019,
+          "painting": 0.0027,
+          "plumbing": 0.002,
+          "roofing": 0.0001,
+          "supervision": 0.0003,
+          "tiling": 0.0008,
+          "welding": 0.001
+        }
+      }
+    ],
+    "C multi_base": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.1245,
+          "electrical": 0.0636,
+          "plumbing": 0.0433,
+          "masonry": 0.0419,
+          "painting": 0.0364,
+          "welding": 0.138,
+          "hvac": 0.0488,
+          "roofing": 0.0112,
+          "tiling": 0.2426,
+          "drywall": 0.0328,
+          "glazing": 0.0524,
+          "flooring": 0.9215,
+          "equipment": 0.0142,
+          "laborer": 0.0307,
+          "insulation": 0.0408,
+          "supervision": 0.0207
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.7505,
+          "electrical": 0.0443,
+          "plumbing": 0.0391,
+          "masonry": 0.0265,
+          "painting": 0.2504,
+          "welding": 0.0729,
+          "hvac": 0.0262,
+          "roofing": 0.0109,
+          "tiling": 0.1151,
+          "drywall": 0.0393,
+          "glazing": 0.0476,
+          "flooring": 0.5443,
+          "equipment": 0.0126,
+          "laborer": 0.0328,
+          "insulation": 0.0319,
+          "supervision": 0.016
+        }
+      }
+    ],
+    "D multi_synth": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0614,
+          "electrical": 0.0399,
+          "plumbing": 0.0871,
+          "masonry": 0.037,
+          "painting": 0.0394,
+          "welding": 0.0614,
+          "hvac": 0.0477,
+          "roofing": 0.013,
+          "tiling": 0.267,
+          "drywall": 0.0229,
+          "glazing": 0.0166,
+          "flooring": 0.9563,
+          "equipment": 0.0091,
+          "laborer": 0.0186,
+          "insulation": 0.0312,
+          "supervision": 0.0154
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.2459,
+          "electrical": 0.038,
+          "plumbing": 0.0471,
+          "masonry": 0.0373,
+          "painting": 0.1284,
+          "welding": 0.0304,
+          "hvac": 0.0144,
+          "roofing": 0.0062,
+          "tiling": 0.1985,
+          "drywall": 0.2466,
+          "glazing": 0.0164,
+          "flooring": 0.9803,
+          "equipment": 0.0045,
+          "laborer": 0.0196,
+          "insulation": 0.0396,
+          "supervision": 0.008
+        }
+      }
+    ],
+    "E multi_synth_rules": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0614,
+          "electrical": 0.0399,
+          "plumbing": 0.0871,
+          "masonry": 0.037,
+          "painting": 0.0394,
+          "welding": 0.0614,
+          "hvac": 0.0477,
+          "roofing": 0.013,
+          "tiling": 0.267,
+          "drywall": 0.0229,
+          "glazing": 0.0166,
+          "flooring": 0.9563,
+          "equipment": 0.0091,
+          "laborer": 0.0186,
+          "insulation": 0.0312,
+          "supervision": 0.0154
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.2459,
+          "electrical": 0.038,
+          "plumbing": 0.0471,
+          "masonry": 0.0373,
+          "painting": 0.1284,
+          "welding": 0.0304,
+          "hvac": 0.0144,
+          "roofing": 0.0062,
+          "tiling": 0.1985,
+          "drywall": 0.2466,
+          "glazing": 0.0164,
+          "flooring": 0.9803,
+          "equipment": 0.0045,
+          "laborer": 0.0196,
+          "insulation": 0.0396,
+          "supervision": 0.008
+        }
+      }
+    ],
+    "F single_synth_rules": [
+      {
+        "text": "residential carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0153,
+          "drywall": 0.0017,
+          "electrical": 0.0066,
+          "equipment": 0.0005,
+          "flooring": 0.9408,
+          "glazing": 0.0021,
+          "hvac": 0.0037,
+          "insulation": 0.0027,
+          "laborer": 0.0021,
+          "masonry": 0.0042,
+          "painting": 0.0019,
+          "plumbing": 0.0082,
+          "roofing": 0.001,
+          "supervision": 0.0014,
+          "tiling": 0.0016,
+          "welding": 0.0062
+        }
+      },
+      {
+        "text": "wall to wall carpet installer",
+        "expected": [
+          "tiling",
+          "flooring"
+        ],
+        "predicted": [
+          "flooring"
+        ],
+        "raw_scores": {
+          "carpenter": 0.0577,
+          "drywall": 0.0109,
+          "electrical": 0.0018,
+          "equipment": 0.0001,
+          "flooring": 0.9163,
+          "glazing": 0.0011,
+          "hvac": 0.0004,
+          "insulation": 0.0017,
+          "laborer": 0.0012,
+          "masonry": 0.0019,
+          "painting": 0.0027,
+          "plumbing": 0.002,
+          "roofing": 0.0001,
+          "supervision": 0.0003,
+          "tiling": 0.0008,
+          "welding": 0.001
+        }
+      }
+    ]
+  }
+}

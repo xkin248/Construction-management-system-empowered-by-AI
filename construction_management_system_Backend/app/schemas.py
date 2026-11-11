@@ -1,0 +1,570 @@
+from pydantic import BaseModel, Field, ConfigDict, EmailStr, BeforeValidator
+from typing import Annotated, Optional, List, Dict, Any
+from datetime import date, datetime
+
+from app.trade_levels import normalise_trade
+from app.specialties import normalise_specialty, normalise_specialties
+
+# Trade / skill level accepted on write. Only the four stored levels pass
+# (general worker / semi skilled worker / skilled worker / foreman); legacy
+# fine-grained values and their aliases are normalised on the way in, unknown
+# values are rejected with a readable 422 instead of being stored.
+# Deliberately NOT used on the *Out models: read paths must stay tolerant of
+# historical rows that still hold an old fine-grained trade string.
+TradeLevel = Annotated[Optional[str], BeforeValidator(normalise_trade)]
+Specialty = Annotated[Optional[str], BeforeValidator(normalise_specialty)]
+SpecialtyList = Annotated[List[str], BeforeValidator(normalise_specialties)]
+
+# 1. Supervisor
+class SupervisorBase(BaseModel):
+    full_name: str = Field(..., max_length=100)
+    email: EmailStr
+    phone: Optional[str] = Field(None, max_length=50)
+    role: Optional[str] = "site_supervisor"
+class SupervisorCreate(SupervisorBase):
+    password: str = Field(..., min_length=6, max_length=100)
+class SupervisorOut(SupervisorBase):
+    supervisor_id: int; created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# 2. Project
+class ProjectBase(BaseModel):
+    project_name: str = Field(..., max_length=200)
+    location_address: str = Field(..., max_length=500)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    status: Optional[str] = "planning"
+    progress: Optional[float] = Field(0.0, ge=0, le=100)
+    supervisor_id: Optional[int] = None
+    center_lat: Optional[float] = 3.1390
+    center_lng: Optional[float] = 101.6869
+    fence_radius: Optional[float] = 5000.0
+class ProjectCreate(ProjectBase): pass
+class ProjectOut(ProjectBase):
+    project_id: int; supervisor: Optional[SupervisorOut] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# 3. Worker
+class WorkerBase(BaseModel):
+    name: str = Field(..., max_length=100)
+    ic_number: Optional[str] = Field(None, max_length=50)
+    phone: Optional[str] = Field(None, max_length=50)
+    trade: Optional[str] = Field(None, max_length=100)
+    specialties: List[str] = Field(default_factory=list)
+    project_id: Optional[int] = None
+    has_safety_training: Optional[bool] = False
+    is_safety_officer: Optional[bool] = False
+class WorkerCreate(WorkerBase):
+    # Redeclared so every write path (POST /workers, PUT /workers/{id}) goes
+    # through the four-level validation. WorkerBase keeps a plain string because
+    # WorkerOut inherits it and must still read historical fine-grained values.
+    trade: TradeLevel = None
+    specialties: SpecialtyList = Field(default_factory=list)
+class WorkerOut(WorkerBase):
+    worker_id: int; project: Optional[ProjectOut] = None
+    email: Optional[str] = None
+    role: Optional[str] = None
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# Worker Auth Schemas
+class WorkerAuthBase(BaseModel):
+    name: str = Field(..., max_length=100)
+    email: EmailStr
+    phone: Optional[str] = Field(None, max_length=50)
+    ic_number: Optional[str] = Field(None, max_length=50)
+    trade: Optional[str] = Field(None, max_length=100)
+    specialties: List[str] = Field(default_factory=list)
+    project_id: Optional[int] = None
+    role: str = "worker"
+class WorkerAuthCreate(WorkerAuthBase):
+    password: str = Field(..., min_length=6, max_length=100)
+    # Registration is the third trade write path (POST /auth/register/worker).
+    trade: TradeLevel = None
+    specialties: SpecialtyList = Field(default_factory=list)
+class WorkerAuthOut(WorkerAuthBase):
+    worker_id: int
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# Unified current user wrapper (can hold either Supervisor or Worker)
+class CurrentUser(BaseModel):
+    user_type: str    # "supervisor" or "worker"
+    id: int
+    email: str
+    name: str
+    role: str
+    phone: Optional[str] = None
+    supervisor_id: Optional[int] = None
+    worker_id: Optional[int] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# 4. Attendance (GPS geofence check-in)
+class CheckInReq(BaseModel):
+    worker_id: int; project_id: int; lat: float; lng: float
+class CheckOutReq(BaseModel):
+    attendance_id: int; lat: float; lng: float
+class HeartbeatReq(BaseModel):
+    attendance_id: int; lat: float; lng: float
+class AttendanceOut(BaseModel):
+    attendance_id: int; worker_id: Optional[int] = None; supervisor_id: Optional[int] = None
+    worker_name: Optional[str] = None
+    project_id: int
+    check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
+    in_distance_m: Optional[float] = None
+    out_distance_m: Optional[float] = None
+    status: str
+    out_of_fence_count: int = 0
+    last_heartbeat_time: Optional[datetime] = None
+    device_info: Optional[str] = None
+    device_type: Optional[str] = None
+    ip_address: Optional[str] = None
+    # On-site selfie evidence (filled by the router from the stored path so the
+    # client can review the picture without knowing the storage layout).
+    in_photo_url: Optional[str] = None
+    out_photo_url: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# Worker check-in with device info
+class WorkerCheckInReq(BaseModel):
+    project_id: int
+    lat: float
+    lng: float
+    device_info: Optional[str] = None
+    device_type: Optional[str] = None
+    device_id: Optional[str] = None
+    # Live camera capture, base64 (raw or data-URL). Mandatory: the router
+    # rejects the request when it is missing, for workers and site supervisors
+    # alike, so a check-in always carries proof of presence on site.
+    photo_base64: Optional[str] = None
+    photo_mime_type: Optional[str] = None
+class WorkerCheckOutReq(BaseModel):
+    lat: float
+    lng: float
+    device_info: Optional[str] = None
+    device_type: Optional[str] = None
+    # Optional at check-out: the geofence still applies, the photo is stored as
+    # extra evidence when the client can take one.
+    photo_base64: Optional[str] = None
+    photo_mime_type: Optional[str] = None
+
+# Worker Task Board (AI-assigned tasks for a specific worker)
+class WorkerTaskItem(BaseModel):
+    task_id: int
+    task_name: str
+    description: Optional[str] = None
+    project_id: int
+    project_name: str
+    priority: str
+    status: str
+    due_date: Optional[date] = None
+    ai_confidence: Optional[float] = None
+    assigned_at: Optional[datetime] = None
+    part_section: Optional[str] = None
+    work_instructions: Optional[str] = None
+    # Exposed so the worker board can render a progress bar consistent with the
+    # detail page instead of guessing from the status label alone.
+    progress: int = 0
+class WorkerTaskBoardResponse(BaseModel):
+    worker_id: int
+    worker_name: str
+    last_updated: datetime
+    tasks: List[WorkerTaskItem]
+    summary: Optional[str] = None
+    alert: Optional[str] = None
+    ai_generated: bool = True
+
+# 5. Task + AI Match
+class WorkerRef(BaseModel):
+    """Lightweight worker summary embedded in task responses (assigned_workers)."""
+    worker_id: int
+    name: str
+    trade: Optional[str] = None
+
+class TaskBase(BaseModel):
+    task_name: str = Field(..., max_length=200)
+    description: Optional[str] = None
+    assigned_worker_id: Optional[int] = None
+    worker_ids: Optional[List[int]] = None   # multi-worker assignment (replaces the full list when set)
+    project_id: int
+    priority: Optional[str] = "medium"
+    status: Optional[str] = "pending"
+    trade: Optional[str] = None  # canonical trade selected by the user (optional)
+    required_specialty: Optional[str] = None
+    due_date: Optional[date] = None
+    ai_confidence: Optional[float] = Field(None, ge=0, le=1)
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    progress: Optional[int] = Field(None, ge=0, le=100)  # supervisor-set 0-100; None falls back to status-derived value
+    completion_note: Optional[str] = None  # mandatory note captured when the task is completed
+class TaskCreate(TaskBase):
+    # Task trade is the required skill level of the task; validated so the AI
+    # matcher never receives a value outside the four levels.
+    trade: TradeLevel = None
+    required_specialty: Specialty = None
+class TaskOut(TaskBase):
+    task_id: int; assigned_worker: Optional[WorkerOut] = None; project: Optional[ProjectOut] = None
+    assigned_workers: List[WorkerRef] = []      # full multi-worker list (worker_id/name/trade)
+    model_config = ConfigDict(from_attributes=True)
+class TaskProgressLogOut(BaseModel):
+    """One timeline entry of a task's status/progress history."""
+    log_id: int
+    task_id: int
+    from_status: Optional[str] = None
+    to_status: Optional[str] = None
+    note: Optional[str] = None
+    # Audit fields: set for privileged moves (reopen), empty for automatic
+    # status/progress entries.
+    action: Optional[str] = None
+    changed_by_id: Optional[int] = None
+    changed_by_name: Optional[str] = None
+    reason: Optional[str] = None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+class AIMatchResult(BaseModel):
+    worker_id: int; worker_name: str; trade: str; match_score: float; reason: str
+
+# 6. Issue
+class IssueBase(BaseModel):
+    title: str = Field(..., max_length=200)
+    description: str
+    project_id: int
+    reported_by: Optional[int] = None
+    status: Optional[str] = "open"
+    priority: Optional[str] = "medium"
+    image_path: Optional[str] = None
+    incident_type: Optional[str] = "general"
+    is_safety_incident: Optional[bool] = False
+    gps_lat: Optional[float] = None
+    gps_lng: Optional[float] = None
+class IssueCreate(IssueBase): pass
+class IssueOut(IssueBase):
+    issue_id: int; created_at: datetime; handled_at: Optional[datetime] = None
+    project: Optional[ProjectOut] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# 7. Daily Report
+class DailyReportBase(BaseModel):
+    project_id: int; report_date: date
+    weather: Optional[str] = Field(None, max_length=100)
+    work_progress: Optional[str] = None
+    issues_encountered: Optional[str] = None
+    materials_used: Optional[str] = None
+    manpower_count: Optional[int] = 0
+    submitted_by: Optional[int] = None
+class DailyReportCreate(DailyReportBase): pass
+class DailyReportOut(DailyReportBase):
+    report_id: int; created_at: datetime
+    project: Optional[ProjectOut] = None; submitter: Optional[SupervisorOut] = None
+    model_config = ConfigDict(from_attributes=True)
+
+# 8. Dashboard KPI
+class DashboardKPI(BaseModel):
+    total_projects: int; ongoing_projects: int; completed_projects: int
+    total_workers: int; today_attendance: int; pending_tasks: int
+    open_issues: int; today_reports: int
+    completed_tasks: int = 0; in_progress_tasks: int = 0
+
+# 9. Worker + today's attendance status (for the Workers list/board screen)
+class WorkerWithStatus(WorkerOut):
+    today_status: str = "absent"           # present / late / absent (derived from today's AttendanceLog)
+    check_in_time: Optional[datetime] = None
+    check_out_time: Optional[datetime] = None
+    hours_today: Optional[float] = None
+
+# 10. Attendance summary (for the supervisor-facing Attendance table, distinct from the
+# worker's own GPS check-in flow in /attendance/check-in etc.)
+class AttendanceSummary(BaseModel):
+    total: int; present: int; late: int; absent: int
+    rows: List[WorkerWithStatus]
+
+# 11. Settings (single company-wide row; geofence lives on Project, users on Supervisor)
+class SettingsBase(BaseModel):
+    company_name: str = "BuildSmart Construction Sdn Bhd"
+    system_language: str = "English"
+    timezone: str = "Asia/Kuala_Lumpur (UTC+8)"
+    date_format: str = "DD/MM/YYYY"
+    work_start: str = "08:00 AM"
+    work_end: str = "05:00 PM"
+    late_threshold: str = "08:30 AM"
+    notif_attendance: bool = True
+    notif_task_overdue: bool = True
+    notif_budget: bool = True
+    notif_safety: bool = True
+    notif_daily_summary: bool = False
+    notif_weekly_report: bool = False
+    # Attendance time windows (24h "HH:MM") — editable from Settings > Attendance
+    check_in_start: str = "08:00"
+    check_in_end: str = "17:00"
+    check_out_start: str = "08:00"
+    check_out_end: str = "17:00"
+    break_start: str = "12:00"
+    break_end: str = "13:00"
+class SettingsUpdate(SettingsBase): pass
+class SettingsOut(SettingsBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+# 12. Users & Roles (thin wrapper over Supervisor for the settings screen)
+class UserInvite(BaseModel):
+    full_name: str; email: EmailStr; role: str = "site_supervisor"
+    password: str = Field(..., min_length=6, max_length=100)
+class UserRoleUpdate(BaseModel):
+    role: str
+
+
+# 13. File Management
+class FileBase(BaseModel):
+    original_name: str = Field(..., max_length=500)
+    file_category: str = Field("attachment", max_length=50)
+    project_id: Optional[int] = None
+
+class FileCreate(FileBase):
+    pass
+
+class FileUpdate(BaseModel):
+    original_name: Optional[str] = Field(None, max_length=500)
+    file_category: Optional[str] = Field(None, max_length=50)
+    project_id: Optional[int] = None
+
+class FileOut(FileBase):
+    file_id: int
+    stored_name: str
+    file_path: str
+    file_size: int
+    mime_type: str
+    thumbnail_path: Optional[str] = None
+    uploaded_by: int
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class FileLinkBase(BaseModel):
+    file_id: int
+    entity_type: str = Field(..., max_length=50)
+    entity_id: int
+
+class FileLinkCreate(FileLinkBase):
+    pass
+
+class FileLinkOut(FileLinkBase):
+    link_id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AITaskAnalysisRequest(BaseModel):
+    task_id: Optional[int] = None
+    task_name: Optional[str] = None
+    description: Optional[str] = None
+    trade: Optional[str] = None
+    project_id: int
+    same_project_only: bool = False
+
+class AITaskAnalysisResponse(BaseModel):
+    suggested_workers: List[Dict[str, Any]]
+    estimated_duration: Optional[str] = None
+    priority_suggestion: Optional[str] = None
+    safety_notes: Optional[str] = None
+    # Decision transparency: lets the UI tell an unsure verdict (skip / low
+    # confidence) apart from a normal one without guessing from worker lists.
+    matched_trades: List[str] = []
+    low_confidence: bool = False
+    assignable: bool = True
+    confidence: Optional[float] = None
+    decision_source: Optional[str] = None
+    llm_used: bool = False
+    llm_reason: Optional[str] = None
+    notice: Optional[str] = None
+
+class AIAutoAssignRequest(BaseModel):
+    project_id: Optional[int] = None
+    task_ids: Optional[List[int]] = None
+    dry_run: bool = True
+    top_k: int = 3
+    same_project_only: bool = True
+
+class AIAutoAssignItem(BaseModel):
+    task_id: int
+    task_name: str
+    assigned_worker_id: Optional[int] = None
+    assigned_worker_ids: List[int] = []
+    suggested_workers: List[Dict[str, Any]] = []
+    ai_used: bool = False
+    skipped: bool = False
+    skip_reason: Optional[str] = None
+    # Why this verdict was produced: "rule" / "semantic" / "llm" / "skip".
+    # Exposed so the app can show *how* the worker was chosen instead of a bare
+    # name, and so a degraded (rule-only) run is visible rather than hidden.
+    trade: Optional[str] = None
+    decision_source: Optional[str] = None
+    confidence: Optional[float] = None
+    llm_used: bool = False
+    llm_reason: Optional[str] = None
+
+class AIAutoAssignResponse(BaseModel):
+    project_id: int
+    dry_run: bool
+    assignments: List[AIAutoAssignItem]
+
+class AIDailyReportRequest(BaseModel):
+    project_id: int
+    report_date: date
+
+class AISafetyAnalysisRequest(BaseModel):
+    issue_description: str
+    project_id: Optional[int] = None
+
+
+# 15. Notifications
+class NotificationBase(BaseModel):
+    notification_type: str = Field(..., max_length=50)
+    title: str = Field(..., max_length=200)
+    content: str
+    related_entity_type: Optional[str] = Field(None, max_length=50)
+    related_entity_id: Optional[int] = None
+
+class NotificationCreate(NotificationBase):
+    supervisor_id: int
+
+class NotificationUpdate(BaseModel):
+    is_read: Optional[bool] = None
+
+class NotificationOut(NotificationBase):
+    notification_id: int
+    supervisor_id: int
+    is_read: bool
+    created_at: datetime
+    read_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class NotificationSettingBase(BaseModel):
+    notif_attendance: bool = True
+    notif_task_overdue: bool = True
+    notif_task_assigned: bool = True
+    notif_issue: bool = True
+    notif_safety: bool = True
+    notif_daily_report: bool = False
+    notif_email: bool = False
+    notif_push: bool = False
+
+class NotificationSettingUpdate(NotificationSettingBase):
+    pass
+
+class NotificationSettingOut(NotificationSettingBase):
+    setting_id: int
+    supervisor_id: int
+    model_config = ConfigDict(from_attributes=True)
+
+class UnreadCountResponse(BaseModel):
+    count: int
+
+
+# ──────────────────────────────────────────────────────────────
+#  16. AI Site Progress Prediction
+# ──────────────────────────────────────────────────────────────
+class ProgressMilestone(BaseModel):
+    label: str
+    predicted_progress: float
+
+class VelocityInfo(BaseModel):
+    weekly_tasks_completed: float
+    remaining_tasks: int
+    estimated_weeks_remaining: float
+
+class AttendanceTrendInfo(BaseModel):
+    avg_daily_7d: float
+    avg_daily_14d: float
+    avg_daily_30d: float
+    declining: bool
+    total_workers: int
+
+class IssueSummary(BaseModel):
+    open: int
+    total: int
+
+class SiteProgressPrediction(BaseModel):
+    project_id: int
+    project_name: str
+    generated_at: str
+    current_progress: float
+    scheduled_progress: Optional[float] = None
+    progress_gap: Optional[float] = None
+    estimated_days_remaining: int = 0
+    planned_start_date: Optional[str] = None
+    planned_end_date: Optional[str] = None
+    predicted_completion_date: str
+    trend: str  # ahead / on_track / behind / critical
+    confidence: float
+    ai_insights: str
+    ai_used: bool
+    velocity: VelocityInfo
+    attendance_trend: AttendanceTrendInfo
+    issues: IssueSummary
+    risk_factors: List[str] = []
+    recommendations: List[str] = []
+    milestones: List[ProgressMilestone] = []
+
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Common daily tasks (briefing / toolbox talk / housekeeping) + toolbox issues
+# ══════════════════════════════════════════════════════════════════════════
+class CommonTaskOut(BaseModel):
+    """One day's common task for one project (read model)."""
+    instance_id: int
+    project_id: int
+    task_kind: str                      # briefing | toolbox | housekeeping
+    work_date: date
+    status: str                         # pending | done
+    photo_path: Optional[str] = None    # relative object key (not a public URL)
+    photo_url: Optional[str] = None     # authenticated endpoint to replay it
+    completed_at: Optional[datetime] = None
+    completed_by: Optional[int] = None
+    completed_by_name: Optional[str] = None
+
+
+class CommonTaskCompleteIn(BaseModel):
+    """Completion payload for a daily common task.
+
+    ``photo_base64`` is deliberately mandatory with no fallback: the point of the
+    digital checklist is that the briefing/housekeeping actually happened, and a
+    camera photo is the only evidence the API is able to check.
+    """
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxItemIn(BaseModel):
+    tool_name: str = Field(..., min_length=1, max_length=200)
+    qty: int = Field(1, ge=1, le=100)
+
+
+class ToolboxTakeIn(BaseModel):
+    """Take several tools out at once, backed by a single shared photo."""
+    project_id: Optional[int] = None
+    items: List[ToolboxItemIn] = Field(..., min_length=1, max_length=50)
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxReturnIn(BaseModel):
+    """Return one or more previously taken tools, backed by one shared photo."""
+    issue_ids: List[int] = Field(..., min_length=1, max_length=100)
+    photo_base64: str = Field(..., min_length=1)
+    photo_mime_type: Optional[str] = None
+
+
+class ToolboxIssueOut(BaseModel):
+    issue_id: int
+    worker_id: int
+    worker_name: Optional[str] = None
+    project_id: Optional[int] = None
+    tool_name: str
+    qty: int
+    status: str                          # taken | returned
+    taken_at: Optional[datetime] = None
+    returned_at: Optional[datetime] = None
+    take_photo_url: Optional[str] = None
+    return_photo_url: Optional[str] = None

@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-10-29 18:54",
+  "artefact": {
+    "path": "data/trade_classifier.joblib",
+    "sha256": "f12ab8d0abb82afa6b8cea777a836218971bf8cc23ceaff61365136d2222d2cf",
+    "short": "f12ab8d0abb8",
+    "size": 2958738,
+    "samples": 4566,
+    "synthetic_rows": 3074,
+    "C": 4.0,
+    "label_mode": "single",
+    "scikit-learn": "1.5.2",
+    "numpy": "1.26.4"
+  },
+  "expectations": {
+    "valid_fresh_rebuild": {
+      "top1_acc": 0.963855,
+      "exact_acc": 0.963855,
+      "strict_acc": 0.963855,
+      "macro_recall": 0.964286,
+      "n": 83
+    },
+    "valid_shipped_artefact": {
+      "top1_acc": 1.0,
+      "exact_acc": 1.0,
+      "n": 83
+    }
+  },
+  "prediction_csv": {
+    "holdout_predictions.csv": "16fceb0da26509b16c92e633f66fa5f8b34c80eb272727b380da50e02fb77bcb",
+    "holdout_predictions_f12ab8d0abb8.csv": "3cd87c5c1831bb7c9efa1b73655f1c81bcf1863c5b7124df603895a96b0f16c1",
+    "trade_matcher_dev_predictions.csv": "6bb6928a1be4c334d4c5178cee263bfbfca0101e665ee29a37eaa4f6d148fd67",
+    "trade_matcher_dev_predictions_f12ab8d0abb8.csv": "aece76538c5454617d16a925600f03a5ba1c8289d91466b254363a345152121c",
+    "trade_matcher_test_predictions.csv": "8fa1d99c84201ec027d53bf48d5a4812e82cb2646f99e8203be12513d07a802e",
+    "trade_matcher_test_predictions_f12ab8d0abb8.csv": "30a37661085db410a88d69247a5520c90838bbe8648ad30b9a4202eb4f893f2f",
+    "trade_matcher_valid_predictions.csv": "c346091e19b6491f7f47903ac7669eb41c4a4df1f46efd351acc1e6c06da950b"
+  },
+  "open_problems": []
+}

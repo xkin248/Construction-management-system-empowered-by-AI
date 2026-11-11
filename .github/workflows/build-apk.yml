@@ -1,0 +1,193 @@
+name: 🏗️ Build & Release BuildSmart APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name (e.g. 1.0.0)'
+        required: false
+        default: 'manual-build'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: 📱 Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── Java Setup ────────────────────────────────────────────
+      - name: ☕ Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # ── Install Android API 35 ────────────────────────────────
+      # ubuntu-latest already ships with Android SDK; we just need platform 35
+      - name: Install Android API 35
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            --sdk_root=$ANDROID_HOME
+
+      # ── Flutter Setup ─────────────────────────────────────────
+      - name: 🐦 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      # ── Caching ───────────────────────────────────────────────
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            construction_management_system_Flutter/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('construction_management_system_Flutter/android/**/build.gradle') }}
+
+      # ── Dependencies ──────────────────────────────────────────
+      - name: 📦 Install Flutter Dependencies
+        working-directory: construction_management_system_Flutter
+        run: flutter pub get
+
+      # ── Decode signing keystore from secrets ─────────────────────
+      - name: 🔑 Decode Signing Keystore
+        working-directory: construction_management_system_Flutter
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/buildsmart-release.jks
+          ls -la android/app/buildsmart-release.jks
+
+      # ── Decode Google Services (FCM) from secrets ───────────────
+      - name: 🔥 Decode Google Services
+        working-directory: construction_management_system_Flutter
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}" | base64 -d > android/app/google-services.json
+          ls -la android/app/google-services.json
+
+      # ── Build ─────────────────────────────────────────────────
+      - name: 🔨 Build Release APK
+        working-directory: construction_management_system_Flutter
+        run: flutter build apk --release --dart-define=BASE_URL=https://construction-management-system-empowered.onrender.com
+        env:
+          ANDROID_KEYSTORE_FILE: app/buildsmart-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+
+      # ── Cleanup secret-generated files ─────────────────────────
+      - name: 🧹 Cleanup Secret Files
+        if: always()
+        working-directory: construction_management_system_Flutter
+        run: |
+          rm -f android/app/google-services.json
+          rm -f android/app/buildsmart-release.jks
+          echo "✅ Removed secret-generated files"
+
+      # ── Rename APK ────────────────────────────────────────────
+      - name: 📝 Rename APK File
+        id: rename_apk
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.ref_name }}"
+          if [ -z "$VERSION" ] || [ "$VERSION" == "refs/heads/main" ]; then
+            VERSION="${{ github.event.inputs.version_name }}"
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION="manual"
+          fi
+
+          APK_SRC="construction_management_system_Flutter/build/app/outputs/flutter-apk/app-release.apk"
+          if [ ! -f "$APK_SRC" ]; then
+            echo "❌ APK not found at $APK_SRC"
+            echo "APK_PRESENT=false" >> $GITHUB_ENV
+            echo "APK_NAME=" >> $GITHUB_ENV
+            ls -la construction_management_system_Flutter/build/app/outputs || true
+          else
+            TARGET="BuildSmart-${VERSION}.apk"
+            cp "$APK_SRC" "$TARGET"
+            echo "APK_NAME=${TARGET}" >> $GITHUB_ENV
+            echo "APK_PRESENT=true" >> $GITHUB_ENV
+            echo "VERSION=${VERSION}" >> $GITHUB_ENV
+            echo "✅ APK ready: $TARGET"
+          fi
+
+      # ── Debug (always run) ────────────────────────────────────
+      - name: 🔍 Debug Info
+        if: always()
+        working-directory: construction_management_system_Flutter
+        run: |
+          echo "---- flutter doctor ----"
+          flutter doctor -v || true
+          echo "---- build outputs ----"
+          ls -la build/app/outputs/flutter-apk || true
+
+      # ── Upload APK ────────────────────────────────────────────
+      - name: 📤 Upload APK Artifact
+        if: env.APK_PRESENT == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_NAME }}
+          path: ${{ env.APK_NAME }}
+          retention-days: 30
+
+      # ── GitHub Release (tag only) ─────────────────────────────
+      - name: 🚀 Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && env.APK_PRESENT == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "BuildSmart ${{ github.ref_name }}"
+          body: |
+            ## 📱 BuildSmart ${{ github.ref_name }} - Android APK
+
+            ### 📥 安装方法 (How to Install)
+            1. 在 Android 手机上下载下方的 `.apk` 文件
+            2. 打开下载的 APK 文件
+            3. 如果提示"未知来源"，请在设置中允许安装
+            4. 安装完成后即可使用！
+
+            ---
+            ### 📥 Installation (English)
+            1. Download the `.apk` file below on your Android phone
+            2. Open the downloaded APK file
+            3. If prompted about "Unknown sources", allow installation in Settings
+            4. Done! Open the app and enjoy.
+
+            ---
+            > ⚠️ **Note**: This app requires the backend server to be running to access data.
+          files: ${{ env.APK_NAME }}
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  notify:
+    name: 📊 Build Summary
+    runs-on: ubuntu-latest
+    needs: build-apk
+    if: always()
+    steps:
+      - name: ✅ Build Status
+        run: |
+          if [ "${{ needs.build-apk.result }}" == "success" ]; then
+            echo "✅ APK built and released successfully!"
+          else
+            echo "❌ Build failed. Check the logs above."
+          fi

@@ -1,0 +1,59 @@
+{
+  "_note": "Register of ambiguous job titles. These rows stay labelled as the dataset labels them, but the alternative reading is legitimate B2B behaviour, so they are reported as boundary cases instead of being forced by keyword hacks.",
+  "cases": [
+    {
+      "text": "scaffold",
+      "dataset_label": "laborer",
+      "alternative": "carpenter",
+      "note": "Erecting/dismantling scaffolding is generic site labour, but a scaffold carpenter legitimately owns the same wording."
+    },
+    {
+      "text": "post tensioning ironworker",
+      "dataset_label": "masonry (Reinforcing Iron and Rebar Workers)",
+      "alternative": "welding (Structural Iron and Steel Workers)",
+      "note": "Post-tensioning strand work sits with rebar/reinforcement, while a structural ironworker welds. Both readings exist on site, so the ambiguous bare word `ironworker` was only removed from the hard rule layer, not rewritten case by case."
+    },
+    {
+      "text": "sewage screen operator",
+      "dataset_label": "plumbing (Septic Tank Servicers and Sewer Pipe Cleaners)",
+      "alternative": "equipment (plant operator)",
+      "note": "A screen operator runs mechanical screening at a treatment plant; the `operator` reading is defensible. Fixed only through `sewage`/`septic` vocabulary, not by special-casing."
+    },
+    {
+      "text": "radiological control and safety technician",
+      "dataset_label": "insulation (Hazardous Materials Removal Workers)",
+      "alternative": "supervision (safety/inspection)",
+      "note": "Hazmat removal and radiological safety overlap; the safety-inspection reading is legitimate."
+    },
+    {
+      "text": "van loader",
+      "dataset_label": "laborer (Laborers and Material Movers)",
+      "alternative": "equipment (Loading Machine Operators)",
+      "note": "Manual loading vs machine loading. Vocabulary was extended with `loader`/`mover`, but a `wheel loader operator` task is still resolved to equipment."
+    },
+    {
+      "text": "truck washer",
+      "dataset_label": "laborer (Cleaners of Vehicles and Equipment)",
+      "alternative": "equipment (heavy truck driver/operator trade)",
+      "note": "Vehicle cleaning is labour, yet the word `truck` pulls towards the operator trade; both readings survive in production wording."
+    },
+    {
+      "text": "auto detailer",
+      "dataset_label": "laborer (Cleaners of Vehicles)",
+      "alternative": "painting / glazing",
+      "note": "Detailing involves coating and glass care, but the occupation is vehicle cleaning."
+    },
+    {
+      "text": "pottery kiln builder",
+      "dataset_label": "masonry",
+      "alternative": "carpenter",
+      "note": "Kiln construction is refractory/masonry work, though kiln furniture and casing are carpentry."
+    },
+    {
+      "text": "boiler engineer",
+      "dataset_label": "hvac (Stationary Engineers and Boiler Operators)",
+      "alternative": "welding (Boilermakers)",
+      "note": "Boiler operation is hvac in the dataset; boiler making/fabrication is welding. Distinguished by adding boiler/stoker/furnace vocabulary on the hvac side."
+    }
+  ]
+}

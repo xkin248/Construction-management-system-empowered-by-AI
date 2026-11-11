@@ -1,0 +1,844 @@
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+from datetime import datetime, date, time, timezone, timedelta
+from typing import Optional
+from zoneinfo import ZoneInfo
+
+from app.database import get_db
+from app.models import AttendanceLog, Worker, Project, Settings
+from app.worker_pool import get_project_workers
+from app.schemas import (
+    CheckInReq, CheckOutReq, HeartbeatReq, AttendanceOut,
+    WorkerWithStatus, AttendanceSummary,
+    WorkerCheckInReq, WorkerCheckOutReq,
+    CurrentUser,
+)
+from app.geofence import is_within_fence
+from app.attendance_photo import (
+    PhotoError,
+    open_photo,
+    photo_owner,
+    photo_url,
+    save_photo,
+)
+from app.storage_service import DEFAULT_SIGNED_URL_TTL
+from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
+
+router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
+
+OUT_OF_FENCE_LIMIT = 2
+
+# A check-in without a live camera photo is refused. The message is reused by
+# both role endpoints so the client can show one consistent explanation.
+PHOTO_REQUIRED_MSG = (
+    "A live site photo of yourself is required to check in. "
+    "Take the photo with the device camera while you are on site and try again."
+)
+
+
+def _notify_supervisor_attendance_alert(
+    db: Session, attendance: AttendanceLog, message: str
+) -> None:
+    """Best-effort attendance alert to the project's supervisor.
+
+    Never raises: an unattended notification must not fail a check-in or a
+    heartbeat, whose own transaction has already been committed by the caller.
+    """
+    try:
+        from app.notification_service import notify_attendance_alert
+
+        project = db.query(Project).get(attendance.project_id)
+        if not project or not project.supervisor_id:
+            return
+        worker = db.query(Worker).get(attendance.worker_id)
+        worker_name = worker.name if worker else f"Worker #{attendance.worker_id}"
+        notify_attendance_alert(
+            db, project.supervisor_id, worker_name, message,
+            worker_id=attendance.worker_id,
+        )
+    except Exception:
+        db.rollback()
+
+# Timezone used for all worker-facing attendance output & window checks.
+# Storage stays UTC (datetime.utcnow()); output is converted to local time.
+KL_TZ = ZoneInfo("Asia/Kuala_Lumpur")  # UTC+8
+
+# Check-in time window defaults (hardcoded fallback when Settings row is missing/invalid)
+CHECK_IN_WINDOW_START = time(8, 0)    # 08:00 AM
+CHECK_IN_WINDOW_END = time(17, 0)     # 05:00 PM
+CHECK_OUT_WINDOW_START = time(8, 0)   # 08:00 AM
+CHECK_OUT_WINDOW_END = time(17, 0)    # 05:00 PM
+
+# Work hours: 08:00-17:00 with a lunch break 12:00-13:00
+BREAK_START = time(12, 0)             # 12:00 PM
+BREAK_END = time(13, 0)               # 01:00 PM
+
+def _parse_hhmm(value, fallback: time) -> time:
+    """Parse a 'HH:MM' string from Settings; fall back to default on any error."""
+    if not value:
+        return fallback
+    try:
+        parts = str(value).strip().split(":")
+        if len(parts) != 2:
+            return fallback
+        h = int(parts[0])
+        m = int(parts[1])
+        if not (0 <= h <= 23 and 0 <= m <= 59):
+            return fallback
+        return time(h, m)
+    except (ValueError, TypeError):
+        return fallback
+
+def _load_attendance_config(db: Session) -> dict:
+    """Read attendance time windows from the settings table (fallback to defaults).
+
+    Returns a dict with keys: check_in_start/end, check_out_start/end,
+    break_start/end as datetime.time objects.
+    """
+    s = db.query(Settings).get(1)
+    if s is None:
+        return {
+            "check_in_start": CHECK_IN_WINDOW_START,
+            "check_in_end": CHECK_IN_WINDOW_END,
+            "check_out_start": CHECK_OUT_WINDOW_START,
+            "check_out_end": CHECK_OUT_WINDOW_END,
+            "break_start": BREAK_START,
+            "break_end": BREAK_END,
+        }
+    return {
+        "check_in_start": _parse_hhmm(s.check_in_start, CHECK_IN_WINDOW_START),
+        "check_in_end": _parse_hhmm(s.check_in_end, CHECK_IN_WINDOW_END),
+        "check_out_start": _parse_hhmm(s.check_out_start, CHECK_OUT_WINDOW_START),
+        "check_out_end": _parse_hhmm(s.check_out_end, CHECK_OUT_WINDOW_END),
+        "break_start": _parse_hhmm(s.break_start, BREAK_START),
+        "break_end": _parse_hhmm(s.break_end, BREAK_END),
+    }
+
+def _today_start():
+    """Start of today in Asia/Kuala_Lumpur, converted back to naive UTC for
+    comparing against the UTC-naive values stored by datetime.utcnow()."""
+    now_kl = datetime.now(KL_TZ)
+    local_midnight = datetime(now_kl.year, now_kl.month, now_kl.day, tzinfo=KL_TZ)
+    utc_midnight = local_midnight.astimezone(timezone.utc)
+    return utc_midnight.replace(tzinfo=None)
+
+def _to_local(dt: Optional[datetime]) -> Optional[datetime]:
+    """Convert a stored naive-UTC datetime to Asia/Kuala_Lumpur aware datetime."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(KL_TZ)
+
+def _to_out(a: AttendanceLog) -> AttendanceOut:
+    o = AttendanceOut.model_validate(a)
+    o.worker_name = a.worker.name if a.worker else None
+    # Output to clients in local time (storage remains UTC).
+    o.check_in_time = _to_local(a.check_in_time)
+    o.check_out_time = _to_local(a.check_out_time)
+    o.last_heartbeat_time = _to_local(a.last_heartbeat_time)
+    # Evidence photos are served by an authorised endpoint, never as a public
+    # static path, so only the relative URLs are exposed here.
+    o.in_photo_url = photo_url(a.in_photo_path)
+    o.out_photo_url = photo_url(a.out_photo_path)
+    return o
+
+
+def _store_check_in_photo(
+    d: WorkerCheckInReq, user_type: str, user_id: int, project_id: int
+) -> str:
+    """Persist the mandatory check-in selfie and return its relative path.
+
+    Raises 422 when the photo is missing or unreadable: this is the hard gate
+    that makes "GPS inside the fence + a photo of yourself on site" the only
+    way to complete a check-in, for workers and site supervisors alike.
+    """
+    if not d.photo_base64:
+        raise HTTPException(422, PHOTO_REQUIRED_MSG)
+    try:
+        return save_photo(
+            d.photo_base64,
+            user_type=user_type,
+            user_id=user_id,
+            project_id=project_id,
+            kind="in",
+            taken_at=datetime.utcnow(),
+        )
+    except PhotoError as exc:
+        raise HTTPException(422, f"{PHOTO_REQUIRED_MSG} ({exc})")
+
+def _format_hhmm(dt: Optional[datetime]) -> str:
+    return dt.strftime("%H:%M") if dt else "-"
+
+
+def _rejection_reason(db: Session, a: AttendanceLog) -> Optional[str]:
+    """Human-readable explanation for a rejected attendance attempt.
+
+    The client uses this to show the worker *why* the check-in was refused
+    instead of guessing from a bare "rejected" status.
+    """
+    if (a.status or "") != "rejected":
+        return None
+    project = db.query(Project).get(a.project_id) if a.project_id else None
+    allowed = int(project.fence_radius) if project and project.fence_radius else None
+    dist = int(a.in_distance_m) if a.in_distance_m is not None else None
+    if allowed and dist is not None:
+        return (
+            f"Outside the site geofence: you are about {dist}m from the site centre, "
+            f"but the allowed range is {allowed}m. Move closer to the site and try again."
+        )
+    return "Rejected: the check-in location is outside the project boundary."
+
+
+def _in_time_window(t: time, start: time, end: time) -> bool:
+    return start <= t <= end
+
+def _in_break(t: time, break_start: time, break_end: time) -> bool:
+    """Lunch break (e.g. 12:00-13:00) — attendance is not allowed during this period."""
+    return break_start <= t < break_end
+
+def _client_ip(request: Request) -> str:
+    try:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        return request.client.host if request.client else ""
+    except Exception:
+        return ""
+
+# ──────────────────────────────────────────────────────────────────
+# Legacy endpoints — retired (kept as explicit 410 responses)
+# ──────────────────────────────────────────────────────────────────
+# These endpoints accepted a bare worker_id / attendance_id with no
+# authentication at all, so anyone could clock in or out for somebody else.
+# The new rules (inside the geofence + a live on-site photo of yourself) cannot
+# be enforced on a request that carries neither an identity nor a photo, and
+# leaving them alive would let a client bypass both rules. They are therefore
+# closed instead of patched; clients must use the authenticated endpoints
+# /attendance/worker/* and /attendance/supervisor/*.
+
+_LEGACY_GONE = (
+    "This endpoint has been retired: check-in and check-out now require an "
+    "authenticated session, a location inside the site geofence and a live "
+    "photo of yourself taken on site. Use /attendance/worker/* or "
+    "/attendance/supervisor/*."
+)
+
+
+@router.post("/check-in", response_model=AttendanceOut, deprecated=True)
+def check_in(d: CheckInReq, db: Session = Depends(get_db)):
+    raise HTTPException(410, _LEGACY_GONE)
+
+
+@router.post("/heartbeat", response_model=AttendanceOut, deprecated=True)
+def heartbeat(d: HeartbeatReq, db: Session = Depends(get_db)):
+    raise HTTPException(410, _LEGACY_GONE)
+
+
+@router.post("/check-out", response_model=AttendanceOut, deprecated=True)
+def check_out(d: CheckOutReq, db: Session = Depends(get_db)):
+    raise HTTPException(410, _LEGACY_GONE)
+
+
+def _apply_heartbeat(d: HeartbeatReq, db: Session) -> AttendanceOut:
+    """Shared heartbeat body: re-check the geofence and auto-cancel on repeat misses.
+
+    Only reachable through the authenticated role endpoints, which first prove
+    that the attendance record belongs to the caller.
+    """
+    a = db.query(AttendanceLog).get(d.attendance_id)
+    if not a:
+        raise HTTPException(404, "Attendance record does not exist")
+    if a.status != "checked_in":
+        raise HTTPException(410, "Check-in was auto-cancelled, please check in again")
+
+    p = db.query(Project).get(a.project_id)
+    verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+
+    a.last_heartbeat_time = datetime.utcnow()
+    a.last_heartbeat_lat = d.lat
+    a.last_heartbeat_lng = d.lng
+
+    if verified:
+        a.out_of_fence_count = 0
+        db.commit()
+        db.refresh(a)
+        return _to_out(a)
+
+    a.out_of_fence_count = (a.out_of_fence_count or 0) + 1
+    if a.out_of_fence_count >= OUT_OF_FENCE_LIMIT:
+        a.status = "left_early"
+        db.commit()
+        db.refresh(a)
+        _notify_supervisor_attendance_alert(
+            db, a, "left the site geofence repeatedly and was auto checked out"
+        )
+        raise HTTPException(410, "Left the site geofence too many times in a row, check-in auto-cancelled")
+
+    db.commit()
+    db.refresh(a)
+    return _to_out(a)
+
+
+@router.get("/worker/{wid}/today", response_model=Optional[AttendanceOut])
+def worker_today(wid: int, db: Session = Depends(get_db)):
+    a = db.query(AttendanceLog).filter(
+        AttendanceLog.worker_id == wid,
+        AttendanceLog.check_in_time >= _today_start(),
+    ).order_by(AttendanceLog.attendance_id.desc()).first()
+    if not a:
+        return None
+    return _to_out(a)
+
+
+@router.get("/today", response_model=AttendanceSummary)
+def today_summary(project_id: Optional[int] = None, db: Session = Depends(get_db)):
+    if project_id:
+        workers = get_project_workers(db, project_id)
+    else:
+        workers = db.query(Worker).all()
+
+    rows: list[WorkerWithStatus] = []
+    present = late = absent = 0
+    for w in workers:
+        a = db.query(AttendanceLog).filter(
+            AttendanceLog.worker_id == w.worker_id,
+            AttendanceLog.check_in_time >= _today_start(),
+        ).order_by(AttendanceLog.attendance_id.desc()).first()
+
+        status = "absent"
+        hours = None
+        if a and a.status in ("checked_in", "checked_out"):
+            status = "present"
+            check_in_local = _to_local(a.check_in_time)
+            if check_in_local and check_in_local.strftime("%H:%M") > "07:30":
+                status = "late"
+            if a.check_in_time and a.check_out_time:
+                hours = round((a.check_out_time - a.check_in_time).total_seconds() / 3600, 1)
+
+        if status == "present":
+            present += 1
+        elif status == "late":
+            late += 1
+        else:
+            absent += 1
+
+        row = WorkerWithStatus.model_validate(w)
+        row.today_status = status
+        row.check_in_time = _to_local(a.check_in_time) if a else None
+        row.check_out_time = _to_local(a.check_out_time) if a else None
+        row.hours_today = hours
+        rows.append(row)
+
+    return AttendanceSummary(total=len(workers), present=present, late=late, absent=absent, rows=rows)
+
+
+# ──────────────────────────────────────────────────────────────────
+# NEW: Worker-authenticated endpoints (with device info, time windows)
+# ──────────────────────────────────────────────────────────────────
+
+@router.post("/worker/check-in", response_model=AttendanceOut)
+def worker_self_check_in(
+    d: WorkerCheckInReq,
+    request: Request,
+    user: CurrentUser = Depends(require_worker),
+    db: Session = Depends(get_db),
+):
+    """Worker self check-in — requires worker authentication.
+    Records device info, enforces check-in time window, validates
+    the worker belongs to the project, and prevents duplicate check-ins."""
+    worker = db.query(Worker).get(user.id)
+    if not worker:
+        raise HTTPException(404, "Worker account not found")
+
+    p = db.query(Project).get(d.project_id)
+    if not p:
+        raise HTTPException(404, "Project does not exist")
+
+    if worker.project_id is not None and worker.project_id != d.project_id:
+        raise HTTPException(400, "You are not assigned to this project")
+
+    # ── Duplicate check-in protection ──
+    existing = db.query(AttendanceLog).filter(
+        AttendanceLog.worker_id == user.id,
+        AttendanceLog.check_in_time >= _today_start(),
+        AttendanceLog.status.in_(["checked_in", "checked_out"]),
+    ).first()
+    if existing:
+        raise HTTPException(
+            400,
+            f"You have already checked in today at {_format_hhmm(_to_local(existing.check_in_time))}. "
+            f"Duplicate check-in is not allowed.",
+        )
+
+    # ── Time window & break checks removed: attendance allowed at any time ──
+
+    # ── Mandatory on-site selfie: no photo, no check-in ──
+    # Stored before the geofence verdict so the picture is on record even for a
+    # rejected attempt (a supervisor can then see who tried from where).
+    photo_path = _store_check_in_photo(d, "worker", user.id, d.project_id)
+
+    # ── Geofence validation (skipped when the project has no fence configured) ──
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        verified, dist = True, 0.0
+
+    a = AttendanceLog(
+        worker_id=user.id,
+        project_id=d.project_id,
+        check_in_time=datetime.utcnow(),
+        in_lat=d.lat,
+        in_lng=d.lng,
+        in_distance_m=dist,
+        in_verified=verified,
+        in_photo_path=photo_path,
+        status="checked_in" if verified else "rejected",
+        last_heartbeat_time=datetime.utcnow() if verified else None,
+        last_heartbeat_lat=d.lat if verified else None,
+        last_heartbeat_lng=d.lng if verified else None,
+        out_of_fence_count=0,
+        device_info=(d.device_info or "")[:500],
+        device_type=(d.device_type or "")[:50],
+        device_id=(d.device_id or "")[:255],
+        ip_address=_client_ip(request)[:100],
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+
+    if not verified:
+        _notify_supervisor_attendance_alert(
+            db, a, "attempted to check in outside the site geofence"
+        )
+        raise HTTPException(
+            400,
+            f"Check-in failed: outside the site geofence "
+            f"(distance from center {int(dist)}m, allowed range {int(p.fence_radius)}m). "
+            f"Please ensure you are within the project boundary before checking in.",
+        )
+    return _to_out(a)
+
+
+@router.post("/worker/check-out", response_model=AttendanceOut)
+def worker_self_check_out(
+    d: WorkerCheckOutReq,
+    request: Request,
+    user: CurrentUser = Depends(require_worker),
+    db: Session = Depends(get_db),
+):
+    """Worker self check-out — requires worker authentication.
+    Enforces check-out time window and validates active check-in."""
+    attendance = db.query(AttendanceLog).filter(
+        AttendanceLog.worker_id == user.id,
+        AttendanceLog.check_in_time >= _today_start(),
+        AttendanceLog.status == "checked_in",
+    ).order_by(AttendanceLog.attendance_id.desc()).first()
+    if not attendance:
+        raise HTTPException(404, "No active check-in found for you today. Please check in first.")
+
+    p = db.query(Project).get(attendance.project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+
+    # ── Check-out time window & break checks removed: allowed at any time ──
+
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        out_verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        out_verified, dist = True, 0.0
+
+    attendance.check_out_time = datetime.utcnow()
+    attendance.out_lat = d.lat
+    attendance.out_lng = d.lng
+    attendance.out_distance_m = dist
+    attendance.out_verified = out_verified
+    # The check-out photo is optional (the geofence still applies): stored as
+    # extra evidence when sent, and a malformed picture must never trap the
+    # worker in an open check-in, so a decode failure is ignored here.
+    if d.photo_base64:
+        try:
+            attendance.out_photo_path = save_photo(
+                d.photo_base64,
+                user_type="worker",
+                user_id=user.id,
+                project_id=attendance.project_id,
+                kind="out",
+                taken_at=datetime.utcnow(),
+            )
+        except PhotoError:
+            pass
+    attendance.status = "checked_out"
+
+    if d.device_info:
+        attendance.device_info = (d.device_info or "")[:500]
+    if d.device_type:
+        attendance.device_type = (d.device_type or "")[:50]
+    attendance.ip_address = _client_ip(request)[:100]
+
+    db.commit()
+    db.refresh(attendance)
+    return _to_out(attendance)
+
+
+@router.get("/worker/today")
+def worker_today_authenticated(
+    user: CurrentUser = Depends(require_worker),
+    db: Session = Depends(get_db),
+):
+    """Authenticated version — get today's attendance record for the current worker."""
+    cfg = _load_attendance_config(db)
+    a = db.query(AttendanceLog).filter(
+        AttendanceLog.worker_id == user.id,
+        AttendanceLog.check_in_time >= _today_start(),
+    ).order_by(AttendanceLog.attendance_id.desc()).first()
+    if not a:
+        return {
+            "checked_in": False,
+            "checked_out": False,
+            "status": None,
+            "rejection_reason": None,
+            "attendance": None,
+            "window_enforced": False,
+            "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+            "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+            "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
+        }
+    hours = 0.0
+    if a.check_in_time and a.check_out_time:
+        hours = round((a.check_out_time - a.check_in_time).total_seconds() / 3600, 1)
+    return {
+        "checked_in": a.status == "checked_in",
+        "checked_out": a.status == "checked_out",
+        "status": a.status,
+        "rejection_reason": _rejection_reason(db, a),
+        "hours_today": hours,
+        "window_enforced": False,
+        "attendance": _to_out(a),
+        "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+        "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+        "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
+    }
+
+
+@router.post("/worker/heartbeat", response_model=AttendanceOut)
+def worker_self_heartbeat(
+    d: HeartbeatReq,
+    user: CurrentUser = Depends(require_worker),
+    db: Session = Depends(get_db),
+):
+    """Authenticated heartbeat endpoint for the current worker."""
+    a = db.query(AttendanceLog).get(d.attendance_id)
+    if not a:
+        raise HTTPException(404, "Attendance record does not exist")
+    if a.worker_id != user.id:
+        raise HTTPException(403, "This attendance record does not belong to you")
+    return _apply_heartbeat(d, db)
+
+
+@router.get("/weekly-stats")
+def weekly_attendance_stats(
+    project_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_any_authorized),
+):
+    """
+    Current week (Mon-Sun) attendance trend for the dashboard.
+    Returns per-day distinct present workers and total check-in records.
+    Optional project_id filters to one project.
+    """
+    def _naive_utc(dt):
+        """Normalise DB values to naive UTC so comparisons never mix
+        offset-aware and offset-naive datetimes (SQLite returns naive,
+        Postgres returns aware)."""
+        if dt is None:
+            return None
+        return dt.astimezone(timezone.utc).replace(tzinfo=None) if dt.tzinfo else dt
+
+    today_local = datetime.now(KL_TZ).date()
+    monday = today_local - timedelta(days=today_local.weekday())
+    # Week boundaries belong to the KL business day (UTC+8), but the column
+    # stores naive UTC (datetime.utcnow()), so convert the window back to UTC.
+    start = (datetime(monday.year, monday.month, monday.day, tzinfo=KL_TZ)
+             .astimezone(timezone.utc).replace(tzinfo=None))
+    end = start + timedelta(days=7)
+
+    q = db.query(AttendanceLog).filter(
+        AttendanceLog.check_in_time >= start,
+        AttendanceLog.check_in_time < end,
+    )
+    if project_id:
+        q = q.filter(AttendanceLog.project_id == project_id)
+    logs = q.all()
+
+    days = []
+    for i in range(7):
+        day_start = start + timedelta(days=i)
+        day_end = day_start + timedelta(days=1)
+        day_logs = [
+            a for a in logs
+            if day_start <= _naive_utc(a.check_in_time) < day_end
+            and a.status in ("checked_in", "checked_out")
+        ]
+        present_workers = len({a.worker_id for a in day_logs})
+        days.append({
+            # Business-day label must be the KL-local calendar date, not the
+            # UTC-normalised window start (which is 8h earlier and can fall on
+            # the previous day).
+            "date": (monday + timedelta(days=i)).isoformat(),
+            "weekday": i,
+            "present_workers": present_workers,
+            "check_in_count": len(day_logs),
+            "is_today": i == today_local.weekday(),
+        })
+    return {"project_id": project_id, "days": days}
+
+
+# ──────────────────────────────────────────────────────────────────
+# Supervisor self attendance (no worker profile required)
+# ──────────────────────────────────────────────────────────────────
+
+def _supervisor_active_check_in(user_id: int, db: Session):
+    return (
+        db.query(AttendanceLog)
+        .filter(
+            AttendanceLog.supervisor_id == user_id,
+            AttendanceLog.check_in_time >= _today_start(),
+            AttendanceLog.status.in_(["checked_in", "checked_out"]),
+        )
+        .order_by(AttendanceLog.attendance_id.desc())
+        .first()
+    )
+
+
+@router.post("/supervisor/check-in", response_model=AttendanceOut)
+def supervisor_self_check_in(
+    d: WorkerCheckInReq,
+    request: Request,
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Site supervisor self check-in — no worker profile needed.
+
+    The supervisor clocks in against their own project. The record is stored
+    with ``supervisor_id`` instead of ``worker_id`` so team reports are not
+    polluted. Geofence is enforced when the project has one configured.
+    """
+    p = db.query(Project).get(d.project_id)
+    if not p:
+        raise HTTPException(404, "Project does not exist")
+
+    if p.supervisor_id is not None and p.supervisor_id != user.id:
+        raise HTTPException(400, "You are not assigned to this project")
+
+    existing = _supervisor_active_check_in(user.id, db)
+    if existing:
+        raise HTTPException(
+            400,
+            f"You have already checked in today at {_format_hhmm(_to_local(existing.check_in_time))}. "
+            f"Duplicate check-in is not allowed.",
+        )
+
+    # ── Mandatory on-site selfie: the same rule as for workers ──
+    # A supervisor can otherwise clock in for the whole crew from anywhere, so
+    # the photo requirement is deliberately not relaxed for this role.
+    photo_path = _store_check_in_photo(d, "supervisor", user.id, d.project_id)
+
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        verified, dist = True, 0.0
+
+    a = AttendanceLog(
+        supervisor_id=user.id,
+        project_id=d.project_id,
+        check_in_time=datetime.utcnow(),
+        in_lat=d.lat,
+        in_lng=d.lng,
+        in_distance_m=dist,
+        in_verified=verified,
+        in_photo_path=photo_path,
+        status="checked_in" if verified else "rejected",
+        last_heartbeat_time=datetime.utcnow() if verified else None,
+        last_heartbeat_lat=d.lat if verified else None,
+        last_heartbeat_lng=d.lng if verified else None,
+        out_of_fence_count=0,
+        device_info=(d.device_info or "")[:500],
+        device_type=(d.device_type or "")[:50],
+        device_id=(d.device_id or "")[:255],
+        ip_address=_client_ip(request)[:100],
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+
+    if not verified:
+        raise HTTPException(
+            400,
+            f"Check-in failed: outside the site geofence "
+            f"(distance from center {int(dist)}m, allowed range {int(p.fence_radius)}m). "
+            f"Please ensure you are within the project boundary before checking in.",
+        )
+    return _to_out(a)
+
+
+@router.post("/supervisor/check-out", response_model=AttendanceOut)
+def supervisor_self_check_out(
+    d: WorkerCheckOutReq,
+    request: Request,
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Site supervisor self check-out for the active check-in."""
+    attendance = (
+        db.query(AttendanceLog)
+        .filter(
+            AttendanceLog.supervisor_id == user.id,
+            AttendanceLog.check_in_time >= _today_start(),
+            AttendanceLog.status == "checked_in",
+        )
+        .order_by(AttendanceLog.attendance_id.desc())
+        .first()
+    )
+    if not attendance:
+        raise HTTPException(404, "No active check-in found for you today. Please check in first.")
+
+    p = db.query(Project).get(attendance.project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+
+    if p.fence_radius and p.fence_radius > 0 and p.center_lat and p.center_lng:
+        out_verified, dist = is_within_fence(d.lat, d.lng, p.center_lat, p.center_lng, p.fence_radius)
+    else:
+        out_verified, dist = True, 0.0
+
+    attendance.check_out_time = datetime.utcnow()
+    attendance.out_lat = d.lat
+    attendance.out_lng = d.lng
+    attendance.out_distance_m = dist
+    attendance.out_verified = out_verified
+    # Same optional-evidence rule as the worker endpoint.
+    if d.photo_base64:
+        try:
+            attendance.out_photo_path = save_photo(
+                d.photo_base64,
+                user_type="supervisor",
+                user_id=user.id,
+                project_id=attendance.project_id,
+                kind="out",
+                taken_at=datetime.utcnow(),
+            )
+        except PhotoError:
+            pass
+    attendance.status = "checked_out"
+
+    if d.device_info:
+        attendance.device_info = (d.device_info or "")[:500]
+    if d.device_type:
+        attendance.device_type = (d.device_type or "")[:50]
+    attendance.ip_address = _client_ip(request)[:100]
+
+    db.commit()
+    db.refresh(attendance)
+    return _to_out(attendance)
+
+
+@router.get("/supervisor/today")
+def supervisor_today_authenticated(
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Authenticated supervisor today record + attendance windows."""
+    cfg = _load_attendance_config(db)
+    a = _supervisor_active_check_in(user.id, db)
+    base = {
+        "window_enforced": False,
+        "check_in_window": f"{cfg['check_in_start'].strftime('%H:%M')} - {cfg['check_in_end'].strftime('%H:%M')}",
+        "check_out_window": f"{cfg['check_out_start'].strftime('%H:%M')} - {cfg['check_out_end'].strftime('%H:%M')}",
+        "break_window": f"{cfg['break_start'].strftime('%H:%M')} - {cfg['break_end'].strftime('%H:%M')}",
+    }
+    if not a:
+        return {"checked_in": False, "attendance": None, **base}
+    hours = 0.0
+    if a.check_in_time and a.check_out_time:
+        hours = round((a.check_out_time - a.check_in_time).total_seconds() / 3600, 1)
+    return {
+        "checked_in": a.status == "checked_in",
+        "checked_out": a.status == "checked_out",
+        "status": a.status,
+        "hours_today": hours,
+        "attendance": _to_out(a),
+        **base,
+    }
+
+
+# ──────────────────────────────────────────────────────────────────
+# Attendance photo replay (authenticated evidence trail)
+# ──────────────────────────────────────────────────────────────────
+
+_PHOTO_MEDIA_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}
+
+
+def _may_view_attendance_photo(
+    db: Session, user: CurrentUser, owner_type: str, owner_id: int
+) -> bool:
+    """Who is allowed to look at a stored evidence photo.
+
+    * the owner always can (a worker sees their own pictures),
+    * a site supervisor sees pictures taken on the projects they run,
+    * nobody else, since these are personal images.
+    """
+    if user.user_type == "worker":
+        return owner_type == "worker" and user.id == owner_id
+    if owner_type == "supervisor":
+        return user.id == owner_id
+    return db.query(AttendanceLog).join(
+        Project, Project.project_id == AttendanceLog.project_id
+    ).filter(
+        Project.supervisor_id == user.id,
+        AttendanceLog.worker_id == owner_id,
+    ).first() is not None
+
+
+@router.get("/photos/{photo_path:path}")
+def get_attendance_photo(
+    photo_path: str,
+    redirect: bool = True,
+    user: CurrentUser = Depends(require_any_authorized),
+    db: Session = Depends(get_db),
+):
+    """Stream one check-in / check-out photo.
+
+    Photos are deliberately not served as static files: every read is
+    authenticated and authorised, so the evidence can be replayed in a dispute
+    (who was on site, when, and what they looked like) without exposing personal
+    images of the whole crew to anyone with a link.
+
+    This URL is unchanged by the move to Supabase Storage. When the object lives
+    in the bucket, the endpoint answers with a 307 to a short-lived signed URL
+    (``redirect=false`` returns ``{"url": ..., "expires_in": ...}`` instead, for
+    clients that prefer to cache the link themselves). A local copy — including
+    every photo taken before the switch — is still streamed directly.
+    """
+    owner_type, owner_id = photo_owner(photo_path)
+    if owner_type is None or owner_id is None:
+        raise HTTPException(404, "Photo not found")
+    try:
+        source_kind, target = open_photo(photo_path)
+    except PhotoError:
+        raise HTTPException(404, "Photo not found")
+
+    if not _may_view_attendance_photo(db, user, owner_type, owner_id):
+        raise HTTPException(403, "You are not allowed to view this photo")
+
+    if source_kind == "local":
+        ext = target.rsplit(".", 1)[-1].lower()
+        return FileResponse(
+            target,
+            media_type=_PHOTO_MEDIA_TYPES.get(ext, "application/octet-stream"),
+        )
+
+    if redirect:
+        return RedirectResponse(target, status_code=307)
+    return JSONResponse({"url": target, "expires_in": DEFAULT_SIGNED_URL_TTL})

@@ -1,0 +1,6 @@
+# Copy to key.properties only for your own signed release builds.
+# Never publish a real signing password or .jks/.keystore in a ZIP.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=REPLACE_ME
+storeFile=app/REPLACE_ME.jks

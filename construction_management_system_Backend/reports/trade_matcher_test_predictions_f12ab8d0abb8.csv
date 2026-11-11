@@ -1,0 +1,84 @@
+text,category,expected,expected_primary,predicted,predicted_primary,correct_top1,source,confidence,before_predicted,before_primary,before_correct_top1,before_source
+arc welder,"Welders, Cutters, Solderers, and Brazers",welding,welding,welding,welding,True,rule,2.000,welding,welding,True,rule
+architectural inspector,Construction and Building Inspectors,supervision,supervision,supervision,supervision,True,rule,1.700,supervision,supervision,True,rule
+asbestos remover,Hazardous Materials Removal Workers,insulation,insulation,insulation,insulation,True,rule,1.700,insulation,insulation,True,semantic
+auto cleaner,Cleaners of Vehicles and Equipment,laborer,laborer,laborer,laborer,True,rule,0.518,laborer,laborer,True,rule
+automotive glazier,Automotive Glass Installers and Repairers,glazing,glazing,glazing,glazing,True,rule,1.700,glazing,glazing,True,rule
+automotive refinish technician,"Coating, Painting, and Spraying Machine Setters, Operators, and Tenders",painting,painting,glazing,glazing,False,semantic,1.000,glazing,glazing,False,semantic
+back hoe operator,"Material Moving Workers, All Other",equipment,equipment,equipment,equipment,True,rule,1.700,equipment,equipment,True,rule
+blade grader operator,Operating Engineers and Other Construction Equipment Operators,equipment,equipment,equipment,equipment,True,rule,1.800,equipment,equipment,True,rule
+brazing machine operator,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,welding,welding,True,rule,0.950,welding,welding,True,rule
+brazing machine tender,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,welding,welding,True,rule,0.950,welding,welding,True,rule
+brickmason apprentice,Brickmasons and Blockmasons,masonry,masonry,masonry,masonry,True,rule,1.000,masonry,masonry,True,rule
+building carpenter,Carpenters,carpenter,carpenter,carpenter,carpenter,True,rule,1.700,carpenter,carpenter,True,rule
+building code inspector,Construction and Building Inspectors,supervision,supervision,supervision,supervision,True,rule,1.600,supervision,supervision,True,rule
+building inspector,Construction and Building Inspectors,supervision,supervision,supervision,supervision,True,rule,1.700,supervision,supervision,True,rule
+carpenter supervisor,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,supervision,supervision,True,rule,1.700,carpenter;supervision,carpenter,False,rule
+cement truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,,(skip),False,skip,0.000,equipment,equipment,True,semantic
+ceramic painter,"Painting, Coating, and Decorating Workers",painting,painting,tiling,tiling,False,rule,1.700,tiling,tiling,False,rule
+cherry picker operator,Crane and Tower Operators,equipment,equipment,equipment,equipment,True,rule,1.600,equipment,equipment,True,rule
+clerk of court,"Managers, All Other",supervision,supervision,,(skip),False,skip,0.000,,(skip),False,skip
+commercial carpet installer,Carpet Installers,flooring,flooring,flooring,flooring,True,rule,1.600,flooring,flooring,True,rule
+composition floor layer,"Floor Layers, Except Carpet, Wood, and Hard Tiles",flooring,flooring,flooring,flooring,True,rule,1.600,flooring,flooring,True,rule
+composition weatherboard installer,"Insulation Workers, Floor, Ceiling, and Wall",insulation,insulation,,(skip),False,skip,0.000,roofing,roofing,False,semantic
+construction backhoe operator,Operating Engineers and Other Construction Equipment Operators,equipment,equipment,equipment,equipment,True,rule,2.000,equipment,equipment,True,rule
+construction inspector,Construction and Building Inspectors,supervision,supervision,supervision,supervision,True,rule,2.000,supervision,supervision,True,rule
+construction ironworker,Structural Iron and Steel Workers,welding,welding,welding,welding,True,semantic,2.000,welding,welding,True,rule
+construction superintendent,Construction Managers,supervision,supervision,supervision,supervision,True,rule,2.000,supervision,supervision,True,rule
+dredge deckhand,Dredge Operators,equipment,equipment,equipment,equipment,True,semantic,1.000,equipment,equipment,True,semantic
+drywall stripper,Drywall and Ceiling Tile Installers,drywall,drywall,drywall,drywall,True,rule,1.700,drywall,drywall,True,rule
+dump truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,1.000,equipment,equipment,True,semantic
+electric motor rewinder,"Electric Motor, Power Tool, and Related Repairers",electrical,electrical,electrical,electrical,True,semantic,1.600,electrical,electrical,True,semantic
+electrical computer aided design and drafting technician,Electrical and Electronics Drafters,electrical,electrical,electrical,electrical,True,rule,1.500,electrical,electrical,True,rule
+electrical drafter,Electrical and Electronics Drafters,electrical,electrical,electrical,electrical,True,rule,1.700,electrical,electrical,True,rule
+firebrick layer,Brickmasons and Blockmasons,masonry,masonry,masonry,masonry,True,rule,0.861,masonry,masonry,True,rule
+floor finisher,Floor Sanders and Finishers,flooring,flooring,flooring,flooring,True,rule,1.700,flooring,flooring,True,rule
+forewoman,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,,(skip),False,skip,0.000,,(skip),False,skip
+freight elevator operator,"Material Moving Workers, All Other",equipment,equipment,equipment,equipment,True,rule,1.600,equipment,equipment,True,rule
+furnace fitter,"Heating, Air Conditioning, and Refrigeration Mechanics and Installers",hvac,hvac,hvac,hvac,True,rule,1.700,,(skip),False,skip
+garbage truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,1.000,equipment,equipment,True,semantic
+granite chip terrazzo finisher,Terrazzo Workers and Finishers,masonry,masonry,masonry,masonry,True,rule,1.700,tiling,tiling,False,rule
+grave digger,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,laborer,laborer,True,rule,1.700,laborer,laborer,True,rule
+greenskeeper laborer,Landscaping and Groundskeeping Workers,laborer,laborer,laborer,laborer,True,rule,1.700,laborer,laborer,True,rule
+hazmat technician,Hazardous Materials Removal Workers,insulation,insulation,glazing,glazing,False,semantic,1.000,glazing,glazing,False,semantic
+home security alarm installer,Security and Fire Alarm Systems Installers,electrical,electrical,electrical,electrical,True,semantic,1.000,electrical,electrical,True,semantic
+hydraulic plumber,"Plumbers, Pipefitters, and Steamfitters",plumbing,plumbing,plumbing,plumbing,True,rule,1.700,plumbing,plumbing,True,rule
+lacquer spray booth operator,"Coating, Painting, and Spraying Machine Setters, Operators, and Tenders",painting,painting,equipment,equipment,False,rule,0.860,equipment,equipment,False,rule
+lead abatement worker,Hazardous Materials Removal Workers,insulation,insulation,insulation,insulation,True,rule,1.600,insulation,insulation,True,semantic
+logging flatbed truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,1.000,equipment,equipment,True,semantic
+marine electrician,Electricians,electrical,electrical,electrical,electrical,True,rule,1.700,electrical,electrical,True,rule
+material handler,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,laborer,laborer,True,rule,0.950,laborer,laborer,True,rule
+mining earth moving equipment operator,"Excavating and Loading Machine and Dragline Operators, Surface Mining",equipment,equipment,equipment,equipment,True,rule,1.520,equipment,equipment,True,rule
+mining end loader operator,"Excavating and Loading Machine and Dragline Operators, Surface Mining",equipment,equipment,equipment,equipment,True,rule,1.550,equipment,equipment,True,rule
+molding plasterer,Plasterers and Stucco Masons,drywall,drywall,masonry,masonry,False,rule,0.900,masonry,masonry,False,rule
+monument mason,Stonemasons,masonry,masonry,masonry,masonry,True,rule,1.700,masonry,masonry,True,rule
+ornamental plasterer,Plasterers and Stucco Masons,drywall,drywall,masonry,masonry,False,rule,0.900,masonry,masonry,False,rule
+payloader operator,"Material Moving Workers, All Other",equipment,equipment,equipment,equipment,True,rule,1.700,equipment,equipment,True,rule
+pipe layer,Pipelayers,plumbing,plumbing,plumbing,plumbing,True,rule,1.700,plumbing,plumbing,True,rule
+plasterer apprentice,Plasterers and Stucco Masons,drywall,drywall,masonry,masonry,False,rule,0.900,masonry,masonry,False,rule
+precast concrete ironworker,Structural Iron and Steel Workers,welding,welding,masonry,masonry,False,rule,1.390,welding,welding,True,rule
+railroad car cleaner,Cleaners of Vehicles and Equipment,laborer,laborer,laborer,laborer,True,rule,0.900,laborer,laborer,True,rule
+residential building inspector,Construction and Building Inspectors,supervision,supervision,supervision,supervision,True,rule,1.600,supervision,supervision,True,rule
+residential roofer,Roofers,roofing,roofing,roofing,roofing,True,rule,1.700,roofing,roofing,True,rule
+rustic terrazzo setter,Terrazzo Workers and Finishers,masonry,masonry,masonry,masonry,True,rule,1.600,tiling,tiling,False,rule
+septic pump truck driver,Septic Tank Servicers and Sewer Pipe Cleaners,plumbing,plumbing,plumbing,plumbing,True,rule,0.908,equipment,equipment,False,semantic
+sewer pipe cleaner,Septic Tank Servicers and Sewer Pipe Cleaners,plumbing,plumbing,plumbing,plumbing,True,rule,1.800,plumbing,plumbing,True,rule
+sewer and drain technician,Septic Tank Servicers and Sewer Pipe Cleaners,plumbing,plumbing,plumbing,plumbing,True,rule,1.800,plumbing,plumbing,True,rule
+shipping and receiving material handler,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,laborer,laborer,True,rule,0.950,laborer,laborer,True,rule
+sign painter,"Painting, Coating, and Decorating Workers",painting,painting,painting,painting,True,rule,1.700,painting,painting,True,rule
+solar panel installation supervisor,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,supervision,supervision,True,rule,1.550,supervision,supervision,True,rule
+solar photovoltaic electrician,Electricians,electrical,electrical,electrical,electrical,True,rule,1.600,electrical,electrical,True,rule
+solar thermal installer,"Plumbers, Pipefitters, and Steamfitters",plumbing,plumbing,welding,welding,False,semantic,1.421,glazing,glazing,False,semantic
+soldering machine operator,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,welding,welding,True,rule,0.950,welding,welding,True,rule
+stacker operator,Industrial Truck and Tractor Operators,equipment,equipment,equipment,equipment,True,rule,1.700,equipment,equipment,True,rule
+stage electrician,Electricians,electrical,electrical,electrical,electrical,True,rule,1.700,electrical,electrical,True,rule
+steam shovel operating engineer,Operating Engineers and Other Construction Equipment Operators,equipment,equipment,equipment,equipment,True,rule,1.550,equipment,equipment,True,rule
+stone chimney mason,Stonemasons,masonry,masonry,masonry,masonry,True,rule,1.600,masonry,masonry,True,rule
+terrazzo worker,Terrazzo Workers and Finishers,masonry,masonry,masonry,masonry,True,rule,1.700,tiling,tiling,False,rule
+transformer assembler,Electrical and Electronic Equipment Assemblers,electrical,electrical,electrical,electrical,True,semantic,1.000,electrical,electrical,True,semantic
+vibratory pile driver,Pile Driver Operators,equipment,equipment,equipment,equipment,True,rule,1.600,equipment,equipment,True,rule
+welder fitter,"Welders, Cutters, Solderers, and Brazers",welding,welding,welding,welding,True,rule,1.700,welding,welding,True,rule
+welding machine operator,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,welding,welding,True,rule,1.600,welding,welding,True,rule
+winch operator,Hoist and Winch Operators,equipment,equipment,equipment,equipment,True,rule,1.700,equipment,equipment,True,rule
+wood furniture assembler,Cabinetmakers and Bench Carpenters,carpenter,carpenter,carpenter,carpenter,True,semantic,1.600,carpenter,carpenter,True,semantic
+woodyard crane operator,Crane and Tower Operators,equipment,equipment,equipment,equipment,True,rule,1.800,equipment,equipment,True,rule

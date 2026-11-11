@@ -1,0 +1,147 @@
+import 'package:flutter/material.dart';
+import '../widgets/app_page_intro.dart';
+import 'settings_page.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
+import '../theme/responsive.dart';
+import '../services/api_service.dart';
+import '../services/app_settings.dart';
+import '../l10n/app_strings.dart';
+import 'login_page.dart';
+
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  Map? user;
+  bool ld = true;
+
+  @override
+  void initState() {
+    super.initState();
+    AppColors.darkMode.addListener(_rebuild);
+    AppSettings.lang.addListener(_rebuild);
+    _load();
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AppColors.darkMode.removeListener(_rebuild);
+    AppSettings.lang.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      user = await ApiService().me();
+    } catch (e) {
+      toast('Failed to load profile: $e');
+    } finally {
+      if (mounted) setState(() => ld = false);
+    }
+  }
+
+  Future<void> _logout() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.clear();
+    ApiService().ct();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
+  }
+
+  @override
+  Widget build(BuildContext c) {
+    return Scaffold(
+      backgroundColor: AppColors.bgMain,
+      appBar: AppBar(
+        backgroundColor: AppColors.bgCard,
+        elevation: 0,
+        scrolledUnderElevation: 0.5,
+        surfaceTintColor: AppColors.transparent,
+        shape: Border(bottom: BorderSide(color: AppColors.border)),
+        centerTitle: false,
+        title: Text(AppStrings.t('profile.title'),
+            style: GoogleFonts.inter(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+      ),
+      body: ld
+          ? const Center(child: CircularProgressIndicator())
+          : Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+                child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
+          AppPageIntro(
+            icon: Icons.person_outline_rounded,
+            enTitle: 'MY PROFILE',
+            msTitle: 'PROFIL SAYA',
+            zhTitle: '个人资料',
+            enSubtitle: 'Contact details and account settings',
+            msSubtitle: 'Butiran perhubungan dan akaun',
+            zhSubtitle: '联系方式与账户设置',
+            worker: false,
+          ),
+          const SizedBox(height: 14),
+                        sectionCard(
+                padding: const EdgeInsets.fromLTRB(16, 28, 16, 24),
+                child: Column(children: [
+                  initialsAvatar(user?['full_name'] ?? '?', radius: 38),
+                  const SizedBox(height: 16),
+                  Text(user?['full_name'] ?? '-',
+                      style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  const SizedBox(height: 4),
+                  Text(user?['email'] ?? '',
+                      style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
+                  const SizedBox(height: 12),
+                  statusPill(user?['role'] ?? 'site_supervisor', label: (user?['role'] ?? '').toString().replaceAll('_', ' ')),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              sectionCard(
+                padding: EdgeInsets.zero,
+                child: Column(children: [
+                  ListTile(
+                    leading: Icon(Icons.phone_outlined, color: AppColors.textSecondary),
+                    title: Text(AppStrings.t('profile.phone'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    trailing: Text(user?['phone'] ?? '-',
+                        style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                  ),
+                  Divider(height: 1, indent: 56, color: AppColors.border),
+                  ListTile(
+                    leading: Icon(Icons.badge_outlined, color: AppColors.textSecondary),
+                    title: Text(AppStrings.t('profile.role'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    trailing: Text((user?['role'] ?? '-').toString().replaceAll('_', ' '),
+                        style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted)),
+                  ),
+                  Divider(height: 1, indent: 56, color: AppColors.border),
+                  ListTile(
+                    leading: Icon(Icons.settings_outlined, color: AppColors.textSecondary),
+                    title: Text(AppStrings.t('profile.appSettings'),
+                        style: GoogleFonts.inter(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                    trailing: Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _logout,
+                icon: Icon(Icons.logout, color: AppColors.red, size: 18),
+                label: Text(AppStrings.t('profile.logout'), style: TextStyle(color: AppColors.red)),
+                style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.redLight), minimumSize: Size.fromHeight(46)),
+              ),
+                ]),
+              ),
+            ),
+    );
+  }
+}

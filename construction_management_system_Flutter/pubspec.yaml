@@ -1,0 +1,40 @@
+name: buildsmart
+description: AI Construction Management System
+publish_to: 'none'
+version: 1.26.0+130
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  shared_preferences: ^2.5.2
+  flutter_secure_storage: ^9.2.4
+  dio: ^5.8.0+1
+  intl: ^0.20.2
+  geolocator: ^13.0.2
+  google_fonts: ^6.2.1
+  flutter_markdown: ^0.7.6+2
+  flutter_map: ^8.1.0
+  latlong2: ^0.9.1
+  firebase_core: ^3.12.0
+  firebase_messaging: ^15.2.0
+  flutter_local_notifications: ^17.2.4
+  file_picker: ^8.1.2
+  # Camera capture for attendance selfies and task completion evidence.
+  # Uses the OS camera intent, so no paid service and no extra native setup.
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/construction_dashboard_hero.png

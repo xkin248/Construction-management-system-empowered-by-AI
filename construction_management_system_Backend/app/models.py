@@ -1,0 +1,484 @@
+from sqlalchemy import Column, Integer, String, Float, DateTime, Date, Text, Boolean, ForeignKey, Index, UniqueConstraint, JSON, func
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+class Supervisor(Base):
+    __tablename__ = "supervisors"
+    supervisor_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    full_name = Column(String(100), nullable=False)
+    email = Column(String(100), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+    role = Column(String(50), default="site_supervisor")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    projects = relationship("Project", back_populates="supervisor")
+    reports = relationship("DailyReport", back_populates="submitter")
+
+class Project(Base):
+    __tablename__ = "projects"
+    project_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_name = Column(String(200), nullable=False)
+    location_address = Column(String(500), nullable=False)
+    start_date = Column(Date, nullable=True)
+    end_date = Column(Date, nullable=True)
+    status = Column(String(50), default="planning")
+    progress = Column(Float, default=0.0)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    # ✅ GPS geofence (used for check-in)
+    center_lat = Column(Float, nullable=False, server_default="3.1390")
+    center_lng = Column(Float, nullable=False, server_default="101.6869")
+    fence_radius = Column(Float, nullable=False, server_default="5000.0")  # unit: meters
+    supervisor = relationship("Supervisor", back_populates="projects")
+    workers = relationship("Worker", back_populates="project")
+    tasks = relationship("Task", back_populates="project")
+    issues = relationship("Issue", back_populates="project")
+    reports = relationship("DailyReport", back_populates="project")
+
+class Worker(Base):
+    __tablename__ = "workers"
+    worker_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    ic_number = Column(String(50), unique=True, nullable=True)
+    phone = Column(String(50), nullable=True)
+    trade = Column(String(100), nullable=True)
+    specialties = Column(JSON, nullable=False, default=list, server_default="[]")
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    has_safety_training = Column(Boolean, nullable=False, server_default="0")
+    is_safety_officer = Column(Boolean, nullable=False, server_default="0")
+    email = Column(String(100), unique=True, nullable=True)
+    password_hash = Column(String(255), nullable=True)
+    role = Column(String(50), default="worker")
+    fcm_token = Column(String(500), nullable=True)  # FCM push token (optional, gitignored creds)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    project = relationship("Project", back_populates="workers")
+    tasks = relationship("Task", back_populates="assigned_worker")
+    task_links = relationship("TaskWorker", back_populates="worker", cascade="all, delete-orphan")
+    attendance_logs = relationship("AttendanceLog", back_populates="worker")
+
+class AttendanceLog(Base):
+    __tablename__ = "attendance_logs"
+    attendance_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=True)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    check_in_time = Column(DateTime(timezone=True), server_default=func.now())
+    check_out_time = Column(DateTime(timezone=True), nullable=True)
+    # Precise location at check-in/check-out
+    in_lat = Column(Float, nullable=True)
+    in_lng = Column(Float, nullable=True)
+    out_lat = Column(Float, nullable=True)
+    out_lng = Column(Float, nullable=True)
+    in_distance_m = Column(Float, nullable=True)   # distance from center at check-in
+    out_distance_m = Column(Float, nullable=True)  # distance from center at check-out
+    # Server-side geofence verdicts.  Keeping the raw coordinates and the
+    # verdict together prevents a later radius change from rewriting history.
+    in_verified = Column(Boolean, nullable=False, server_default="0")
+    out_verified = Column(Boolean, nullable=True)
+    # ✅ Status: checked_in=on site / checked_out=checked out normally / left_early=auto-cancelled after leaving fence / absent=absent / rejected=check-in rejected
+    status = Column(String(50), default="checked_in")
+    last_heartbeat_time = Column(DateTime(timezone=True), nullable=True)  # last location report
+    last_heartbeat_lat = Column(Float, nullable=True)
+    last_heartbeat_lng = Column(Float, nullable=True)
+    out_of_fence_count = Column(Integer, nullable=False, server_default="0")  # consecutive times outside the fence
+    device_info = Column(String(500), nullable=True)   # Device make/model/OS info
+    device_type = Column(String(50), nullable=True)    # android / ios / web / windows
+    device_id = Column(String(255), nullable=True)     # Unique device identifier
+    ip_address = Column(String(100), nullable=True)    # Client IP address at check-in
+    # On-site selfie evidence, mandatory at check-in for both workers and site
+    # supervisors. Path is relative to UPLOAD_DIR (see app/attendance_photo.py)
+    # so the row survives a change of storage root and the photo can always be
+    # replayed for review (anti proxy check-in).
+    in_photo_path = Column(String(500), nullable=True)
+    out_photo_path = Column(String(500), nullable=True)
+    worker = relationship("Worker", back_populates="attendance_logs")
+
+class Task(Base):
+    __tablename__ = "tasks"
+    task_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    assigned_worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    priority = Column(String(50), default="medium")
+    status = Column(String(50), default="pending")
+    trade = Column(String(100), nullable=True)  # canonical trade selected by the user (optional, beats semantic guessing)
+    required_specialty = Column(String(50), nullable=True)
+    due_date = Column(Date, nullable=True)
+    ai_confidence = Column(Float, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)  # first time the task entered in_progress
+    completed_at = Column(DateTime(timezone=True), nullable=True)  # time the task was marked completed
+    progress = Column(Integer, nullable=True)  # supervisor-set 0-100 progress; None falls back to status-derived value
+    completion_note = Column(Text, nullable=True)  # mandatory note captured when the task is completed
+    # Completion evidence: a site photo the worker must take before the task can
+    # be marked completed. The path is relative to UPLOAD_DIR (see task_photo.py).
+    completion_photo_path = Column(String(500), nullable=True)
+    completion_photo_at = Column(DateTime(timezone=True), nullable=True)  # when the photo was submitted
+    assigned_worker = relationship("Worker", back_populates="tasks")
+    task_workers = relationship("TaskWorker", back_populates="task", cascade="all, delete-orphan")
+    project = relationship("Project", back_populates="tasks")
+    progress_logs = relationship("TaskProgressLog", back_populates="task", cascade="all, delete-orphan", order_by="TaskProgressLog.log_id")
+
+    @property
+    def assigned_workers(self) -> list:
+        """Derived list of {worker_id, name, trade} for the task_workers links."""
+        result = []
+        for link in self.task_workers:
+            if link.worker:
+                result.append({
+                    "worker_id": link.worker.worker_id,
+                    "name": link.worker.name,
+                    "trade": link.worker.trade,
+                })
+        return result
+
+    @property
+    def worker_ids(self) -> list:
+        return [link.worker_id for link in self.task_workers]
+
+class Issue(Base):
+    __tablename__ = "issues"
+    issue_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    reported_by = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    status = Column(String(50), default="open")
+    priority = Column(String(50), default="medium")
+    image_path = Column(String(500), nullable=True)
+    incident_type = Column(String(50), nullable=False, server_default="general")
+    is_safety_incident = Column(Boolean, nullable=False, server_default="0")
+    gps_lat = Column(Float, nullable=True)
+    gps_lng = Column(Float, nullable=True)
+    handled_by = Column(Integer, ForeignKey("workers.worker_id"), nullable=True)
+    handled_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    project = relationship("Project", back_populates="issues")
+
+class DailyReport(Base):
+    __tablename__ = "daily_reports"
+    report_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    report_date = Column(Date, nullable=False)
+    weather = Column(String(100), nullable=True)
+    work_progress = Column(Text, nullable=True)
+    issues_encountered = Column(Text, nullable=True)
+    materials_used = Column(Text, nullable=True)
+    manpower_count = Column(Integer, default=0)
+    submitted_by = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    project = relationship("Project", back_populates="reports")
+    submitter = relationship("Supervisor", back_populates="reports")
+
+class Settings(Base):
+    # Single-row table (id=1) holding company-wide app settings.
+    __tablename__ = "settings"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    company_name = Column(String(200), nullable=False, server_default="BuildSmart Construction Sdn Bhd")
+    system_language = Column(String(50), nullable=False, server_default="English")
+    timezone = Column(String(100), nullable=False, server_default="Asia/Kuala_Lumpur (UTC+8)")
+    date_format = Column(String(20), nullable=False, server_default="DD/MM/YYYY")
+    work_start = Column(String(20), nullable=False, server_default="08:00 AM")
+    work_end = Column(String(20), nullable=False, server_default="05:00 PM")
+    late_threshold = Column(String(20), nullable=False, server_default="08:30 AM")
+    notif_attendance = Column(Boolean, nullable=False, server_default="1")
+    notif_task_overdue = Column(Boolean, nullable=False, server_default="1")
+    notif_budget = Column(Boolean, nullable=False, server_default="1")
+    notif_safety = Column(Boolean, nullable=False, server_default="1")
+    notif_daily_summary = Column(Boolean, nullable=False, server_default="0")
+    notif_weekly_report = Column(Boolean, nullable=False, server_default="0")
+    # Attendance time windows (24h "HH:MM") — consumed by attendance.py & worker dashboard.
+    # Kept as plain strings for easy editing; attendance.py falls back to hardcoded defaults
+    # when the value is missing/invalid.
+    check_in_start = Column(String(20), nullable=False, server_default="08:00")
+    check_in_end = Column(String(20), nullable=False, server_default="17:00")
+    check_out_start = Column(String(20), nullable=False, server_default="08:00")
+    check_out_end = Column(String(20), nullable=False, server_default="17:00")
+    break_start = Column(String(20), nullable=False, server_default="12:00")
+    break_end = Column(String(20), nullable=False, server_default="13:00")
+
+
+class File(Base):
+    __tablename__ = "files"
+    file_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    original_name = Column(String(500), nullable=False)
+    stored_name = Column(String(500), nullable=False)
+    file_path = Column(String(1000), nullable=False)
+    file_size = Column(Integer, nullable=False)
+    mime_type = Column(String(100), nullable=False)
+    file_category = Column(String(50), nullable=False, default="attachment")
+    thumbnail_path = Column(String(1000), nullable=True)
+    uploaded_by = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=False)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    uploader = relationship("Supervisor")
+    project = relationship("Project")
+    links = relationship("FileLink", back_populates="file", cascade="all, delete-orphan")
+
+
+class FileLink(Base):
+    __tablename__ = "file_links"
+    link_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    file_id = Column(Integer, ForeignKey("files.file_id"), nullable=False)
+    entity_type = Column(String(50), nullable=False)
+    entity_id = Column(Integer, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    file = relationship("File", back_populates="links")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    notification_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=False)
+    notification_type = Column(String(50), nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    related_entity_type = Column(String(50), nullable=True)
+    related_entity_id = Column(Integer, nullable=True)
+    is_read = Column(Boolean, nullable=False, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    supervisor = relationship("Supervisor")
+
+
+class NotificationSetting(Base):
+    __tablename__ = "notification_settings"
+    setting_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    supervisor_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=False, unique=True)
+    notif_attendance = Column(Boolean, nullable=False, server_default="1")
+    notif_task_overdue = Column(Boolean, nullable=False, server_default="1")
+    notif_task_assigned = Column(Boolean, nullable=False, server_default="1")
+    notif_issue = Column(Boolean, nullable=False, server_default="1")
+    notif_safety = Column(Boolean, nullable=False, server_default="1")
+    notif_daily_report = Column(Boolean, nullable=False, server_default="0")
+    notif_email = Column(Boolean, nullable=False, server_default="0")
+    notif_push = Column(Boolean, nullable=False, server_default="0")
+    supervisor = relationship("Supervisor")
+
+
+class WorkerNotificationSetting(Base):
+    """Per-worker notification preferences.
+
+    ``notification_settings`` is keyed on ``supervisor_id`` only, so a worker
+    account had no row to read or write (the endpoint raised 500 / 422 and the
+    app's Save button appeared dead). Worker preferences live in their own
+    table instead, which ``create_all`` adds to existing databases without a
+    column migration.
+    """
+    __tablename__ = "worker_notification_settings"
+    setting_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False, unique=True)
+    notif_attendance = Column(Boolean, nullable=False, server_default="1")
+    notif_task_overdue = Column(Boolean, nullable=False, server_default="1")
+    notif_task_assigned = Column(Boolean, nullable=False, server_default="1")
+    notif_issue = Column(Boolean, nullable=False, server_default="1")
+    notif_safety = Column(Boolean, nullable=False, server_default="1")
+    notif_daily_report = Column(Boolean, nullable=False, server_default="0")
+    notif_email = Column(Boolean, nullable=False, server_default="0")
+    notif_push = Column(Boolean, nullable=False, server_default="0")
+    worker = relationship("Worker")
+
+
+class TaskWorker(Base):
+    """Many-to-many link between Task and Worker (multi-worker assignment).
+
+    Keeps the legacy Task.assigned_worker_id column in sync (first worker) so
+    existing front-ends continue to work while the association table holds the
+    full list of assigned workers.
+    """
+    __tablename__ = "task_workers"
+    __table_args__ = (
+        UniqueConstraint("task_id", "worker_id", name="uq_task_worker"),
+    )
+    link_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=False)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
+    task = relationship("Task", back_populates="task_workers")
+    worker = relationship("Worker", back_populates="task_links")
+
+
+class TaskProgressLog(Base):
+    """One row per task status/progress change, forming the task timeline.
+
+    Written automatically by the update_task endpoint whenever a task's status
+    or progress changes. ``from_status`` equals ``to_status`` for pure progress
+    updates (the note explains what changed); both are set for status
+    transitions.
+
+    The ``changed_by_*`` / ``reason`` / ``action`` columns turn the same row into
+    an audit record for privileged moves (currently ``reopen``): who performed
+    it, what the move was, and why. Plain progress/status updates leave them
+    empty, so the timeline stays readable.
+    """
+    __tablename__ = "task_progress_logs"
+    log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=False, index=True)
+    from_status = Column(String(50), nullable=True)
+    to_status = Column(String(50), nullable=True)
+    note = Column(Text, nullable=True)
+    # What produced this entry: "status", "progress" or "reopen".
+    action = Column(String(30), nullable=True)
+    # Actor of a privileged move (supervisor). Nullable: automatic entries have
+    # no actor, and the name is denormalised so the audit line survives a
+    # supervisor account being deleted later.
+    changed_by_id = Column(Integer, ForeignKey("supervisors.supervisor_id"), nullable=True)
+    changed_by_name = Column(String(255), nullable=True)
+    # Free-text justification supplied by the actor (mandatory for reopen).
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    task = relationship("Task", back_populates="progress_logs")
+
+
+class PredictionHistory(Base):
+    """Snapshot of one AI progress prediction, kept for accuracy comparison.
+
+    Every successful call to ``predict_site_progress`` inserts one row so the
+    dashboard can show "predicted vs actual" progress over recent weeks.
+    """
+    __tablename__ = "prediction_history"
+    prediction_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=False)
+    predicted_progress = Column(Float, nullable=False, server_default="0.0")
+    scheduled_progress = Column(Float, nullable=True)
+    actual_progress = Column(Float, nullable=False, server_default="0.0")
+    predicted_completion_date = Column(Date, nullable=True)
+    trend = Column(String(50), nullable=True)
+    confidence = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    project = relationship("Project")
+
+
+class AIDecisionLog(Base):
+    """Audit trail of one AI trade/assignment decision.
+
+    Two stages are recorded so the team can close the data loop and evaluate the
+    AI on a real hold-out set later:
+
+    * ``trade_resolution`` - how the required trade was decided (keyword rule,
+      semantic matcher, Gemini fallback or a skip).
+    * ``auto_assign`` - the final per-task outcome of an auto-assign run.
+
+    ``was_overridden`` is back-filled when a supervisor later edits the task's
+    trade by hand, which turns every row into a labelled sample
+    (prediction vs. ground truth). Logging is best-effort: a write failure must
+    never block the assignment pipeline.
+    """
+    __tablename__ = "ai_decision_log"
+    # Composite index backing the analytics queries of the stats endpoint and the
+    # report CLI, which all filter by project and slice by time, then group by
+    # stage. Declared on the model so fresh databases get it from create_all;
+    # db_migrate.ensure_ai_decision_log_indexes adds it to existing databases.
+    __table_args__ = (
+        Index(
+            "ix_ai_decision_log_project_created_stage",
+            "project_id", "created_at", "stage",
+        ),
+    )
+    log_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    stage = Column(String(30), nullable=False, server_default="trade_resolution")
+    task_id = Column(Integer, ForeignKey("tasks.task_id"), nullable=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.project_id"), nullable=True)
+    task_text = Column(Text, nullable=True)
+    # JSON list of trades matched by the deterministic keyword rules.
+    rule_trades = Column(Text, nullable=True)
+    # JSON object {trade: score} produced by the semantic matcher.
+    semantic_scores = Column(Text, nullable=True)
+    # Canonical trade finally decided (None when the decision was a skip).
+    final_trade = Column(String(100), nullable=True)
+    # rule | semantic | llm | skip
+    source = Column(String(20), nullable=False, server_default="rule")
+    confidence = Column(Float, nullable=True)
+    elapsed_ms = Column(Integer, nullable=True)
+    llm_used = Column(Boolean, nullable=False, server_default="0")
+    llm_reason = Column(Text, nullable=True)
+    skip_reason = Column(Text, nullable=True)
+    was_overridden = Column(Boolean, nullable=False, server_default="0", index=True)
+    override_trade = Column(String(100), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class WorkerNotification(Base):
+    """In-app notification for workers (FCM push is mirrored here).
+
+    The legacy ``notifications`` table is supervisor-only (supervisor_id NOT
+    NULL FK), so worker-facing notifications live in their own table. Rows are
+    written when a task is assigned/created for the worker; the FCM push itself
+    is best-effort and may be absent when no token is registered.
+    """
+    __tablename__ = "worker_notifications"
+    notification_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(Integer, ForeignKey("workers.worker_id"), nullable=False)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    related_entity_type = Column(String(50), nullable=True)
+    related_entity_id = Column(Integer, nullable=True)
+    is_read = Column(Boolean, nullable=False, server_default="0")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    worker = relationship("Worker")
+
+# ══════════════════════════════════════════════════════════════════════════
+# Common daily tasks (morning briefing / toolbox talk / housekeeping)
+# ══════════════════════════════════════════════════════════════════════════
+# Every site runs the same three jobs every single day. On paper nothing could
+# prove they happened, so they get a row per (project, kind, work_date): the day's
+# checklist is created on first access (no background scheduler to depend on) and
+# the unique constraint makes a concurrent double-create a no-op instead of a
+# duplicate. A row is only ever closed with a photo — the same evidence rule the
+# attendance selfie and task completion already follow.
+class CommonTaskInstance(Base):
+    __tablename__ = "common_task_instances"
+    instance_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_id = Column(
+        Integer, ForeignKey("projects.project_id"), nullable=False, index=True
+    )
+    # briefing | toolbox | housekeeping
+    task_kind = Column(String(20), nullable=False)
+    work_date = Column(Date, nullable=False, index=True)
+    # pending | done
+    status = Column(String(20), nullable=False, server_default="pending")
+    # Relative object key (see storage_service) — never image bytes, never a URL.
+    photo_path = Column(String(500), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completed_by = Column(
+        Integer, ForeignKey("workers.worker_id"), nullable=True
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id", "task_kind", "work_date",
+            name="uq_common_task_project_kind_date",
+        ),
+        Index("ix_common_task_project_date", "project_id", "work_date"),
+    )
+
+
+class ToolboxIssue(Base):
+    """One hand-over of tools, optionally closed by a later return.
+
+    A toolbox talk signs tools out and back in; both halves are photographed, and
+    several tools can share one photo (a worker takes a tray of tools at once).
+    Rows are therefore per tool line, all pointing at the same photo object, so
+    "what is still out there?" stays a simple query on ``status``.
+    """
+    __tablename__ = "toolbox_issues"
+    issue_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    worker_id = Column(
+        Integer, ForeignKey("workers.worker_id"), nullable=False, index=True
+    )
+    project_id = Column(
+        Integer, ForeignKey("projects.project_id"), nullable=True, index=True
+    )
+    tool_name = Column(String(200), nullable=False)
+    qty = Column(Integer, nullable=False, server_default="1")
+    taken_at = Column(DateTime(timezone=True), nullable=False)
+    take_photo_path = Column(String(500), nullable=True)
+    returned_at = Column(DateTime(timezone=True), nullable=True)
+    return_photo_path = Column(String(500), nullable=True)
+    # taken | returned
+    status = Column(String(20), nullable=False, server_default="taken", index=True)
+    __table_args__ = (
+        Index("ix_toolbox_worker_status", "worker_id", "status"),
+    )

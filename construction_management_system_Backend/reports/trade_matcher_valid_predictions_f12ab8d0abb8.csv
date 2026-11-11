@@ -1,0 +1,84 @@
+text,category,expected,expected_primary,before_predicted,before_primary,before_correct,before_source,clf_predicted,clf_primary,clf_correct,clf_source,final_predicted,final_primary,final_correct,final_source,final_confidence
+alarm technician,Security and Fire Alarm Systems Installers,electrical,electrical,electrical,electrical,True,semantic,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.711
+aluminum pool installer,"Construction and Related Workers, All Other",laborer,laborer,drywall,drywall,False,semantic,,(skip),False,skip,,(skip),False,skip,0.000
+armature rewinder,"Electric Motor, Power Tool, and Related Repairers",electrical,electrical,electrical,electrical,True,semantic,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.848
+asbestos abatement worker,Hazardous Materials Removal Workers,insulation,insulation,insulation,insulation,True,rule,insulation,insulation,True,classifier,insulation,insulation,True,classifier,0.998
+auto carrier driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.774
+auto glass installer,Automotive Glass Installers and Repairers,glazing,glazing,glazing,glazing,True,rule,glazing,glazing,True,classifier,glazing,glazing,True,classifier,0.984
+auto painter,"Coating, Painting, and Spraying Machine Setters, Operators, and Tenders",painting,painting,painting,painting,True,rule,painting,painting,True,classifier,painting,painting,True,classifier,0.997
+automotive glass technician,Automotive Glass Installers and Repairers,glazing,glazing,glazing,glazing,True,rule,glazing,glazing,True,classifier,glazing,glazing,True,classifier,0.762
+boiler installer,Boilermakers,welding,welding,hvac,hvac,False,rule,hvac,hvac,False,classifier,welding,welding,True,rule,0.950
+boiler mechanic,Boilermakers,welding,welding,hvac,hvac,False,rule,hvac,hvac,False,classifier,welding,welding,True,rule,0.950
+boiler operator,Stationary Engineers and Boiler Operators,hvac,hvac,hvac,hvac,True,rule,hvac,hvac,True,classifier,hvac,hvac,True,classifier,0.686
+boiler setter,Boilermakers,welding,welding,hvac,hvac,False,rule,hvac,hvac,False,classifier,welding,welding,True,rule,0.950
+boilermaker mechanic,Boilermakers,welding,welding,hvac,hvac,False,rule,hvac,hvac,False,classifier,welding,welding,True,rule,0.950
+brazing machine setter and setup operator,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,equipment,equipment,False,rule,equipment,equipment,False,classifier,welding,welding,True,rule,0.950
+bricklayer,Brickmasons and Blockmasons,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.804
+cabinet builder,Cabinetmakers and Bench Carpenters,carpenter,carpenter,carpenter,carpenter,True,rule,carpenter,carpenter,True,classifier,carpenter,carpenter,True,classifier,0.977
+cabinet finisher,Furniture Finishers,carpenter,carpenter,carpenter,carpenter,True,rule,carpenter,carpenter,True,classifier,carpenter,carpenter,True,classifier,0.724
+cargo handler,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,insulation,insulation,False,semantic,insulation,insulation,False,classifier,laborer,laborer,True,rule,0.950
+cart pusher,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,,(skip),False,skip,,(skip),False,skip,laborer,laborer,True,classifier,0.268
+cement patcher,Cement Masons and Concrete Finishers,masonry,masonry,,(skip),False,skip,,(skip),False,skip,masonry,masonry,True,classifier,0.981
+circuit board drafter,Electrical and Electronics Drafters,electrical,electrical,,(skip),False,skip,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.943
+concrete mason,Cement Masons and Concrete Finishers,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,1.000
+concrete smoother,Cement Masons and Concrete Finishers,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.987
+construction coordinator,Construction Managers,supervision,supervision,supervision,supervision,True,rule,supervision,supervision,True,classifier,supervision,supervision,True,classifier,0.972
+coping machine assembler,Electrical and Electronic Equipment Assemblers,electrical,electrical,electrical,electrical,True,semantic,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.612
+dredge engineer,Dredge Operators,equipment,equipment,hvac,hvac,False,semantic,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.333
+drywall finisher,Drywall and Ceiling Tile Installers,drywall,drywall,drywall,drywall,True,rule,drywall,drywall,True,classifier,drywall,drywall,True,classifier,0.696
+electrical design engineer,Electrical Engineers,electrical,electrical,electrical,electrical,True,rule,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.992
+electrical high tension tester,Electrical Power-Line Installers and Repairers,electrical,electrical,electrical,electrical,True,rule,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.754
+electronic sensing equipment assembler,Electrical and Electronic Equipment Assemblers,electrical,electrical,equipment,equipment,False,rule,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.986
+erecting crane operator,Crane and Tower Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.998
+excavating supervisor,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,supervision,supervision,True,rule,supervision,supervision,True,classifier,supervision,supervision,True,classifier,0.969
+finish carpenter,Carpenters,carpenter,carpenter,carpenter,carpenter,True,rule,carpenter,carpenter,True,classifier,carpenter,carpenter,True,classifier,0.979
+fire alarm technician,Security and Fire Alarm Systems Installers,electrical,electrical,electrical,electrical,True,semantic,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.776
+foreman,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,supervision,supervision,True,rule,supervision,supervision,True,classifier,supervision,supervision,True,classifier,0.988
+forklift driver,Industrial Truck and Tractor Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.999
+forklift operator,Industrial Truck and Tractor Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,1.000
+furnace mason,Brickmasons and Blockmasons,masonry,masonry,hvac,hvac,False,rule,hvac,hvac,False,classifier,masonry,masonry,True,rule,0.950
+grader operator,Operating Engineers and Other Construction Equipment Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.999
+heat and frost insulator,"Insulation Workers, Mechanical",insulation,insulation,insulation,insulation,True,rule,insulation,insulation,True,classifier,insulation,insulation,True,classifier,0.966
+hot tar roofer,Roofers,roofing,roofing,roofing,roofing,True,rule,roofing,roofing,True,classifier,roofing,roofing,True,classifier,0.994
+iron guardrail installer,Structural Iron and Steel Workers,welding,welding,plumbing,plumbing,False,semantic,,(skip),False,skip,welding,welding,True,classifier,0.433
+journey level plasterer,Plasterers and Stucco Masons,drywall,drywall,masonry,masonry,False,rule,drywall,drywall,True,classifier,drywall,drywall,True,classifier,0.903
+lawn maintenance worker,Landscaping and Groundskeeping Workers,laborer,laborer,laborer,laborer,True,rule,laborer,laborer,True,classifier,laborer,laborer,True,classifier,0.932
+lawn mower,Landscaping and Groundskeeping Workers,laborer,laborer,laborer,laborer,True,rule,laborer,laborer,True,classifier,laborer,laborer,True,classifier,0.975
+machine cleaner,Cleaners of Vehicles and Equipment,laborer,laborer,laborer,laborer,True,rule,laborer,laborer,True,classifier,laborer,laborer,True,classifier,0.320
+marine steamfitter,"Plumbers, Pipefitters, and Steamfitters",plumbing,plumbing,plumbing,plumbing,True,semantic,plumbing,plumbing,True,classifier,plumbing,plumbing,True,classifier,0.606
+master electrician,Electricians,electrical,electrical,electrical,electrical,True,rule,electrical,electrical,True,classifier,electrical,electrical,True,classifier,0.934
+mining payloader operator,"Excavating and Loading Machine and Dragline Operators, Surface Mining",equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.994
+monorail crane operator,Crane and Tower Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.999
+onyx chip terrazzo worker,Terrazzo Workers and Finishers,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.834
+ornamental ironworker,Structural Iron and Steel Workers,welding,welding,welding,welding,True,semantic,welding,welding,True,classifier,welding,welding,True,classifier,0.980
+overhead crane operator,Crane and Tower Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,1.000
+package handler,"Laborers and Freight, Stock, and Material Movers, Hand",laborer,laborer,insulation,insulation,False,semantic,insulation,insulation,False,classifier,laborer,laborer,True,rule,0.950
+railroad car painter,"Coating, Painting, and Spraying Machine Setters, Operators, and Tenders",painting,painting,painting,painting,True,rule,painting,painting,True,classifier,painting,painting,True,classifier,0.999
+refractory bricklayer,Brickmasons and Blockmasons,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.997
+refrigeration insulator,"Insulation Workers, Mechanical",insulation,insulation,insulation,insulation,True,rule,insulation,insulation,True,classifier,insulation,insulation,True,classifier,0.524
+residential carpet installer,Carpet Installers,flooring,flooring,flooring,flooring,True,rule,flooring,flooring,True,classifier,flooring,flooring,True,classifier,0.897
+road grader,Operating Engineers and Other Construction Equipment Operators,equipment,equipment,equipment,equipment,True,rule,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.970
+rock mason,Stonemasons,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.969
+segmental paving supervisor,First-Line Supervisors of Construction Trades and Extraction Workers,supervision,supervision,supervision,supervision,True,rule,supervision,supervision,True,classifier,supervision,supervision,True,classifier,0.985
+self loading flatbed truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.990
+semi truck driver,Heavy and Tractor-Trailer Truck Drivers,equipment,equipment,equipment,equipment,True,semantic,equipment,equipment,True,classifier,equipment,equipment,True,classifier,0.997
+sheet metal duct installer,Sheet Metal Workers,welding,welding,welding,welding,True,rule,welding,welding,True,classifier,welding,welding,True,classifier,0.926
+sheet rock installer,Drywall and Ceiling Tile Installers,drywall,drywall,drywall,drywall,True,semantic,drywall,drywall,True,classifier,drywall,drywall,True,classifier,0.718
+sheet rock worker,Drywall and Ceiling Tile Installers,drywall,drywall,drywall,drywall,True,semantic,drywall,drywall,True,classifier,drywall,drywall,True,classifier,0.955
+slate roofer,Roofers,roofing,roofing,roofing,roofing,True,rule,roofing,roofing,True,classifier,roofing,roofing,True,classifier,0.994
+social science manager,"Managers, All Other",supervision,supervision,supervision,supervision,True,rule,supervision,supervision,True,classifier,supervision,supervision,True,classifier,0.971
+soldering machine setter and setup operator,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,equipment,equipment,False,rule,equipment,equipment,False,classifier,welding,welding,True,rule,0.950
+soldering machine tender,"Welding, Soldering, and Brazing Machine Setters, Operators, and Tenders",welding,welding,equipment,equipment,False,semantic,equipment,equipment,False,classifier,welding,welding,True,rule,0.950
+stained glass glazier,Glaziers,glazing,glazing,glazing,glazing,True,rule,glazing,glazing,True,classifier,glazing,glazing,True,classifier,0.999
+sub arc operator,"Welders, Cutters, Solderers, and Brazers",welding,welding,equipment,equipment,False,rule,equipment,equipment,False,classifier,welding,welding,True,rule,0.950
+terrazzo setter,Terrazzo Workers and Finishers,masonry,masonry,masonry,masonry,True,rule,masonry,masonry,True,classifier,masonry,masonry,True,classifier,0.969
+transformer maker,Electrical and Electronic Equipment Assemblers,electrical,electrical,carpenter,carpenter,False,semantic,carpenter,carpenter,False,classifier,carpenter,carpenter,False,classifier,0.363
+underground bolting machine operator,"Roof Bolters, Mining",roofing,roofing,equipment,equipment,False,rule,equipment,equipment,False,classifier,equipment,equipment,False,classifier,0.652
+underground roof bolter,"Roof Bolters, Mining",roofing,roofing,roofing,roofing,True,rule,roofing,roofing,True,classifier,roofing,roofing,True,classifier,0.696
+wall to wall carpet installer,Carpet Installers,flooring,flooring,flooring,flooring,True,rule,carpenter,carpenter,False,classifier,carpenter,carpenter,False,classifier,0.714
+wallpaper hanger,Paperhangers,painting,painting,drywall,drywall,False,semantic,drywall,drywall,False,classifier,painting,painting,True,rule,0.950
+wallpaperer,Paperhangers,painting,painting,,(skip),False,skip,,(skip),False,skip,painting,painting,True,rule,0.950
+water main pipe layer,Pipelayers,plumbing,plumbing,plumbing,plumbing,True,rule,plumbing,plumbing,True,classifier,plumbing,plumbing,True,classifier,0.982
+water pump installer,"Plumbers, Pipefitters, and Steamfitters",plumbing,plumbing,,(skip),False,skip,plumbing,plumbing,True,classifier,plumbing,plumbing,True,classifier,0.253
+wire welder,"Welders, Cutters, Solderers, and Brazers",welding,welding,welding,welding,True,rule,welding,welding,True,classifier,welding,welding,True,classifier,0.990
+wood cabinet finisher,Furniture Finishers,carpenter,carpenter,carpenter,carpenter,True,rule,carpenter,carpenter,True,classifier,carpenter,carpenter,True,classifier,0.996

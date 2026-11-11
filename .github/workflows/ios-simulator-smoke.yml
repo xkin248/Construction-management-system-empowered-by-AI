@@ -1,0 +1,89 @@
+name: 🧪 iOS Simulator Smoke Test
+
+# Runs the Flutter app inside a real iOS Simulator (macOS runner),
+# installs the simulator .app, launches it and captures screenshots.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  simulator:
+    name: 🍎 Boot iOS Simulator & install app
+    runs-on: macos-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐦 Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.3'
+          channel: stable
+          cache: true
+
+      - name: 📦 Install Flutter Dependencies
+        working-directory: construction_management_system_Flutter
+        run: flutter pub get
+
+      - name: 📱 List available simulators
+        run: xcrun simctl list devices available
+
+      - name: 🔨 Build for iOS Simulator
+        working-directory: construction_management_system_Flutter
+        run: |
+          flutter build ios --simulator --debug \
+            --dart-define=BASE_URL=https://construction-management-system-empowered.onrender.com
+          ls -la build/ios/iphonesimulator
+
+      - name: 🚀 Boot simulator, install and launch
+        id: run_app
+        run: |
+          set -euo pipefail
+          # pick the first available iPhone device
+          UDID=$(xcrun simctl list devices available -j \
+            | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['udid'] for k,v in d.items() if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          echo "Using simulator $UDID"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b || true
+          APP="construction_management_system_Flutter/build/ios/iphonesimulator/Runner.app"
+          xcrun simctl install "$UDID" "$APP"
+          echo "✅ installed"
+          xcrun simctl launch "$UDID" com.example.constructionManagementSystem
+          echo "✅ launched"
+
+      - name: 📸 Capture screenshots
+        if: always()
+        run: |
+          set +e
+          mkdir -p sim-shots
+          sleep 20
+          xcrun simctl io "$SIM_UDID" screenshot sim-shots/01-launch.png
+          sleep 15
+          xcrun simctl io "$SIM_UDID" screenshot sim-shots/02-settled.png
+          xcrun simctl spawn "$SIM_UDID" log show --last 3m --predicate 'processImagePath CONTAINS "Runner"' > sim-shots/app.log 2>/dev/null || true
+          grep -i -m 20 -E "flutter|exception|error" sim-shots/app.log || true
+          ls -la sim-shots
+
+      - name: 💾 Commit screenshots as evidence
+        if: always()
+        run: |
+          set +e
+          mkdir -p docs/verification/ios-simulator
+          cp sim-shots/*.png docs/verification/ios-simulator/ 2>/dev/null
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f docs/verification/ios-simulator
+          git commit -m "chore(evidence): iOS simulator launch screenshots [skip ci]"
+          git push
+
+      - name: 📤 Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-screenshots
+          path: sim-shots
+          retention-days: 14
