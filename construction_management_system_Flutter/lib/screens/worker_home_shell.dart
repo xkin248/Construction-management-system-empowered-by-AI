@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/app_settings.dart';
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_settings_actions.dart';
 import '../widgets/worker_ui.dart';
@@ -10,6 +11,7 @@ import 'worker_dashboard_page.dart';
 import 'worker_notifications_page.dart';
 import 'worker_profile_page.dart';
 import 'worker_tasks_page.dart';
+import 'profile_page.dart';
 
 /// Worker shell â€” the five-tab bar from the current UI reference:
 /// Home / Tasks / Attendance / Safety / Profile.
@@ -33,6 +35,7 @@ class WorkerHomeShell extends StatefulWidget {
 
 class _WorkerHomeShellState extends State<WorkerHomeShell> {
   int idx = kWorkerTabHome;
+  String _profileInitials = '?';
   bool get _showLegacyTabs => false;
 
   @override
@@ -43,6 +46,24 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
     AppSettings.lang.addListener(_onSettingsChanged);
     AppColors.darkMode.addListener(_onSettingsChanged);
     _bootstrapLanguage();
+    _loadProfileInitials();
+  }
+
+  Future<void> _loadProfileInitials() async {
+    try {
+      final me = await ApiService().me();
+      final name = (me['full_name'] ?? me['name'] ?? '').toString().trim();
+      final initials = name.isEmpty
+          ? '?'
+          : name.split(RegExp(r'\s+')).take(2).map((part) => part[0]).join().toUpperCase();
+      if (mounted) setState(() => _profileInitials = initials);
+    } catch (_) {
+      // The avatar is decorative; the worker shell remains usable offline.
+    }
+  }
+
+  void _openProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfilePage()));
   }
 
   /// English is the first-run language for every role. The one-time marker
@@ -145,6 +166,32 @@ class _WorkerHomeShellState extends State<WorkerHomeShell> {
             // without a response from the notification endpoint.
           ]),
           const AppSettingsActions(),
+          Semantics(
+            button: true,
+            label: wT(en: 'My profile', ms: 'Profil saya', zh: '个人资料'),
+            child: InkWell(
+              onTap: _openProfile,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                width: 36,
+                height: 36,
+                margin: const EdgeInsets.only(right: 12),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.accentSolid,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  _profileInitials,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       body: IndexedStack(index: idx, children: _buildPages()),

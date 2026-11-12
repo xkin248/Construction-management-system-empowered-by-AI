@@ -21,6 +21,7 @@ import 'projects_page.dart';
 import 'tasks_page.dart';
 import 'workers_page.dart';
 import 'attendance_page.dart';
+import 'files_page.dart';
 
 const _weathers = ['Sunny', 'Cloudy', 'Rain', 'Thunderstorm'];
 const _severities = ['low', 'medium', 'high'];
@@ -359,6 +360,9 @@ class _NotificationsPageState extends State<NotificationsPage>
     if (type == 'task') builder = () => const TasksPage();
     if (type == 'worker') builder = () => const WorkersPage();
     if (type == 'attendance') builder = () => const AttendancePage();
+    if (type == 'file' && item.relatedEntityId != null) {
+      builder = () => FilesPage(initialFileId: item.relatedEntityId);
+    }
     if (builder != null) {
       Navigator.push(context, MaterialPageRoute(builder: (_) => builder!()));
     }

@@ -426,13 +426,14 @@ class ApiService {
   Future<Map> completeTaskWithPhoto(
     int taskId, {
     required String photoBase64,
-    required String completionNote,
+    String? completionNote,
     String photoMimeType = 'image/jpeg',
   }) async =>
       Map.from((await dio.post('/tasks/$taskId/complete', data: {
         'photo_base64': photoBase64,
         'photo_mime_type': photoMimeType,
-        'completion_note': completionNote,
+        if (completionNote != null && completionNote.trim().isNotEmpty)
+          'completion_note': completionNote.trim(),
       })).data);
   Future<Map> deleteTask(int taskId) async =>
       Map.from((await dio.delete('/tasks/$taskId')).data);

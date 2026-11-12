@@ -354,19 +354,7 @@ def _attach_completion_photo(task: Task, payload: Dict[str, Any], *, worker_id: 
     """
     photo_b64 = str(payload.get("photo_base64") or "").strip()
     if photo_b64:
-        try:
-            rel_path = save_task_photo(
-                photo_b64,
-                task_id=task.task_id,
-                worker_id=worker_id,
-            )
-        except PhotoError as exc:
-            raise HTTPException(400, str(exc))
-        previous = task.completion_photo_path
-        task.completion_photo_path = rel_path
-        task.completion_photo_at = datetime.utcnow()
-        if previous and previous != rel_path:
-            delete_task_photo(previous)
+        _replace_task_photo(task, photo_b64, worker_id=worker_id)
         return
 
     if not task.completion_photo_path:
@@ -375,6 +363,28 @@ def _attach_completion_photo(task: Task, payload: Dict[str, Any], *, worker_id: 
             "A site photo is required when completing a task "
             "(send photo_base64, camera capture only)",
         )
+
+
+def _replace_task_photo(task: Task, photo_b64: str, *, worker_id: Optional[int]) -> None:
+    """Persist the latest on-site photo submitted for a task.
+
+    Progress and completion uploads share one current evidence photo.  This
+    keeps storage bounded and, importantly, avoids accepting a progress photo
+    only to silently throw it away.
+    """
+    try:
+        rel_path = save_task_photo(
+            photo_b64,
+            task_id=task.task_id,
+            worker_id=worker_id,
+        )
+    except PhotoError as exc:
+        raise HTTPException(400, str(exc))
+    previous = task.completion_photo_path
+    task.completion_photo_path = rel_path
+    task.completion_photo_at = datetime.utcnow()
+    if previous and previous != rel_path:
+        delete_task_photo(previous)
 
 
 
@@ -500,10 +510,9 @@ def complete_task_with_photo(
         # A resubmission without a new note keeps the original one instead of
         # failing: the photo, not the wording, is the evidence being updated.
         note = (task.completion_note or "").strip() or None
+    # Field workers submit photo evidence; a written description is optional.
     if not note:
-        raise HTTPException(
-            400, "completion_note is required when completing a task"
-        )
+        note = "Photo evidence submitted by worker"
 
     # Photo first: if it is missing or unreadable the task stays untouched, so a
     # rejected upload never leaves a half-completed task behind.
@@ -642,6 +651,11 @@ def update_task(
                 "Workers must use the completion endpoint to finish a task",
             )
 
+    progress_photo = str(payload.get("progress_photo_base64") or "").strip()
+    if progress_photo:
+        # Store the real camera evidence rather than accepting and ignoring it.
+        _replace_task_photo(task, progress_photo, worker_id=user.id)
+
     if "task_name" in payload or "title" in payload:
         task.task_name = str(payload.get("task_name") or payload.get("title") or "").strip() or task.task_name
 
@@ -711,11 +725,12 @@ def update_task(
         # Leave a trace on any status or progress change (timeline entry).
         # from_status == to_status for pure progress updates; the note
         # explains what changed. Completion writes the mandatory note.
-        if status_changed or progress_changed:
+        if status_changed or progress_changed or progress_photo:
             log_note = (
                 completion_note
                 if new_status == "completed"
-                else str(payload.get("note") or "").strip() or None
+                else str(payload.get("note") or "").strip()
+                or ("Progress photo submitted" if progress_photo else None)
             )
             db.add(TaskProgressLog(
                 task_id=task.task_id,

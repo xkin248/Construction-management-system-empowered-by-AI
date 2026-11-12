@@ -32,6 +32,9 @@ class NotificationListTile extends StatelessWidget {
         return Icons.health_and_safety_rounded;
       case 'daily_report':
         return Icons.description_rounded;
+      case 'document':
+      case 'file':
+        return Icons.attach_file_rounded;
       default:
         return Icons.notifications_rounded;
     }

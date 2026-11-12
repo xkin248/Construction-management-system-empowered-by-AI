@@ -24,6 +24,10 @@ class SupervisorBase(BaseModel):
 class SupervisorCreate(SupervisorBase):
     password: str = Field(..., min_length=6, max_length=100)
 class SupervisorOut(SupervisorBase):
+    # Existing installations may use a short login name (for example
+    # ``admin123``) instead of a mailbox. It is safe to expose that identifier
+    # as text on reads; only creation/registration keeps the EmailStr check.
+    email: str
     supervisor_id: int; created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -83,6 +87,10 @@ class WorkerAuthCreate(WorkerAuthBase):
     trade: TradeLevel = None
     specialties: SpecialtyList = Field(default_factory=list)
 class WorkerAuthOut(WorkerAuthBase):
+    # Legacy/local-test login identifiers are not necessarily email addresses.
+    # Keep input validation strict, but never turn a valid account response
+    # into a server error merely because its identifier has no "@".
+    email: str
     worker_id: int
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)

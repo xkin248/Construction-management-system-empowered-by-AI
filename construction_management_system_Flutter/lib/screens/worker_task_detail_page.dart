@@ -124,9 +124,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 
   /// Progress update â€” same PUT endpoint, capped at 99% so that the only way to
   /// finish a task stays the photo-evidence flow.
-  Future<void> _uploadProgress({bool photo = false}) async {
+  Future<void> _uploadProgress() async {
     var value = _progress.clamp(0, 99);
-    final noteCtrl = TextEditingController();
     CapturedPhoto? photoShot;
 
     final ok = await showDialog<bool>(
@@ -135,9 +134,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         builder: (ctx, setLocal) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: AppRadius.rXl),
           title: Text(
-            photo
-                ? wT(en: 'PROGRESS PHOTO', ms: 'FOTO KEMAJUAN', zh: '进度照片')
-                : wT(en: 'UPDATE PROGRESS', ms: 'KEMAJUAN', zh: '更新进度'),
+            wT(en: 'PROGRESS PHOTO', ms: 'FOTO KEMAJUAN', zh: '进度照片'),
             style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w800),
           ),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -154,18 +151,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
               label: '$value%',
               onChanged: (v) => setLocal(() => value = v.round()),
             ),
-            TextField(
-              controller: noteCtrl,
-              maxLines: 2,
-              style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
-              decoration: InputDecoration(
-                labelText: wT(en: 'What did you finish?', ms: 'Apa sudah siap?', zh: '完成了什么？'),
-                border: OutlineInputBorder(borderRadius: AppRadius.rMd),
-              ),
-            ),
-            if (photo) ...[
-              const SizedBox(height: 12),
-              Row(children: [
+            const SizedBox(height: 12),
+            Row(children: [
                 Icon(
                   photoShot == null
                       ? Icons.photo_camera_outlined
@@ -198,8 +185,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                       style: GoogleFonts.inter(
                           fontSize: 13, fontWeight: FontWeight.w800)),
                 ),
-              ]),
-            ],
+            ]),
           ]),
           actions: [
             TextButton(
@@ -208,7 +194,9 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                   style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: photoShot == null
+                  ? null
+                  : () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(110, 48),
                 backgroundColor: AppColors.accentSolid,
@@ -222,14 +210,12 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         ),
       ),
     );
-    final note = noteCtrl.text.trim();
     if (ok != true || !mounted) return;
 
     setState(() => _busy = true);
     try {
       await ApiService().updateTask(widget.taskId, {
         'progress': value,
-        'note': note.isEmpty ? 'Progress $value%' : note,
         if (photoShot != null) 'progress_photo_base64': photoShot!.base64,
       });
       toast(wT(en: 'PROGRESS SAVED', ms: 'KEMAJUAN DISIMPAN', zh: '进度已保存'));
@@ -257,10 +243,10 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
     }
     if (!mounted) return;
 
-    final note = await Navigator.of(context).push<String>(
+    final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => _CompletionPreviewPage(photo: photo)),
     );
-    if (note == null || !mounted) return;
+    if (confirmed != true || !mounted) return;
 
     setState(() => _busy = true);
     try {
@@ -268,7 +254,6 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         widget.taskId,
         photoBase64: photo.base64,
         photoMimeType: photo.mimeType,
-        completionNote: note,
       );
       if (!mounted) return;
       setState(() => _submitted = true);
@@ -732,7 +717,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             label: wT(en: 'Upload Progress Photo', ms: 'Muat Naik Foto Kemajuan', zh: '上传进度照片'),
             icon: Icons.add_a_photo_outlined,
             tone: AppButtonTone.secondary,
-            onPressed: _busy ? null : () => _uploadProgress(photo: true),
+            onPressed: _busy ? null : _uploadProgress,
             height: 50,
           ),
           const SizedBox(height: 10),
@@ -803,14 +788,6 @@ class _CompletionPreviewPage extends StatefulWidget {
 }
 
 class _CompletionPreviewPageState extends State<_CompletionPreviewPage> {
-  final TextEditingController _noteCtrl = TextEditingController();
-
-  @override
-  void dispose() {
-    _noteCtrl.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     Uint8List? bytes;
@@ -819,7 +796,6 @@ class _CompletionPreviewPageState extends State<_CompletionPreviewPage> {
     } catch (_) {
       bytes = null;
     }
-    final note = _noteCtrl.text.trim();
     return Scaffold(
       backgroundColor: AppColors.bgMain,
       appBar: AppBar(
@@ -858,27 +834,12 @@ class _CompletionPreviewPageState extends State<_CompletionPreviewPage> {
                 zh: '任务照片，与考勤自拍分开保存。'),
             style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _noteCtrl,
-            maxLines: 3,
-            autofocus: true,
-            onChanged: (_) => setState(() {}),
-            style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              labelText: wT(
-                  en: 'What did you finish? (required)',
-                  ms: 'Apa sudah siap? (wajib)',
-                  zh: '完成了什么（必填）'),
-              border: OutlineInputBorder(borderRadius: AppRadius.rMd),
-            ),
-          ),
           const SizedBox(height: 20),
           AppButton(
             label: wT(en: 'Submit for Review', ms: 'Hantar untuk Semakan', zh: '提交审核'),
             icon: Icons.send_rounded,
             loading: false,
-            onPressed: note.isEmpty ? null : () => Navigator.of(context).pop(note),
+            onPressed: () => Navigator.of(context).pop(true),
             height: 52,
           ),
           const SizedBox(height: 10),

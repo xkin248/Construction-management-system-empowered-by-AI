@@ -21,7 +21,17 @@ import '../widgets/signed_file_image.dart';
 import '../widgets/a11y.dart';
 
 class FilesPage extends StatefulWidget {
-  const FilesPage({super.key});
+  const FilesPage({
+    super.key,
+    this.initialProjectId,
+    this.initialFileId,
+  });
+
+  /// Lets notification deep-links open the correct project/file without
+  /// making a user search through the Files page manually.
+  final int? initialProjectId;
+  final int? initialFileId;
+
   @override
   State<FilesPage> createState() => _FilesPageState();
 }
@@ -34,6 +44,7 @@ class _FilesPageState extends State<FilesPage> {
   int? _selectedProjectId;
   String _selectedCategory = 'all';
   bool _gridMode = true;
+  int? _pendingPreviewFileId;
 
   /// Drives the always-available scrollbar of the list/grid.
   final ScrollController _scrollCtrl = ScrollController();
@@ -55,6 +66,8 @@ class _FilesPageState extends State<FilesPage> {
   @override
   void initState() {
     super.initState();
+    _selectedProjectId = widget.initialProjectId;
+    _pendingPreviewFileId = widget.initialFileId;
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
     _load();
@@ -106,12 +119,34 @@ class _FilesPageState extends State<FilesPage> {
       _files = rawFiles
           .map((e) => FileItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
+      _openPendingPreview();
     } catch (e) {
       _loadError = e;
       toast('Failed to load files: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// A notification only stores a file id.  After the list has loaded, find
+  /// that row and show its normal preview sheet, including the signed-link
+  /// Download/Open action.  The id is consumed so pull-to-refresh does not
+  /// reopen the sheet repeatedly.
+  void _openPendingPreview() {
+    final targetId = _pendingPreviewFileId;
+    if (targetId == null) return;
+    FileItem? target;
+    for (final file in _files) {
+      if (file.fileId == targetId) {
+        target = file;
+        break;
+      }
+    }
+    if (target == null) return;
+    _pendingPreviewFileId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openPreview(target!);
+    });
   }
 
   Future<void> _deleteFile(FileItem file) async {

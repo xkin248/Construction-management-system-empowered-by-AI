@@ -10,6 +10,7 @@ import '../widgets/worker_live_badge.dart';
 import '../widgets/worker_ui.dart';
 import 'login_page.dart';
 import 'worker_notifications_page.dart';
+import 'profile_page.dart';
 
 /// Worker profile (spec A9).
 ///
@@ -358,6 +359,34 @@ class _WorkerProfilePageState extends State<WorkerProfilePage> {
 
   Widget _actionsCard() {
     return Column(children: [
+      GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const ProfilePage(),
+        )),
+        child: Container(
+          height: kWPrimaryTap,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.bgCard,
+            borderRadius: AppRadius.rLg,
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(children: [
+            Icon(Icons.person_outline_rounded, size: 28, color: AppColors.accentSolid),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                wT(en: 'MY PROFILE', ms: 'PROFIL SAYA', zh: '个人资料'),
+                style: GoogleFonts.inter(
+                    fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, size: 26, color: AppColors.textMuted),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 12),
       GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
