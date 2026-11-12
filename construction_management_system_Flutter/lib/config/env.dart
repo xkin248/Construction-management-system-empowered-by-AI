@@ -9,8 +9,11 @@ class Env {
   );
 
   static const String apiVersion = '/api/v1';
-  static const int connectTimeout = 15000;
-  static const int receiveTimeout = 30000;
+  // Render's free instance can take tens of seconds to wake after it has been
+  // idle.  Keep the web/mobile client connected long enough for that first
+  // request instead of showing a false "no internet" error after six seconds.
+  static const int connectTimeout = 30000;
+  static const int receiveTimeout = 60000;
 
   // Locked theme colors — do not modify
   static const int primaryColor = 0xFF1976D2;

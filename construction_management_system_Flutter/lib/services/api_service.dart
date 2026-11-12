@@ -41,8 +41,11 @@ class ApiService {
     }
     _d = Dio(BaseOptions(
       baseUrl: baseUrl + p,
-      connectTimeout: const Duration(seconds: 6),
-      receiveTimeout: const Duration(seconds: 10),
+      // Use the central environment values.  The previous hard-coded 6/10 s
+      // values ignored Env and timed out before a sleeping Render service had
+      // a chance to wake up, which appeared in the UI as a network failure.
+      connectTimeout: Duration(milliseconds: Env.connectTimeout),
+      receiveTimeout: Duration(milliseconds: Env.receiveTimeout),
       contentType: Headers.jsonContentType,
       responseType: ResponseType.json,
       headers: {'Accept': 'application/json'},
