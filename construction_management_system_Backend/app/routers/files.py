@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from urllib.parse import quote
@@ -14,8 +14,48 @@ from app.file_service import (
 )
 from app.file_tokens import clamp_ttl, create_download_token, decode_download_token
 from app.routers.auth import cu
+from app import storage_service
+from app.storage_service import StorageError
 
 router = APIRouter(tags=["📁 File Management"])
+
+# Documents must not share the evidence-photo bucket: that bucket can safely
+# restrict uploads to images, while project documents need PDFs, office files
+# and text checklists. The bucket is private; reads still use signed URLs.
+FILE_STORAGE_BUCKET = os.getenv("SUPABASE_FILE_BUCKET", "buildsmart-files")
+
+def _storage_keys(file: DBFile) -> list[str]:
+    """Return compatible bucket keys for a legacy or current file record."""
+    raw = (file.file_path or "").replace("\\", "/").lstrip("./")
+    keys = [raw]
+    if raw.startswith("uploads/"):
+        keys.append(raw[len("uploads/"):])
+    return [key for index, key in enumerate(keys) if key and key not in keys[:index]]
+
+
+def _file_source(file: DBFile) -> tuple[str, str]:
+    """Resolve a file from the local development disk or Supabase Storage."""
+    if file.file_path and os.path.isfile(file.file_path):
+        return "local", file.file_path
+    for key in _storage_keys(file):
+        try:
+            return storage_service.open_source(key, bucket=FILE_STORAGE_BUCKET)
+        except StorageError:
+            continue
+    raise HTTPException(status_code=404, detail="File content is unavailable")
+
+
+def _file_response(file: DBFile):
+    source_type, source = _file_source(file)
+    if source_type == "local":
+        return FileResponse(
+            path=source,
+            filename=file.original_name,
+            media_type=file.mime_type,
+        )
+    # The signed Supabase URL is short-lived. Redirecting prevents Render's
+    # ephemeral process from proxying large documents and supports previews.
+    return RedirectResponse(url=source, status_code=307)
 
 
 @router.post("/files/upload", response_model=FileOut)
@@ -28,6 +68,15 @@ async def upload_file(
 ):
     file_path, stored_name, file_size, mime_type = await save_upload_file(file)
     thumbnail_path = create_thumbnail(file_path, stored_name, mime_type)
+
+    # Render's disk is temporary. Retain the short-lived local copy for the
+    # thumbnail helper, but make Supabase Storage the durable source of truth.
+    with open(file_path, "rb") as uploaded_file:
+        content = uploaded_file.read()
+    object_key = "files/" + file_path.replace("\\", "/").split("/", 1)[-1]
+    stored_path = storage_service.save_object(
+        object_key, content, content_type=mime_type, bucket=FILE_STORAGE_BUCKET
+    )
 
     # Infer a meaningful category when the client did not pass an explicit one
     # ("attachment" is the API default). This keeps files visible under the
@@ -43,7 +92,7 @@ async def upload_file(
     db_file = DBFile(
         original_name=file.filename or "unknown",
         stored_name=stored_name,
-        file_path=file_path,
+        file_path=stored_path,
         file_size=file_size,
         mime_type=mime_type,
         file_category=file_category,
@@ -88,23 +137,15 @@ def download_file(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-    if not os.path.exists(file.file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-
-    return FileResponse(
-        path=file.file_path,
-        filename=file.original_name,
-        media_type=file.mime_type
-    )
+    return _file_response(file)
 
 
 def _get_downloadable_file(db: Session, file_id: int) -> DBFile:
-    """Fetch a file row that also exists on disk, or raise 404."""
+    """Fetch a file row whose local or Supabase object can be opened."""
     file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
-    if not os.path.exists(file.file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
+    _file_source(file)
     return file
 
 
@@ -155,11 +196,7 @@ def download_file_with_token(
     """
     file_id = decode_download_token(token)
     file = _get_downloadable_file(db, file_id)
-    return FileResponse(
-        path=file.file_path,
-        filename=file.original_name,
-        media_type=file.mime_type
-    )
+    return _file_response(file)
 
 
 @router.put("/files/{file_id}", response_model=FileOut)
@@ -197,7 +234,10 @@ def delete_file_endpoint(
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
+    # Remove the local-development copy and the durable Storage object.
     delete_file(file.file_path, file.thumbnail_path)
+    for key in _storage_keys(file):
+        storage_service.delete_object(key, bucket=FILE_STORAGE_BUCKET)
     db.delete(file)
     db.commit()
     return {"status": "ok", "message": "File deleted successfully"}

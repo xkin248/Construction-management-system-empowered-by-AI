@@ -88,9 +88,9 @@ def supabase_secret() -> str:
     return _env("SUPABASE_SECRET_KEY")
 
 
-def bucket_name() -> str:
-    """Target bucket, defaulting to the project bucket."""
-    return _env("SUPABASE_STORAGE_BUCKET") or DEFAULT_BUCKET
+def bucket_name(bucket: Optional[str] = None) -> str:
+    """Return an explicit bucket or the default photo-evidence bucket."""
+    return (bucket or "").strip() or _env("SUPABASE_STORAGE_BUCKET") or DEFAULT_BUCKET
 
 
 def remote_enabled() -> bool:
@@ -214,10 +214,10 @@ def _quote_key(key: str) -> str:
     return urllib.parse.quote(key, safe="/")
 
 
-def _object_url(key: str) -> str:
+def _object_url(key: str, *, bucket: Optional[str] = None) -> str:
     return (
         f"{supabase_url()}/storage/v1/object/"
-        f"{urllib.parse.quote(bucket_name())}/{_quote_key(key)}"
+        f"{urllib.parse.quote(bucket_name(bucket))}/{_quote_key(key)}"
     )
 
 
@@ -254,7 +254,8 @@ def _http(
 
 
 def upload_object(
-    key: str, data: bytes, *, content_type: Optional[str] = None
+    key: str, data: bytes, *, content_type: Optional[str] = None,
+    bucket: Optional[str] = None,
 ) -> bool:
     """Upload one object. Returns False (never raises) when it cannot upload."""
     if not remote_enabled():
@@ -268,7 +269,7 @@ def upload_object(
     headers["cache-control"] = "max-age=3600"
     try:
         status_code, body = _http(
-            "POST", _object_url(cleaned), data=data, headers=headers,
+            "POST", _object_url(cleaned, bucket=bucket), data=data, headers=headers,
             timeout=_UPLOAD_TIMEOUT,
         )
     except StorageError as exc:
@@ -276,6 +277,24 @@ def upload_object(
         return False
     if 200 <= status_code < 300:
         return True
+    # Some Storage buckets are configured with a restrictive MIME allow-list
+    # and reject otherwise safe office/text uploads (for example text/plain).
+    # The database keeps the original MIME type for download responses; this
+    # fallback only makes the object acceptable to that bucket.
+    if status_code == 400 and b"invalid_mime_type" in body:
+        fallback_headers = dict(headers)
+        fallback_headers["Content-Type"] = "application/octet-stream"
+        try:
+            retry_status, retry_body = _http(
+                "POST", _object_url(cleaned, bucket=bucket), data=data, headers=fallback_headers,
+                timeout=_UPLOAD_TIMEOUT,
+            )
+        except StorageError as exc:
+            logger.warning("Supabase MIME fallback skipped for %s: %s", cleaned, exc)
+            return False
+        if 200 <= retry_status < 300:
+            return True
+        status_code, body = retry_status, retry_body
     logger.warning(
         "Supabase upload failed (%s) for %s: %s",
         status_code, cleaned, body[:200],
@@ -283,7 +302,7 @@ def upload_object(
     return False
 
 
-def remote_exists(key: str) -> bool:
+def remote_exists(key: str, *, bucket: Optional[str] = None) -> bool:
     """Whether the object exists in the bucket.
 
     Probes with a one-byte ranged GET: cheap, and correct for both private and
@@ -296,7 +315,7 @@ def remote_exists(key: str) -> bool:
     headers["Range"] = "bytes=0-0"
     url = (
         f"{supabase_url()}/storage/v1/object/authenticated/"
-        f"{urllib.parse.quote(bucket_name())}/{_quote_key(cleaned)}"
+        f"{urllib.parse.quote(bucket_name(bucket))}/{_quote_key(cleaned)}"
     )
     try:
         status_code, _ = _http(
@@ -309,7 +328,8 @@ def remote_exists(key: str) -> bool:
 
 
 def signed_url(
-    key: str, *, expires_in: int = DEFAULT_SIGNED_URL_TTL
+    key: str, *, expires_in: int = DEFAULT_SIGNED_URL_TTL,
+    bucket: Optional[str] = None,
 ) -> Optional[str]:
     """Create a short-lived signed download URL, or None when unavailable."""
     if not remote_enabled():
@@ -317,7 +337,7 @@ def signed_url(
     cleaned = normalise_key(key)
     url = (
         f"{supabase_url()}/storage/v1/object/sign/"
-        f"{urllib.parse.quote(bucket_name())}/{_quote_key(cleaned)}"
+        f"{urllib.parse.quote(bucket_name(bucket))}/{_quote_key(cleaned)}"
     )
     headers = _auth_headers()
     headers["Content-Type"] = "application/json"
@@ -350,14 +370,14 @@ def signed_url(
     return f"{supabase_url()}/storage/v1{signed}"
 
 
-def read_remote(key: str) -> bytes:
+def read_remote(key: str, *, bucket: Optional[str] = None) -> bytes:
     """Download one object through the authenticated object route."""
     if not remote_enabled():
         raise StorageError("Remote storage is not configured")
     cleaned = normalise_key(key)
     url = (
         f"{supabase_url()}/storage/v1/object/authenticated/"
-        f"{urllib.parse.quote(bucket_name())}/{_quote_key(cleaned)}"
+        f"{urllib.parse.quote(bucket_name(bucket))}/{_quote_key(cleaned)}"
     )
     status_code, body = _http("GET", url, headers=_auth_headers())
     if not 200 <= status_code < 300:
@@ -369,7 +389,8 @@ def read_remote(key: str) -> bytes:
 # Public API used by the photo modules and the routers
 # --------------------------------------------------------------------------- #
 def save_object(
-    key: str, data: bytes, *, content_type: Optional[str] = None
+    key: str, data: bytes, *, content_type: Optional[str] = None,
+    bucket: Optional[str] = None,
 ) -> str:
     """Persist one object and return the key to store in the database.
 
@@ -379,7 +400,7 @@ def save_object(
     cleaned = normalise_key(key)
     if remote_enabled():
         try:
-            if upload_object(cleaned, data, content_type=content_type):
+            if upload_object(cleaned, data, content_type=content_type, bucket=bucket):
                 return cleaned
         except StorageError as exc:
             logger.warning("Supabase upload errored for %s: %s", cleaned, exc)
@@ -393,6 +414,7 @@ def open_source(
     *,
     root_subdir: Optional[str] = None,
     expires_in: int = DEFAULT_SIGNED_URL_TTL,
+    bucket: Optional[str] = None,
 ) -> Tuple[str, str]:
     """Resolve a key for reading.
 
@@ -408,22 +430,24 @@ def open_source(
         raise
     if os.path.isfile(path):
         return "local", path
-    if remote_enabled() and remote_exists(cleaned):
-        url = signed_url(cleaned, expires_in=expires_in)
+    if remote_enabled() and remote_exists(cleaned, bucket=bucket):
+        url = signed_url(cleaned, expires_in=expires_in, bucket=bucket)
         if url:
             return "url", url
     raise StorageError("Photo not found")
 
 
-def read_object(key: str, *, root_subdir: Optional[str] = None) -> bytes:
+def read_object(
+    key: str, *, root_subdir: Optional[str] = None, bucket: Optional[str] = None
+) -> bytes:
     """Return the bytes of one object, local copy first, bucket second."""
     cleaned = normalise_key(key)
     if local_exists(cleaned, root_subdir=root_subdir):
         return read_local(cleaned, root_subdir=root_subdir)
-    return read_remote(cleaned)
+    return read_remote(cleaned, bucket=bucket)
 
 
-def delete_object(key: str) -> bool:
+def delete_object(key: str, *, bucket: Optional[str] = None) -> bool:
     """Delete an object from both backends (best effort, never raises)."""
     try:
         cleaned = normalise_key(key)
@@ -433,7 +457,7 @@ def delete_object(key: str) -> bool:
     if remote_enabled():
         try:
             status_code, _ = _http(
-                "DELETE", _object_url(cleaned), headers=_auth_headers(),
+                "DELETE", _object_url(cleaned, bucket=bucket), headers=_auth_headers(),
                 timeout=_SIGN_TIMEOUT,
             )
             if 200 <= status_code < 300 or status_code == 404:
