@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import '../widgets/app_page_intro.dart';
 import 'settings_page.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/token_storage.dart';
 import '../l10n/app_strings.dart';
 import 'login_page.dart';
 
@@ -50,8 +50,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _logout() async {
-    final sp = await SharedPreferences.getInstance();
-    await sp.clear();
+    await TokenStorage.clearAuth();
     ApiService().ct();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);

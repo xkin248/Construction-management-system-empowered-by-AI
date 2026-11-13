@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/token_storage.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import 'login_page.dart';
@@ -123,8 +124,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
     setState(() => _busyLogout = true);
     try {
-      final sp = await SharedPreferences.getInstance();
-      await sp.clear();
+      await TokenStorage.clearAuth();
       ApiService().ct();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(context,

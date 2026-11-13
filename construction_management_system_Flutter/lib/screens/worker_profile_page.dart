@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/token_storage.dart';
 import '../theme/app_theme.dart';
 import '../widgets/worker_live_badge.dart';
 import '../widgets/worker_ui.dart';
@@ -96,8 +97,8 @@ class _WorkerProfilePageState extends State<WorkerProfilePage> {
   }
 
   Future<void> _logout() async {
-    final sp = await SharedPreferences.getInstance();
-    await sp.clear();
+    await TokenStorage.clearAuth();
+    ApiService().ct();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginPage()),

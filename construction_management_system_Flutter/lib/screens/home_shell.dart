@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/project_cache.dart';
+import '../services/token_storage.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
 import 'projects_page.dart';
@@ -226,8 +227,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   Future<void> _logout() async {
-    final sp = await SharedPreferences.getInstance();
-    await sp.clear();
+    await TokenStorage.clearAuth();
     ApiService().ct();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(context,

@@ -84,9 +84,23 @@ class ApiService {
             final c = e.response?.statusCode;
             final d = e.response?.data;
             if (c == 401) {
-              m = 'Login session expired';
-              _t = null;
-              _out?.call();
+              // A rejected sign-in is an expected form validation result, not
+              // an expired authenticated session. Treating it as a global
+              // logout rebuilds LoginPage before it can show its inline error
+              // and makes both fields appear to have been cleared.
+              final isLoginRequest =
+                  e.requestOptions.path.endsWith('/auth/login');
+              m = isLoginRequest
+                  ? 'Invalid credentials'
+                  : 'Login session expired';
+
+              // Only a protected request made with a saved token can expire a
+              // real session. Login itself must stay on the current form so
+              // the caller can retain the entered values and show feedback.
+              if (!isLoginRequest && _t?.isNotEmpty == true) {
+                _t = null;
+                _out?.call();
+              }
             } else if (c == 410) {
               m = d is Map ? d['detail'] ?? 'Check-in was auto-cancelled' : 'Check-in cancelled';
             } else {

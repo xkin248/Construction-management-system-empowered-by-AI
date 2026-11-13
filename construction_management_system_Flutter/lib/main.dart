@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'theme/app_theme.dart';
 import 'services/api_service.dart';
 import 'services/token_storage.dart';
 import 'screens/login_page.dart';
+import 'screens/home_shell.dart';
+import 'screens/worker_home_shell.dart';
 import 'services/app_settings.dart';
 import 'services/gps_notification_service.dart';
 import 'theme/text_scale.dart';
@@ -217,6 +220,8 @@ class SplashGate extends StatefulWidget {
 }
 
 class _SplashGateState extends State<SplashGate> {
+  bool _isRedirectingToLogin = false;
+
   @override
   void initState() {
     super.initState();
@@ -224,16 +229,21 @@ class _SplashGateState extends State<SplashGate> {
   }
 
   Future<void> _boot() async {
-    // ── 1. Force a clean, logged-out start ──────────────────────────────────
-    // Product requirement: EVERY cold launch must land on the login page, so
-    // any token / cached identity left over from a previous session is
-    // dropped before anything else runs. Only auth keys are cleared — user
-    // preferences (theme, language, …) must survive a restart.
+    // Restore the previous authenticated session if one was securely saved.
+    // Theme, language, and notification preferences remain separate from
+    // authentication and therefore survive both restart and sign-out.
+    String? storedToken;
+    String? cachedUserType;
+    String? cachedRole;
     try {
-      await TokenStorage.clearAuth();
+      storedToken = await TokenStorage.getToken();
+      cachedUserType = await TokenStorage.getUserType();
+      cachedRole = await TokenStorage.getUserRole();
     } catch (e, st) {
-      if (kDebugMode) debugPrint('[Boot] clearAuth failed: $e\n$st');
+      if (kDebugMode) debugPrint('[Boot] session restore failed: $e\n$st');
     }
+    final token = storedToken?.trim();
+    final hasStoredToken = token?.isNotEmpty == true;
 
     // ── 2. Initialise the API client — UNCONDITIONAL ────────────────────────
     // ApiService is a singleton used by every screen; it must be initialised
@@ -241,13 +251,8 @@ class _SplashGateState extends State<SplashGate> {
     // later calls run against an unconfigured client and crash.
     try {
       ApiService().init(
-        token: null,
-        onUnauthorized: () async {
-          await TokenStorage.clearAll();
-          navigatorKey.currentState?.pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const LoginPage()),
-              (_) => false);
-        },
+        token: hasStoredToken ? token : null,
+        onUnauthorized: () => unawaited(_handleUnauthorized()),
       );
     } catch (e, st) {
       if (kDebugMode) debugPrint('[Boot] ApiService.init failed: $e\n$st');
@@ -262,13 +267,115 @@ class _SplashGateState extends State<SplashGate> {
 
     if (!mounted) return;
 
-    // ── 4. Always start at the login page ───────────────────────────────────
-    // Session restore is intentionally disabled: the user must authenticate
-    // on every launch, then the login screen pushes the matching shell.
+    // Choose the login page only when there is no valid local session.
+    if (!hasStoredToken) {
+      _openLogin();
+      return;
+    }
+
+    // A normal login always caches the account type. The JWT fallback also
+    // supports a token created before that metadata was introduced; it only
+    // selects the initial shell, while the backend still authorizes every API
+    // request.
+    final userType = (cachedUserType?.trim().isNotEmpty ?? false)
+        ? cachedUserType!.trim()
+        : _userTypeFromToken(token!);
+    final role = cachedRole?.trim();
+    if (userType == null && (role == null || role.isEmpty)) {
+      // We cannot safely choose a shell for an unreadable legacy token.
+      await _clearLocalSession();
+      if (mounted) _openLogin();
+      return;
+    }
+
+    final isWorker = userType?.toLowerCase() == 'worker' ||
+        role?.toLowerCase() == 'worker';
+    _openShell(isWorker: isWorker);
+
+    // Verify the restored token without delaying the UI. A temporary outage
+    // (or a waking free backend) leaves the cached session usable; a real 401
+    // is handled by the global callback and returns to LoginPage.
+    unawaited(_refreshCachedIdentity());
+  }
+
+  Future<void> _handleUnauthorized() async {
+    if (_isRedirectingToLogin) return;
+    _isRedirectingToLogin = true;
+    try {
+      await TokenStorage.clearAuth();
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('[Auth] failed to clear session: $e\n$st');
+    } finally {
+      ApiService().ct();
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (_) => false,
+      );
+      _isRedirectingToLogin = false;
+    }
+  }
+
+  Future<void> _clearLocalSession() async {
+    try {
+      await TokenStorage.clearAuth();
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('[Boot] failed to clear session: $e\n$st');
+    }
+    ApiService().ct();
+  }
+
+  void _openLogin() {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginPage()),
     );
+  }
+
+  void _openShell({required bool isWorker}) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => isWorker ? const WorkerHomeShell() : const HomeShell(),
+      ),
+    );
+  }
+
+  Future<void> _refreshCachedIdentity() async {
+    try {
+      final user = await ApiService().me();
+      final userType = user['user_type']?.toString().trim();
+      if (userType == null || userType.isEmpty) return;
+
+      await TokenStorage.saveUserMeta(
+        userType: userType,
+        role: user['role']?.toString() ?? '',
+        workerId: _asInt(user['worker_id']),
+        supervisorId: _asInt(user['supervisor_id']),
+        projectId: _asInt(user['project_id']),
+      );
+    } catch (_) {
+      // Network failures are non-destructive. A 401 triggers
+      // _handleUnauthorized through ApiService's interceptor.
+    }
+  }
+
+  int? _asInt(Object? value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '');
+  }
+
+  String? _userTypeFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map) return null;
+      final userType = decoded['user_type']?.toString().trim();
+      return userType == null || userType.isEmpty ? null : userType;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override

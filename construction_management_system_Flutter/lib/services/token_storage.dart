@@ -87,7 +87,8 @@ class TokenStorage {
   /// Drops only the authentication state (JWT + cached identity), leaving
   /// user preferences (theme / language / …) intact.
   ///
-  /// Used on every cold start so the app always opens on the login page.
+  /// Used when the user signs out or the server confirms that a session is no
+  /// longer valid.
   static Future<void> clearAuth() async {
     try {
       await deleteToken();
