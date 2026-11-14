@@ -63,7 +63,8 @@ class FileInfoChip extends StatelessWidget {
       ),
       child: Text(label,
           style: GoogleFonts.inter(
-              fontSize: 14, fontWeight: FontWeight.w600,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
               color: AppColors.textSecondary)),
     );
   }
@@ -80,12 +81,14 @@ class FileGridCard extends StatelessWidget {
     required this.file,
     this.onTap,
     this.onLongPress,
+    this.actions,
     this.cacheSize,
   });
 
   final FileItem file;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final Widget? actions;
 
   /// Max decoded edge in physical pixels for the thumbnail.
   final int? cacheSize;
@@ -94,59 +97,64 @@ class FileGridCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final icon = Icon(fileTypeIcon(file), size: 32, color: fileTypeColor(file));
     return semanticTapTarget(
-      label: '${file.originalName}, ${file.fileCategory}',
-      child: GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: sectionCard(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: fileCategoryBg(file.fileCategory),
-                  borderRadius: AppRadius.rMd,
-                ),
-                child: Center(
-                  child: file.isImage && file.thumbnailPath != null
-                      ? ClipRRect(
-                          borderRadius: AppRadius.rMd,
-                          child: SignedFileImage(
-                            fileId: file.fileId,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                            cacheWidth: cacheSize,
-                            cacheHeight: cacheSize,
-                            errorWidget: icon,
-                          ),
-                        )
-                      : icon,
-                ),
+        label: '${file.originalName}, ${file.fileCategory}',
+        child: GestureDetector(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Stack(children: [
+            sectionCard(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: fileCategoryBg(file.fileCategory),
+                        borderRadius: AppRadius.rMd,
+                      ),
+                      child: Center(
+                        child: file.isImage && file.thumbnailPath != null
+                            ? ClipRRect(
+                                borderRadius: AppRadius.rMd,
+                                child: SignedFileImage(
+                                  fileId: file.fileId,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  cacheWidth: cacheSize,
+                                  cacheHeight: cacheSize,
+                                  errorWidget: icon,
+                                ),
+                              )
+                            : icon,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    file.originalName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${file.sizeFormatted}  ${file.dateFormatted}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 14, color: AppColors.textMuted),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              file.originalName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${file.sizeFormatted}  ${file.dateFormatted}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 14, color: AppColors.textMuted),
-            ),
-          ],
-        ),
-      ),
-    ));
+            if (actions != null) Positioned(top: 2, right: 2, child: actions!),
+          ]),
+        ));
   }
 }
 
@@ -157,67 +165,69 @@ class FileListTile extends StatelessWidget {
     required this.file,
     this.onTap,
     this.onLongPress,
+    this.actions,
   });
 
   final FileItem file;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
     return semanticTapTarget(
-      label: '${file.originalName}, ${file.fileCategory}',
-      child: GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: sectionCard(
-        padding: const EdgeInsets.all(12),
-        child: Row(children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: fileCategoryBg(file.fileCategory),
-              borderRadius: AppRadius.rMd,
-            ),
-            child: Center(
-              child: Icon(fileTypeIcon(file), size: 24, color: fileTypeColor(file)),
-            ),
+        label: '${file.originalName}, ${file.fileCategory}',
+        child: GestureDetector(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: sectionCard(
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: fileCategoryBg(file.fileCategory),
+                  borderRadius: AppRadius.rMd,
+                ),
+                child: Center(
+                  child: Icon(fileTypeIcon(file),
+                      size: 24, color: fileTypeColor(file)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(file.originalName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: AppColors.textPrimary)),
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      FileInfoChip(label: file.categoryLabel),
+                      const SizedBox(width: 8),
+                      Text(file.sizeFormatted,
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: AppColors.textMuted)),
+                      const SizedBox(width: 8),
+                      Text(file.dateFormatted,
+                          style: GoogleFonts.inter(
+                              fontSize: 13, color: AppColors.textMuted)),
+                    ]),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              actions ??
+                  Icon(Icons.chevron_right_rounded,
+                      color: AppColors.textMuted, size: 20),
+            ]),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(file.originalName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13.5,
-                        color: AppColors.textPrimary)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  FileInfoChip(label: file.categoryLabel),
-                  const SizedBox(width: 8),
-                  Text(file.sizeFormatted,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.textMuted)),
-                  const SizedBox(width: 8),
-                  Text(file.dateFormatted,
-                      style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: AppColors.textMuted)),
-                ]),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.chevron_right_rounded,
-              color: AppColors.textMuted, size: 20),
-        ]),
-      ),
-    ));
+        ));
   }
 }

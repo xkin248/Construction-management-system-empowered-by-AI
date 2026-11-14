@@ -1,4 +1,3 @@
-
 import '../widgets/app_page_intro.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
+import '../services/project_scope.dart';
 import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../widgets/app_button.dart';
@@ -64,11 +64,27 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   Object? _weekError;
 
   static const List<String> _monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   static const List<String> _dayNames = [
-    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun',
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
   ];
 
   @override
@@ -76,6 +92,7 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
+    ProjectScope.activeProjectId.addListener(_onProjectScopeChanged);
     _load();
   }
 
@@ -88,15 +105,18 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
+    ProjectScope.activeProjectId.removeListener(_onProjectScopeChanged);
     super.dispose();
   }
+
+  void _onProjectScopeChanged() => _load();
 
   // -------------------------------- Data ------------------------------------
   Future<void> _load({bool silent = false}) async {
     if (!silent) setState(() => ld = true);
     try {
       final results = await Future.wait([
-        ApiService().attendanceToday(),
+        ApiService().attendanceToday(pid: ProjectScope.activeProjectId.value),
         ProjectCache.get(ApiService()),
       ]);
       summary = results[0] as Map;
@@ -169,12 +189,14 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     }
     final direct = _asDouble(worker['fence_radius']);
     if (direct != null) return direct;
-    final pid = worker['project_id'] ?? (proj is Map ? proj['project_id'] : null);
+    final pid =
+        worker['project_id'] ?? (proj is Map ? proj['project_id'] : null);
     final pname = proj is Map ? proj['project_name'] : null;
     for (final p in projects) {
       if (p is! Map) continue;
-      final matches = (pid != null && (p['project_id'] == pid || p['id'] == pid)) ||
-          (pname != null && p['project_name'] == pname);
+      final matches =
+          (pid != null && (p['project_id'] == pid || p['id'] == pid)) ||
+              (pname != null && p['project_name'] == pname);
       if (!matches) continue;
       final r = _asDouble(p['fence_radius']);
       if (r != null) return r;
@@ -184,17 +206,23 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
   List<Map> _filteredRows(List rows) {
     final q = _searchQuery.trim().toLowerCase();
-    return rows.where((dynamic raw) {
-      if (raw is! Map) return false;
-      final name = '${raw['name'] ?? ''}'.toLowerCase();
-      final projectName = raw['project'] is Map
-          ? '${raw['project']['project_name'] ?? ''}'.toLowerCase()
-          : '${raw['project_name'] ?? ''}'.toLowerCase();
-      final status = '${raw['status'] ?? raw['today_status'] ?? 'absent'}'.toLowerCase();
-      final matchSearch = q.isEmpty || name.contains(q) || projectName.contains(q);
-      final matchStatus = _statusFilter == 'All' || status == _statusFilter.toLowerCase();
-      return matchSearch && matchStatus;
-    }).map<Map>((dynamic raw) => raw as Map).toList();
+    return rows
+        .where((dynamic raw) {
+          if (raw is! Map) return false;
+          final name = '${raw['name'] ?? ''}'.toLowerCase();
+          final projectName = raw['project'] is Map
+              ? '${raw['project']['project_name'] ?? ''}'.toLowerCase()
+              : '${raw['project_name'] ?? ''}'.toLowerCase();
+          final status = '${raw['status'] ?? raw['today_status'] ?? 'absent'}'
+              .toLowerCase();
+          final matchSearch =
+              q.isEmpty || name.contains(q) || projectName.contains(q);
+          final matchStatus =
+              _statusFilter == 'All' || status == _statusFilter.toLowerCase();
+          return matchSearch && matchStatus;
+        })
+        .map<Map>((dynamic raw) => raw as Map)
+        .toList();
   }
 
   // -------------------------------- Build -----------------------------------
@@ -215,7 +243,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       child: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          constraints:
+              const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
           child: SizedBox(
             width: double.infinity,
             child: AppScrollbar(
@@ -228,24 +257,29 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     padding: const EdgeInsets.all(16),
                     sliver: SliverList.list(
                       children: [
-          AppPageIntro(
-            icon: Icons.fact_check_rounded,
-            enTitle: 'ATTENDANCE',
-            msTitle: 'KEHADIRAN',
-            zhTitle: '考勤记录',
-            enSubtitle: 'Check site attendance by day, week or month',
-            msSubtitle: 'Semak kehadiran harian, mingguan atau bulanan',
-            zhSubtitle: '按日、周或月查看考勤',
-            worker: false,
-          ),
-          const SizedBox(height: 14),
-          _periodSwitch(),
+                        AppPageIntro(
+                          icon: Icons.fact_check_rounded,
+                          enTitle: 'ATTENDANCE',
+                          msTitle: 'KEHADIRAN',
+                          zhTitle: '考勤记录',
+                          enSubtitle:
+                              'Check site attendance by day, week or month',
+                          msSubtitle:
+                              'Semak kehadiran harian, mingguan atau bulanan',
+                          zhSubtitle: '按日、周或月查看考勤',
+                          worker: false,
+                        ),
+                        const SizedBox(height: 14),
+                        _periodSwitch(),
                         const SizedBox(height: 12),
                         _rangeCaption(),
                         const SizedBox(height: 16),
-                        if (_period == 'today') ..._todaySections(filtered)
-                        else if (_period == 'week') ..._weekSections()
-                        else ..._monthSections(),
+                        if (_period == 'today')
+                          ..._todaySections(filtered)
+                        else if (_period == 'week')
+                          ..._weekSections()
+                        else
+                          ..._monthSections(),
                       ],
                     ),
                   ),
@@ -296,7 +330,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     alignment: Alignment.center,
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
-                      color: _period == it[0] ? AppColors.navy : Colors.transparent,
+                      color: _period == it[0]
+                          ? AppColors.navy
+                          : Colors.transparent,
                       borderRadius: AppRadius.rSm,
                     ),
                     child: Row(
@@ -305,7 +341,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                         Icon(
                           icons[it[0]],
                           size: 14,
-                          color: _period == it[0] ? Colors.white : AppColors.textMuted,
+                          color: _period == it[0]
+                              ? Colors.white
+                              : AppColors.textMuted,
                         ),
                         const SizedBox(width: 5),
                         Flexible(
@@ -316,7 +354,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: _period == it[0] ? Colors.white : AppColors.textSecondary,
+                              color: _period == it[0]
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -338,7 +378,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     if (_period == 'today') {
       window = AppSettings.t('Today', '今天', 'Hari ini');
     } else if (_period == 'week') {
-      window = AppSettings.t('This week (Mon-Sun)', '本周（周一至周日）', 'Minggu ini (Isnin-Ahad)');
+      window = AppSettings.t(
+          'This week (Mon-Sun)', '本周（周一至周日）', 'Minggu ini (Isnin-Ahad)');
     } else {
       window = AppSettings.t('This month', '本月', 'Bulan ini');
     }
@@ -386,21 +427,22 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
 
     return [
       _kpiStrip([
-        _Kpi(AppSettings.t('Total', '总人数', 'Jumlah'), '$total', AppColors.textPrimary,
-            Icons.groups_rounded),
-        _Kpi(AppSettings.t('Present', '已出勤', 'Hadir'), '$present', AppColors.green,
-            Icons.check_circle_rounded),
+        _Kpi(AppSettings.t('Total', '总人数', 'Jumlah'), '$total',
+            AppColors.textPrimary, Icons.groups_rounded),
+        _Kpi(AppSettings.t('Present', '已出勤', 'Hadir'), '$present',
+            AppColors.green, Icons.check_circle_rounded),
         _Kpi(AppSettings.t('Late', '迟到', 'Lewat'), '$late', AppColors.yellow,
             Icons.schedule_rounded),
-        _Kpi(AppSettings.t('Absent', '缺勤', 'Tidak hadir'), '$absent', AppColors.red,
-            Icons.person_off_rounded),
+        _Kpi(AppSettings.t('Absent', '缺勤', 'Tidak hadir'), '$absent',
+            AppColors.red, Icons.person_off_rounded),
       ]),
       const SizedBox(height: 12),
       _toolbar(),
       const SizedBox(height: 14),
       _sectionHeader(
         AppSettings.t('Worker logs', '工人打卡明细', 'Log pekerja'),
-        AppSettings.t('${filtered.length} of ${(summary['rows'] as List?)?.length ?? 0}',
+        AppSettings.t(
+            '${filtered.length} of ${(summary['rows'] as List?)?.length ?? 0}',
             '共 ${filtered.length} / ${(summary['rows'] as List?)?.length ?? 0} 人',
             '${filtered.length} daripada ${(summary['rows'] as List?)?.length ?? 0}'),
       ),
@@ -418,12 +460,14 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           onChanged: (v) => setState(() => _searchQuery = v),
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
-            hintText: AppSettings.t('Search worker or project', '搜索工人或项目', 'Cari pekerja atau projek'),
+            hintText: AppSettings.t('Search worker or project', '搜索工人或项目',
+                'Cari pekerja atau projek'),
             prefixIcon: const Icon(Icons.search_rounded, size: 20),
             isDense: true,
             filled: true,
             fillColor: AppColors.bgCard,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             border: OutlineInputBorder(
               borderRadius: AppRadius.rMd,
               borderSide: BorderSide(color: AppColors.border),
@@ -502,10 +546,14 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           child: sectionCard(
             child: GuidedEmptyState(
               compact: true,
-              icon: rowsAll.isEmpty ? Icons.event_busy_rounded : Icons.search_off_rounded,
+              icon: rowsAll.isEmpty
+                  ? Icons.event_busy_rounded
+                  : Icons.search_off_rounded,
               title: rowsAll.isEmpty
-                  ? AppSettings.t('No attendance today', '今天还没有打卡记录', 'Tiada kehadiran hari ini')
-                  : AppSettings.t('No worker matches', '没有匹配的工人', 'Tiada pekerja sepadan'),
+                  ? AppSettings.t('No attendance today', '今天还没有打卡记录',
+                      'Tiada kehadiran hari ini')
+                  : AppSettings.t(
+                      'No worker matches', '没有匹配的工人', 'Tiada pekerja sepadan'),
               description: rowsAll.isEmpty
                   ? AppSettings.t(
                       'Nobody has clocked in yet. Pull down or tap refresh to check again.',
@@ -519,8 +567,11 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     ),
               primaryLabel: rowsAll.isEmpty
                   ? AppSettings.t('Refresh', '刷新', 'Muat semula')
-                  : AppSettings.t('Reset filters', '重置筛选', 'Set semula penapis'),
-              primaryIcon: rowsAll.isEmpty ? Icons.refresh_rounded : Icons.filter_alt_off_rounded,
+                  : AppSettings.t(
+                      'Reset filters', '重置筛选', 'Set semula penapis'),
+              primaryIcon: rowsAll.isEmpty
+                  ? Icons.refresh_rounded
+                  : Icons.filter_alt_off_rounded,
               onPrimary: () {
                 if (rowsAll.isEmpty) {
                   _refreshCurrent();
@@ -582,7 +633,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           child: Text(
             title,
             style: GoogleFonts.inter(
-                fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary),
           ),
         ),
         if (trailing != null)
@@ -606,7 +659,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             children: [
               for (var j = 0; j < perRow; j++) ...[
                 Expanded(
-                  child: j < slice.length ? _kpiTile(slice[j]) : const SizedBox(),
+                  child:
+                      j < slice.length ? _kpiTile(slice[j]) : const SizedBox(),
                 ),
                 if (j != perRow - 1) const SizedBox(width: 8),
               ],
@@ -634,7 +688,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                   k.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.textMuted),
+                  style: GoogleFonts.inter(
+                      fontSize: 11.5, color: AppColors.textMuted),
                 ),
               ),
             ],
@@ -674,22 +729,25 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     }
 
     final days = _weekDays;
-    final checkIns = days.fold<int>(0, (a, d) => a + _asInt(d['check_in_count']));
-    final presentSum = days.fold<int>(0, (a, d) => a + _asInt(d['present_workers']));
+    final checkIns =
+        days.fold<int>(0, (a, d) => a + _asInt(d['check_in_count']));
+    final presentSum =
+        days.fold<int>(0, (a, d) => a + _asInt(d['present_workers']));
     final avgPresent = days.isEmpty ? 0 : (presentSum / days.length).round();
     final todayRow = days.where((d) => d['is_today'] == true).toList();
-    final todayPresent = todayRow.isEmpty ? 0 : _asInt(todayRow.first['present_workers']);
+    final todayPresent =
+        todayRow.isEmpty ? 0 : _asInt(todayRow.first['present_workers']);
 
     return [
       _kpiStrip([
-        _Kpi(AppSettings.t('Days', '统计天数', 'Hari'), '${days.length}', AppColors.textPrimary,
-            Icons.date_range_rounded),
-        _Kpi(AppSettings.t('Check-ins', '打卡次数', 'Daftar masuk'), '$checkIns', AppColors.blue,
-            Icons.fingerprint_rounded),
-        _Kpi(AppSettings.t('Avg present', '日均出勤', 'Purata hadir'), '$avgPresent',
-            AppColors.green, Icons.trending_up_rounded),
-        _Kpi(AppSettings.t('Today', '今日出勤', 'Hari ini'), '$todayPresent', AppColors.yellow,
-            Icons.today_rounded),
+        _Kpi(AppSettings.t('Days', '统计天数', 'Hari'), '${days.length}',
+            AppColors.textPrimary, Icons.date_range_rounded),
+        _Kpi(AppSettings.t('Check-ins', '打卡次数', 'Daftar masuk'), '$checkIns',
+            AppColors.blue, Icons.fingerprint_rounded),
+        _Kpi(AppSettings.t('Avg present', '日均出勤', 'Purata hadir'),
+            '$avgPresent', AppColors.green, Icons.trending_up_rounded),
+        _Kpi(AppSettings.t('Today', '今日出勤', 'Hari ini'), '$todayPresent',
+            AppColors.yellow, Icons.today_rounded),
       ]),
       const SizedBox(height: 12),
       sectionCard(
@@ -697,15 +755,19 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _sectionHeader(
-              AppSettings.t('Check-ins this week', '本周打卡趋势', 'Daftar masuk minggu ini'),
-              days.isEmpty ? null : AppSettings.t('Mon – Sun', '周一至周日', 'Isnin – Ahad'),
+              AppSettings.t(
+                  'Check-ins this week', '本周打卡趋势', 'Daftar masuk minggu ini'),
+              days.isEmpty
+                  ? null
+                  : AppSettings.t('Mon – Sun', '周一至周日', 'Isnin – Ahad'),
             ),
             const SizedBox(height: 14),
             if (days.isEmpty)
               GuidedEmptyState(
                 compact: true,
                 icon: Icons.bar_chart_rounded,
-                title: AppSettings.t('No weekly data', '暂无本周数据', 'Tiada data mingguan'),
+                title: AppSettings.t(
+                    'No weekly data', '暂无本周数据', 'Tiada data mingguan'),
                 description: AppSettings.t(
                   'The weekly endpoint returned no days yet.',
                   '周统计接口暂未返回数据。',
@@ -734,7 +796,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                 '数据来源：/attendance/weekly-stats。该接口仅返回公司级每日统计，没有项目维度拆分，因此此处不做项目筛选。',
                 'Sumber: /attendance/weekly-stats. Endpoint ini hanya memulangkan kiraan harian seluruh syarikat tanpa pecahan projek.',
               ),
-              style: GoogleFonts.inter(fontSize: 11.5, height: 1.45, color: AppColors.textMuted),
+              style: GoogleFonts.inter(
+                  fontSize: 11.5, height: 1.45, color: AppColors.textMuted),
             ),
           ],
         ),
@@ -748,8 +811,10 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       if (days.isEmpty)
         sectionCard(
           child: Text(
-            AppSettings.t('Nothing to break down yet.', '暂无可展开的每日明细。', 'Tiada pecahan untuk dipaparkan.'),
-            style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.textSecondary),
+            AppSettings.t('Nothing to break down yet.', '暂无可展开的每日明细。',
+                'Tiada pecahan untuk dipaparkan.'),
+            style: GoogleFonts.inter(
+                fontSize: 12.5, color: AppColors.textSecondary),
           ),
         )
       else
@@ -759,7 +824,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             children: [
               for (var i = 0; i < days.length; i++) ...[
                 _dayRow(days[i]),
-                if (i != days.length - 1) Divider(height: 1, color: AppColors.border),
+                if (i != days.length - 1)
+                  Divider(height: 1, color: AppColors.border),
               ],
             ],
           ),
@@ -800,13 +866,16 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           Expanded(
             child: Text(
               dateRaw.length >= 10 ? dateRaw.substring(0, 10) : dateRaw,
-              style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+              style:
+                  GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
             ),
           ),
           Text(
             AppSettings.t('$present present', '$present 人出勤', '$present hadir'),
             style: GoogleFonts.inter(
-                fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary),
           ),
           const SizedBox(width: 10),
           Container(
@@ -818,7 +887,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             child: Text(
               '$checkIns',
               style: GoogleFonts.inter(
-                  fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.blue),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.blue),
             ),
           ),
           if (isToday) ...[
@@ -832,7 +903,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
               child: Text(
                 AppSettings.t('Today', '今天', 'Hari ini'),
                 style: GoogleFonts.inter(
-                    fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.accentText),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.accentText),
               ),
             ),
           ],
@@ -848,8 +921,10 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
   List<Widget> _monthSections() {
     final now = DateTime.now();
     final monthLabel = '${_monthNames[now.month - 1]} ${now.year}';
-    final checkIns = _weekDays.fold<int>(0, (a, d) => a + _asInt(d['check_in_count']));
-    final presentSum = _weekDays.fold<int>(0, (a, d) => a + _asInt(d['present_workers']));
+    final checkIns =
+        _weekDays.fold<int>(0, (a, d) => a + _asInt(d['check_in_count']));
+    final presentSum =
+        _weekDays.fold<int>(0, (a, d) => a + _asInt(d['present_workers']));
     final first = now.subtract(Duration(days: now.weekday - 1));
     final last = first.add(const Duration(days: 6));
 
@@ -876,7 +951,9 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                     AppSettings.t('Month totals are not available yet',
                         '月度汇总暂不可用', 'Jumlah bulanan belum tersedia'),
                     style: GoogleFonts.inter(
-                        fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary),
                   ),
                 ),
               ],
@@ -888,14 +965,17 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
                 '$monthLabel 暂无月度汇总：后端只提供单日汇总（/attendance/today）与周一至周日窗口（/attendance/weekly-stats）。此处若给出月度数字即为伪造，因此改为展示已核实的 7 天窗口数据。',
                 '$monthLabel tidak dapat diagregat: backend hanya menyediakan ringkasan sehari (/attendance/today) dan tetingkap Isnin–Ahad (/attendance/weekly-stats).',
               ),
-              style: GoogleFonts.inter(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
+              style: GoogleFonts.inter(
+                  fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
             AppButton(
               label: _weekDays.isEmpty
                   ? AppSettings.t('Load this week', '加载本周数据', 'Muat minggu ini')
                   : AppSettings.t('Open this week', '查看本周', 'Buka minggu ini'),
-              icon: _weekDays.isEmpty ? Icons.download_rounded : Icons.arrow_forward_rounded,
+              icon: _weekDays.isEmpty
+                  ? Icons.download_rounded
+                  : Icons.arrow_forward_rounded,
               tone: AppButtonTone.secondary,
               height: 46,
               loading: _weekLoading,
@@ -914,7 +994,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
       ),
       const SizedBox(height: 12),
       _sectionHeader(
-        AppSettings.t('Verified 7-day window', '已核实的 7 天窗口', 'Tetingkap 7 hari disahkan'),
+        AppSettings.t(
+            'Verified 7-day window', '已核实的 7 天窗口', 'Tetingkap 7 hari disahkan'),
         '${_fmtDate(first)} – ${_fmtDate(last)}',
       ),
       const SizedBox(height: 10),
@@ -923,7 +1004,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
           child: GuidedEmptyState(
             compact: true,
             icon: Icons.calendar_month_rounded,
-            title: AppSettings.t('No 7-day data loaded', '尚未加载 7 天数据', 'Data 7 hari belum dimuatkan'),
+            title: AppSettings.t('No 7-day data loaded', '尚未加载 7 天数据',
+                'Data 7 hari belum dimuatkan'),
             description: AppSettings.t(
               'Tap the button above to load the current Mon–Sun attendance counts.',
               '点击上方按钮加载本周周一至周日的考勤统计。',
@@ -938,8 +1020,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
         _kpiStrip([
           _Kpi(AppSettings.t('Check-ins', '打卡次数', 'Daftar masuk'), '$checkIns',
               AppColors.blue, Icons.fingerprint_rounded),
-          _Kpi(AppSettings.t('Present (sum)', '出勤人次', 'Jumlah hadir'), '$presentSum',
-              AppColors.green, Icons.groups_rounded),
+          _Kpi(AppSettings.t('Present (sum)', '出勤人次', 'Jumlah hadir'),
+              '$presentSum', AppColors.green, Icons.groups_rounded),
           _Kpi(AppSettings.t('Days', '天数', 'Hari'), '${_weekDays.length}',
               AppColors.textPrimary, Icons.date_range_rounded),
           _Kpi(
@@ -956,7 +1038,8 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
             children: [
               for (var i = 0; i < _weekDays.length; i++) ...[
                 _dayRow(_weekDays[i]),
-                if (i != _weekDays.length - 1) Divider(height: 1, color: AppColors.border),
+                if (i != _weekDays.length - 1)
+                  Divider(height: 1, color: AppColors.border),
               ],
             ],
           ),

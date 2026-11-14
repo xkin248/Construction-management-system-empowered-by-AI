@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -41,7 +41,13 @@ router = APIRouter(tags=["🤖 Tasks & AI Assignment"])
 STATUS_TO_PROGRESS = {
     "pending": 0,
     "in_progress": 50,
+    # A worker has supplied the final evidence, but a supervisor still has to
+    # accept or reject it.  It is intentionally 100% work-progress while not
+    # being a completed/approved task for reporting purposes.
+    "submitted": 100,
+    "approved": 100,
     "completed": 100,
+    "rejected": 99,
 }
 
 
@@ -69,12 +75,20 @@ def _authorize_task_access(db: Session, task: Task, user: CurrentUser) -> None:
 # definition the API validates against.
 TASK_STATUS_TRANSITIONS = {
     "pending": {"in_progress"},
-    "in_progress": {"completed", "pending"},
+    # ``completed`` remains a legacy supervisor-only compatibility state.
+    # Field workers submit evidence through /complete, which lands at
+    # ``submitted`` and therefore cannot silently bypass review.
+    "in_progress": {"submitted", "completed", "pending"},
+    "submitted": {"approved", "rejected"},
+    "rejected": {"in_progress", "submitted"},
+    "approved": {"in_progress", "pending"},
     "completed": {"in_progress", "pending"},
 }
 
 # Edges that may only be traversed through POST /tasks/{id}/reopen.
 REOPEN_ONLY_TRANSITIONS = {
+    ("approved", "in_progress"),
+    ("approved", "pending"),
     ("completed", "in_progress"),
     ("completed", "pending"),
 }
@@ -82,6 +96,7 @@ REOPEN_ONLY_TRANSITIONS = {
 # Statuses a reopen may land on (a completed task never reopens straight back to
 # completed).
 REOPEN_TARGET_STATUSES = ("in_progress", "pending")
+TERMINAL_APPROVED_STATUSES = {"approved", "completed"}
 
 
 def _validate_status_transition(old_status: str, new_status: str, allow_reopen: bool = False) -> None:
@@ -96,8 +111,8 @@ def _validate_status_transition(old_status: str, new_status: str, allow_reopen: 
         raise HTTPException(
             400,
             f"Invalid task status transition: {old_status} -> {new_status}. "
-            "Allowed transitions: pending -> in_progress, in_progress -> completed, "
-            "in_progress -> pending.",
+            "Allowed transitions: pending -> in_progress; in_progress -> submitted; "
+            "submitted -> approved or rejected.",
         )
     if not allow_reopen and (old_status, new_status) in REOPEN_ONLY_TRANSITIONS:
         raise HTTPException(
@@ -108,21 +123,35 @@ def _validate_status_transition(old_status: str, new_status: str, allow_reopen: 
         )
 
 
-def _recalc_project_progress(db: Session, project_id: int) -> None:
-    """Recompute project.progress = completed tasks / total tasks * 100.
+def _task_progress_value(task: Task) -> float:
+    """Return one task's actual work progress as a safe 0-100 number."""
+    raw = task.progress
+    if raw is None:
+        raw = STATUS_TO_PROGRESS.get((task.status or "pending").lower(), 0)
+    try:
+        return max(0.0, min(100.0, float(raw)))
+    except (TypeError, ValueError):
+        return 0.0
 
-    Called on task creation / status change so the project progress stays in
-    sync with its task board (progress closed loop). Supervisor can still
-    override progress manually via the project update endpoint; the next task
-    status change simply recalculates from tasks again.
+
+def _recalc_project_progress(db: Session, project_id: int) -> None:
+    """Recompute project.progress as the average task work progress.
+
+    Counting only completed rows made a project with ten 90%-finished tasks
+    appear as 0%.  Task weights are not captured yet, so an equal-weight average
+    is the honest interim model and keeps project progress aligned with the work
+    workers actually report.
     """
     project = db.query(Project).filter(Project.project_id == project_id).first()
     if not project:
         return
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
     total = len(tasks)
-    completed = sum(1 for t in tasks if t.status == "completed")
-    new_progress = round(completed / total * 100, 1) if total > 0 else 0.0
+    new_progress = (
+        round(sum(_task_progress_value(task) for task in tasks) / total, 1)
+        if total > 0
+        else 0.0
+    )
     if (project.progress or 0.0) != new_progress:
         project.progress = new_progress
         db.add(project)
@@ -147,7 +176,7 @@ def _recalc_project_status(db: Session, project_id: int) -> None:
     tasks = db.query(Task).filter(Task.project_id == project_id).all()
     if not tasks:
         new_status = "planning"
-    elif all(t.status == "completed" for t in tasks):
+    elif all((t.status or "").lower() in TERMINAL_APPROVED_STATUSES for t in tasks):
         new_status = "completed"
     else:
         # Any task exists (pending / in_progress / mixed): the project has left
@@ -306,6 +335,61 @@ def _notify_workers_assigned(db: Session, task: Task, worker_ids: List[int]) -> 
             send_to_device(worker.fcm_token, title, content, data)
 
 
+def _notify_task_review(
+    db: Session,
+    task: Task,
+    *,
+    decision: str,
+    reason: Optional[str] = None,
+) -> None:
+    """Write a durable worker notification for a supervisor review decision."""
+    from app.models import WorkerNotification
+    from app.services.fcm import send_to_device
+
+    approved = decision == "approved"
+    title = "Task approved" if approved else "Task needs rework"
+    if approved:
+        content = f'Your task "{task.task_name}" was approved by the supervisor.'
+    else:
+        suffix = f" Reason: {reason}" if reason else ""
+        content = f'Your task "{task.task_name}" needs rework.{suffix}'
+    worker_ids = task.worker_ids or ([task.assigned_worker_id] if task.assigned_worker_id else [])
+    for worker_id in worker_ids:
+        worker = db.get(Worker, worker_id)
+        if not worker:
+            continue
+        db.add(WorkerNotification(
+            worker_id=worker_id,
+            title=title,
+            content=content,
+            related_entity_type="task",
+            related_entity_id=task.task_id,
+        ))
+        if worker.fcm_token:
+            send_to_device(worker.fcm_token, title, content, {
+                "type": "task_review",
+                "task_id": str(task.task_id),
+                "decision": decision,
+            })
+
+
+def _notify_supervisor_submission(db: Session, task: Task) -> None:
+    """Put a task-review action in the owning supervisor's notification inbox."""
+    from app.models import Notification
+
+    project = task.project or db.get(Project, task.project_id)
+    if not project or not project.supervisor_id:
+        return
+    db.add(Notification(
+        supervisor_id=project.supervisor_id,
+        notification_type="task_review",
+        title="Task evidence awaiting review",
+        content=f'"{task.task_name}" has been submitted with photo evidence.',
+        related_entity_type="task",
+        related_entity_id=task.task_id,
+    ))
+
+
 def _task_load_options():
     return (
         joinedload(Task.assigned_worker),
@@ -414,6 +498,26 @@ def list_tasks(
     return [_serialize_task(task) for task in tasks]
 
 
+@router.get("/tasks")
+def list_supervisor_tasks(
+    project_id: Optional[int] = Query(default=None),
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Return one supervisor-scoped task board without one request per project."""
+    query = (
+        db.query(Task)
+        .options(*_task_load_options())
+        .join(Project, Task.project_id == Project.project_id)
+        .filter(Project.supervisor_id == user.id)
+    )
+    if project_id is not None:
+        project_for_user(db, user, project_id, supervisor_only=True)
+        query = query.filter(Task.project_id == project_id)
+    tasks = query.order_by(Task.task_id.desc()).all()
+    return [_serialize_task(task) for task in tasks]
+
+
 @router.post("/tasks")
 def create_task(
     payload: Dict[str, Any],
@@ -489,8 +593,8 @@ def complete_task_with_photo(
     if not assigned:
         raise HTTPException(403, "This task is not assigned to you")
 
-    old_status = task.status or "pending"
-    is_resubmission = old_status == "completed"
+    old_status = (task.status or "pending").lower()
+    is_resubmission = old_status == "rejected"
     if is_resubmission:
         # Repeat-submission rule: the assigned worker may resubmit a completed
         # task, but only together with a fresh site photo. The newest evidence
@@ -503,7 +607,7 @@ def complete_task_with_photo(
                 "replace the completion evidence",
             )
     else:
-        _validate_status_transition(old_status, "completed")
+        _validate_status_transition(old_status, "submitted")
 
     note = str(payload.get("completion_note") or "").strip() or None
     if not note and is_resubmission:
@@ -519,25 +623,70 @@ def complete_task_with_photo(
     _attach_completion_photo(task, payload, worker_id=worker.worker_id)
 
     task.completion_note = note
-    task.status = "completed"
+    task.status = "submitted"
     task.progress = 100
     # completed_at keeps the FIRST completion moment (audit), while
     # completion_photo_at always tracks the latest evidence submission.
-    if not is_resubmission:
-        task.completed_at = datetime.utcnow()
+    task.completed_at = None
 
     db.add(TaskProgressLog(
         task_id=task.task_id,
         from_status=old_status,
-        to_status="completed",
-        note=(f"Completion evidence updated: {note}" if is_resubmission else note),
-        action="status",
+        to_status="submitted",
+        note=(f"Resubmitted completion evidence: {note}" if is_resubmission else note),
+        action="submit",
     ))
+    _notify_supervisor_submission(db, task)
     db.flush()
     _recalc_project_progress(db, task.project_id)
     _recalc_project_status(db, task.project_id)
     db.commit()
 
+    task = db.query(Task).options(*_task_load_options()).get(task.task_id)
+    return _serialize_task(task)
+
+
+@router.post("/tasks/{task_id}/review")
+def review_submitted_task(
+    task_id: int,
+    payload: Dict[str, Any] = Body(default_factory=dict),
+    current_user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Approve or reject a worker submission with an auditable decision."""
+    task = db.query(Task).options(*_task_load_options()).get(task_id)
+    if not task:
+        raise HTTPException(404, "Task does not exist")
+    _authorize_task_access(db, task, current_user)
+    if (task.status or "").lower() != "submitted":
+        raise HTTPException(400, "Only submitted tasks can be reviewed")
+
+    decision = str(payload.get("decision") or "").strip().lower()
+    if decision not in {"approved", "rejected"}:
+        raise HTTPException(400, "decision must be 'approved' or 'rejected'")
+    reason = str(payload.get("reason") or "").strip()
+    if decision == "rejected" and not reason:
+        raise HTTPException(400, "reason is required when rejecting a task")
+
+    old_status = task.status
+    task.status = decision
+    task.progress = 100 if decision == "approved" else 99
+    task.completed_at = datetime.utcnow() if decision == "approved" else None
+    db.add(TaskProgressLog(
+        task_id=task.task_id,
+        from_status=old_status,
+        to_status=decision,
+        note=reason or "Evidence approved by supervisor",
+        action="approve" if decision == "approved" else "reject",
+        changed_by_id=current_user.id,
+        changed_by_name=current_user.name,
+        reason=reason or None,
+    ))
+    _notify_task_review(db, task, decision=decision, reason=reason or None)
+    db.flush()
+    _recalc_project_progress(db, task.project_id)
+    _recalc_project_status(db, task.project_id)
+    db.commit()
     task = db.query(Task).options(*_task_load_options()).get(task.task_id)
     return _serialize_task(task)
 
@@ -685,6 +834,16 @@ def update_task(
 
         old_status = task.status or "pending"
         new_status = _normalize_status(payload.get("status"), parsed_progress)
+        if new_status in {"submitted", "approved", "rejected"}:
+            raise HTTPException(
+                400,
+                "Use the completion and review endpoints for submitted task decisions",
+            )
+        if user.user_type == "worker" and parsed_progress is not None and parsed_progress >= 100:
+            raise HTTPException(
+                400,
+                "Workers must use the completion endpoint to submit final evidence",
+            )
         status_changed = new_status != old_status
         if status_changed:
             _validate_status_transition(old_status, new_status)
@@ -740,7 +899,7 @@ def update_task(
                 action="status" if status_changed else "progress",
             ))
 
-        if status_changed:
+        if status_changed or progress_changed:
             db.flush()  # persist in-memory change so the recalc query sees it
             _recalc_project_progress(db, task.project_id)
             _recalc_project_status(db, task.project_id)
@@ -839,10 +998,10 @@ def reopen_task(
         )
 
     old_status = task.status or "pending"
-    if old_status != "completed":
+    if old_status not in TERMINAL_APPROVED_STATUSES:
         raise HTTPException(
             400,
-            f"Only a completed task can be reopened (current status: {old_status})",
+            f"Only an approved task can be reopened (current status: {old_status})",
         )
     # Reuse the shared state machine so the reopen edges stay declared in exactly
     # one place (allow_reopen opts into the completed -> * edges).

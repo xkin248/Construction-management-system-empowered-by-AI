@@ -65,7 +65,7 @@ class TaskCardState extends State<TaskCard> {
   /// Mirrors the "Overdue" segment of the list filter, so the card tag and the
   /// chip count always agree.
   bool _isOverdue() {
-    if (_status == 'completed') return false;
+    if (_status == 'completed' || _status == 'approved') return false;
     final raw = _dueDate;
     if (raw == null || raw.isEmpty) return false;
     final d = DateTime.tryParse(raw);
@@ -91,8 +91,7 @@ class TaskCardState extends State<TaskCard> {
       ]);
     }
     final parsed = DateTime.tryParse(_dueDate!);
-    final display =
-        parsed != null ? DateHelper.formatShort(parsed) : _dueDate!;
+    final display = parsed != null ? DateHelper.formatShort(parsed) : _dueDate!;
     final color = _dueColor();
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(Icons.calendar_today_outlined, size: 12, color: color),
@@ -108,8 +107,7 @@ class TaskCardState extends State<TaskCard> {
   }
 
   Future<void> _editDueDate() async {
-    final init =
-        _dueDate != null ? DateTime.tryParse(_dueDate!) : null;
+    final init = _dueDate != null ? DateTime.tryParse(_dueDate!) : null;
     final picked = await showDatePicker(
       context: context,
       initialDate: init ?? DateTime.now(),
@@ -240,7 +238,59 @@ class TaskCardState extends State<TaskCard> {
     }
   }
 
-  /// Reopen a completed task through the dedicated supervisor endpoint.
+  Future<void> _reviewTask(String decision) async {
+    String? reason;
+    if (decision == 'rejected') {
+      final controller = TextEditingController();
+      final rejected = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Request rework'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Reason for rework',
+              hintText: 'Tell the worker what needs to be fixed.',
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isEmpty) {
+                  toast('A rework reason is required.');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Request rework'),
+            ),
+          ],
+        ),
+      );
+      if (rejected != true) return;
+      reason = controller.text.trim();
+    }
+    try {
+      final result = await ApiService()
+          .reviewTask(widget.task['task_id'], decision, reason: reason);
+      final status = (result['status'] ?? decision).toString();
+      setState(() => _status = status);
+      widget.task['status'] = status;
+      widget.task['progress'] = result['progress'];
+      widget.onChanged?.call();
+      TaskStatusNotifier.notify();
+      toast(decision == 'approved' ? 'Task approved.' : 'Rework requested.');
+    } catch (_) {
+      toast('Could not save the review. Please try again.');
+    }
+  }
+
+  /// Reopen an approved task through the dedicated supervisor endpoint.
   ///
   /// `completed` is forward-only for [ApiService.updateTask] (the backend
   /// rejects the backward edge on PUT so a stray edit cannot undo a sign-off),
@@ -276,9 +326,8 @@ class TaskCardState extends State<TaskCard> {
                       child: ElevatedButton(
                         onPressed: () => setDialogState(() => target = opt),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: target == opt
-                              ? AppColors.blue
-                              : AppColors.border,
+                          backgroundColor:
+                              target == opt ? AppColors.blue : AppColors.border,
                           foregroundColor: target == opt
                               ? AppColors.onAccent
                               : AppColors.textMuted,
@@ -371,28 +420,48 @@ class TaskCardState extends State<TaskCard> {
     }
     final progress = (widget.task['progress'] as num? ?? 0).toDouble();
     final isInProgress = _status == 'in_progress';
-    final isCompleted = _status == 'completed';
+    final isSubmitted = _status == 'submitted';
+    final isRejected = _status == 'rejected';
+    final isCompleted = _status == 'completed' || _status == 'approved';
 
     final leadIcon = isCompleted
         ? _SpinningOrIcon(
             icon: Icons.check_circle_rounded,
             color: AppColors.green,
             spin: false)
-        : isInProgress
+        : isSubmitted
             ? _SpinningOrIcon(
-                icon: Icons.settings_rounded,
-                color: AppColors.blue,
-                spin: true)
-            : _SpinningOrIcon(
-                icon: Icons.radio_button_unchecked_rounded,
-                color: AppColors.textMuted,
-                spin: false);
+                icon: Icons.rate_review_rounded,
+                color: AppColors.warning,
+                spin: false)
+            : isRejected
+                ? _SpinningOrIcon(
+                    icon: Icons.assignment_late_rounded,
+                    color: AppColors.danger,
+                    spin: false)
+                : isInProgress
+                    ? _SpinningOrIcon(
+                        icon: Icons.settings_rounded,
+                        color: AppColors.blue,
+                        spin: true)
+                    : _SpinningOrIcon(
+                        icon: Icons.radio_button_unchecked_rounded,
+                        color: AppColors.textMuted,
+                        spin: false);
 
-    final barColor =
-        isCompleted ? AppColors.green : isInProgress ? AppColors.blue : AppColors.yellow;
+    final barColor = isCompleted
+        ? AppColors.green
+        : isSubmitted
+            ? AppColors.warning
+            : isRejected
+                ? AppColors.danger
+                : isInProgress
+                    ? AppColors.blue
+                    : AppColors.yellow;
 
     return Container(
-      margin: widget.inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
+      margin:
+          widget.inGrid ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
@@ -402,142 +471,173 @@ class TaskCardState extends State<TaskCard> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Navigable section (header + progress + worker/due) ──
         semanticTapTarget(
-          label: (widget.task['task_name'] ?? 'Task').toString(),
-          child: InkWell(
-          borderRadius: AppRadius.rMd,
-          onTap: () async {
-            final changed = await Navigator.push<bool>(context,
-                MaterialPageRoute(builder: (_) => TaskDetailPage(task: widget.task)));
-            if (changed == true) widget.onChanged?.call();
-          },
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Title row
-            Row(children: [
-              leadIcon,
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(widget.task['task_name'] ?? '-',
-                    style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              const SizedBox(width: 8),
-              _StatusTag(status: _status, overdue: _isOverdue()),
-            ]),
-            const SizedBox(height: 6),
-            Padding(
-              padding: const EdgeInsets.only(left: 32),
-              child: Row(children: [
-                _PriorityBadge(priority: priority),
-                const SizedBox(width: 8),
-                Text('${progress.toStringAsFixed(0)}%',
-                    style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary)),
-              ]),
-            ),
-            if (widget.task['project_name'] != null ||
-                (widget.task['project'] != null)) ...[
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(left: 32),
-                child: Row(children: [
-                  Icon(Icons.apartment_rounded,
-                      size: 12, color: AppColors.textMuted),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                        widget.task['project_name'] ??
-                            widget.task['project']?['project_name'] ??
-                            '',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: AppColors.textMuted)),
-                  ),
-                ]),
-              ),
-            ],
-            const SizedBox(height: 12),
-            // Progress bar
-            ClipRRect(
+            label: (widget.task['task_name'] ?? 'Task').toString(),
+            child: InkWell(
               borderRadius: AppRadius.rMd,
-              child: LinearProgressIndicator(
-                value: progress / 100,
-                minHeight: 6,
-                backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(barColor),
-              ),
-            ),
-            // Required skill level (one of the four trades) + crew size
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.only(left: 32),
-              child: Wrap(spacing: 6, runSpacing: 6, children: [
-                _MetaChip(
-                  icon: Icons.engineering_rounded,
-                  label: widget.task['trade'] != null
-                      ? TradeLevels.label(widget.task['trade'] as String)
-                      : AppStrings.t('tasks.generalWorker'),
-                  fg: AppColors.accent,
-                  bg: AppColors.accent.withValues(alpha: 0.10),
-                ),
-                _MetaChip(
-                  icon: Icons.people_alt_rounded,
-                  label: workers.isEmpty
-                      ? AppStrings.t('tasks.unassigned')
-                      : '${workers.length} ${AppStrings.t('tasks.assignedCount')}',
-                  fg: AppColors.textSecondary,
-                  bg: AppColors.bgMain,
-                ),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            // Worker + due date row
-            Row(children: [
-              if (workers.isNotEmpty) ...[
-                initialsAvatar(workers.first['name'] ?? '?', radius: 11),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    workers.length > 1
-                        ? '${workers.first['name'] ?? ''} +${workers.length - 1} more'
-                        : (workers.first['name'] ?? ''),
-                    style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ] else
-                Text(AppStrings.t('tasks.unassigned'),
-                    style:
-                        GoogleFonts.inter(fontSize: 14, color: AppColors.textMuted)),
-              const Spacer(),
-              // Tap due date to quickly edit
-              semanticTapTarget(
-                label: 'Edit due date',
-                child: GestureDetector(
-                onTap: _editDueDate,
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _dueLabel(),
-                ),
-              )),
-            ]),
-          ]),
-        )),
+              onTap: () async {
+                final changed = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => TaskDetailPage(task: widget.task)));
+                if (changed == true) widget.onChanged?.call();
+              },
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title row
+                    Row(children: [
+                      leadIcon,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(widget.task['task_name'] ?? '-',
+                            style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary),
+                            overflow: TextOverflow.ellipsis),
+                      ),
+                      const SizedBox(width: 8),
+                      _StatusTag(status: _status, overdue: _isOverdue()),
+                    ]),
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32),
+                      child: Row(children: [
+                        _PriorityBadge(priority: priority),
+                        const SizedBox(width: 8),
+                        Text('${progress.toStringAsFixed(0)}%',
+                            style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textSecondary)),
+                      ]),
+                    ),
+                    if (widget.task['project_name'] != null ||
+                        (widget.task['project'] != null)) ...[
+                      const SizedBox(height: 4),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 32),
+                        child: Row(children: [
+                          Icon(Icons.apartment_rounded,
+                              size: 12, color: AppColors.textMuted),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                                widget.task['project_name'] ??
+                                    widget.task['project']?['project_name'] ??
+                                    '',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                    fontSize: 12, color: AppColors.textMuted)),
+                          ),
+                        ]),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    // Progress bar
+                    ClipRRect(
+                      borderRadius: AppRadius.rMd,
+                      child: LinearProgressIndicator(
+                        value: progress / 100,
+                        minHeight: 6,
+                        backgroundColor: AppColors.border,
+                        valueColor: AlwaysStoppedAnimation(barColor),
+                      ),
+                    ),
+                    // Required skill level (one of the four trades) + crew size
+                    const SizedBox(height: 10),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 32),
+                      child: Wrap(spacing: 6, runSpacing: 6, children: [
+                        _MetaChip(
+                          icon: Icons.engineering_rounded,
+                          label: widget.task['trade'] != null
+                              ? TradeLevels.label(
+                                  widget.task['trade'] as String)
+                              : AppStrings.t('tasks.generalWorker'),
+                          fg: AppColors.accent,
+                          bg: AppColors.accent.withValues(alpha: 0.10),
+                        ),
+                        _MetaChip(
+                          icon: Icons.people_alt_rounded,
+                          label: workers.isEmpty
+                              ? AppStrings.t('tasks.unassigned')
+                              : '${workers.length} ${AppStrings.t('tasks.assignedCount')}',
+                          fg: AppColors.textSecondary,
+                          bg: AppColors.bgMain,
+                        ),
+                      ]),
+                    ),
+                    const SizedBox(height: 12),
+                    // Worker + due date row
+                    Row(children: [
+                      if (workers.isNotEmpty) ...[
+                        initialsAvatar(workers.first['name'] ?? '?',
+                            radius: 11),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            workers.length > 1
+                                ? '${workers.first['name'] ?? ''} +${workers.length - 1} more'
+                                : (workers.first['name'] ?? ''),
+                            style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ] else
+                        Text(AppStrings.t('tasks.unassigned'),
+                            style: GoogleFonts.inter(
+                                fontSize: 14, color: AppColors.textMuted)),
+                      const Spacer(),
+                      // Tap due date to quickly edit
+                      semanticTapTarget(
+                          label: 'Edit due date',
+                          child: GestureDetector(
+                            onTap: _editDueDate,
+                            behavior: HitTestBehavior.opaque,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: _dueLabel(),
+                            ),
+                          )),
+                    ]),
+                  ]),
+            )),
         const SizedBox(height: 12),
         // ── Status quick-toggle (does not navigate) ──
         // A completed task is forward-only for the normal status buttons, so
         // offering them would just produce a rejected request. Swap the row for
         // the audited reopen action instead.
-        if (isCompleted)
+        if (isSubmitted)
+          Row(children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _reviewTask('approved'),
+                icon: const Icon(Icons.verified_rounded, size: 18),
+                label: const Text('Approve'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: AppColors.onAccent,
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _reviewTask('rejected'),
+                icon: const Icon(Icons.assignment_late_rounded, size: 18),
+                label: const Text('Request rework'),
+                style:
+                    OutlinedButton.styleFrom(foregroundColor: AppColors.danger),
+              ),
+            ),
+          ])
+        else if (isCompleted)
           SizedBox(
             height: 32,
             width: double.infinity,
@@ -598,12 +698,11 @@ class TaskCardState extends State<TaskCard> {
             foregroundColor: fg,
             padding: EdgeInsets.zero,
             elevation: 0,
-            shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.rMd),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
           ),
           child: Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 13, fontWeight: FontWeight.w700)),
+              style:
+                  GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700)),
         ),
       ),
     );
@@ -630,6 +729,18 @@ class _StatusTag extends StatelessWidget {
       case 'completed':
         icon = Icons.check_circle_rounded;
         label = AppStrings.t('tasks.completed');
+        break;
+      case 'approved':
+        icon = Icons.verified_rounded;
+        label = 'Approved';
+        break;
+      case 'submitted':
+        icon = Icons.rate_review_rounded;
+        label = 'Awaiting review';
+        break;
+      case 'rejected':
+        icon = Icons.assignment_late_rounded;
+        label = 'Rework required';
         break;
       case 'in_progress':
         icon = Icons.timelapse_rounded;
@@ -694,17 +805,26 @@ class _PriorityBadge extends StatelessWidget {
     final String label;
     switch (priority.toLowerCase()) {
       case 'high':
-        label = AppStrings.t('tasks.high'); bg = AppColors.redLight; fg = AppColors.red; break;
+        label = AppStrings.t('tasks.high');
+        bg = AppColors.redLight;
+        fg = AppColors.red;
+        break;
       case 'medium':
-        label = AppStrings.t('tasks.medium'); bg = AppColors.yellowLight; fg = AppColors.yellow; break;
+        label = AppStrings.t('tasks.medium');
+        bg = AppColors.yellowLight;
+        fg = AppColors.yellow;
+        break;
       default:
-        label = AppStrings.t('tasks.low'); bg = AppColors.blueLight; fg = AppColors.blue;
+        label = AppStrings.t('tasks.low');
+        bg = AppColors.blueLight;
+        fg = AppColors.blue;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(color: bg, borderRadius: AppRadius.rMd),
       child: Text(label,
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
+          style: GoogleFonts.inter(
+              fontSize: 14, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 }
@@ -713,12 +833,14 @@ class _SpinningOrIcon extends StatefulWidget {
   final IconData icon;
   final Color color;
   final bool spin;
-  const _SpinningOrIcon({required this.icon, required this.color, required this.spin});
+  const _SpinningOrIcon(
+      {required this.icon, required this.color, required this.spin});
   @override
   State<_SpinningOrIcon> createState() => _SpinningOrIconState();
 }
 
-class _SpinningOrIconState extends State<_SpinningOrIcon> with SingleTickerProviderStateMixin {
+class _SpinningOrIconState extends State<_SpinningOrIcon>
+    with SingleTickerProviderStateMixin {
   // Nullable on purpose: the controller (and its ticker) must only be created
   // from a live element. A `late final` initializer would run inside dispose()
   // when the widget never started spinning, and creating a ticker on an already
@@ -727,8 +849,9 @@ class _SpinningOrIconState extends State<_SpinningOrIcon> with SingleTickerProvi
   AnimationController? _ctrl;
 
   // Same duration / repeat behaviour as before, created on first use.
-  AnimationController get _controller =>
-      _ctrl ??= AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+  AnimationController get _controller => _ctrl ??=
+      AnimationController(vsync: this, duration: const Duration(seconds: 3))
+        ..repeat();
 
   @override
   void dispose() {

@@ -28,9 +28,34 @@ def _derived_project_status(project) -> str:
     tasks = list(project.tasks or [])
     if not tasks:
         return "planning"
-    if all(t.status == "completed" for t in tasks):
+    if all((t.status or "").lower() in {"approved", "completed"} for t in tasks):
         return "completed"
     return "in_progress"
+
+
+def _derived_project_progress(project) -> float:
+    """Average real task progress instead of only counting completed rows."""
+    tasks = list(project.tasks or [])
+    if not tasks:
+        return float(project.progress or 0.0)
+    status_progress = {
+        "pending": 0,
+        "in_progress": 50,
+        "submitted": 100,
+        "approved": 100,
+        "completed": 100,
+        "rejected": 99,
+    }
+    values = []
+    for task in tasks:
+        raw = task.progress
+        if raw is None:
+            raw = status_progress.get((task.status or "pending").lower(), 0)
+        try:
+            values.append(max(0.0, min(100.0, float(raw))))
+        except (TypeError, ValueError):
+            values.append(0.0)
+    return round(sum(values) / len(values), 1)
 
 
 @router.get("/projects", response_model=List[ProjectOut])
@@ -44,12 +69,10 @@ def lp(user: CurrentUser = Depends(require_any_authorized), db=Depends(get_db)):
             return []
         query = query.filter(Project.project_id == worker.project_id)
     projects = query.order_by(Project.project_id.desc()).all()
-    # Dynamically compute progress: projects with tasks show task completion rate; projects without tasks keep the manual value (not persisted)
+    # Compute actual work progress. Submitted evidence counts as work done while
+    # the status remains in-progress until a supervisor approves it.
     for p in projects:
-        total = len(p.tasks)
-        if total > 0:
-            done = sum(1 for t in p.tasks if t.status == "completed")
-            p.progress = round(done / total * 100, 1)
+        p.progress = _derived_project_progress(p)
         p.status = _derived_project_status(p)  # read-derived, not written back
     return projects
 
@@ -73,6 +96,7 @@ def cp(
 @router.get("/projects/{pid}", response_model=ProjectOut)
 def gp(pid: int, user: CurrentUser = Depends(require_any_authorized), db=Depends(get_db)):
     p = project_for_user(db, user, pid)
+    p.progress = _derived_project_progress(p)
     p.status = _derived_project_status(p)  # read-derived, not written back
     return p
 

@@ -5,6 +5,7 @@ import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
+import '../services/project_scope.dart';
 import '../services/task_status_notifier.dart';
 import '../l10n/app_strings.dart';
 import '../widgets/task_form.dart';
@@ -44,6 +45,8 @@ class _TasksPageState extends State<TasksPage> {
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
     TaskStatusNotifier.addListener(_onExternalTaskChange);
+    ProjectScope.activeProjectId.addListener(_onProjectScopeChanged);
+    pid = ProjectScope.activeProjectId.value;
     _load();
   }
 
@@ -57,6 +60,7 @@ class _TasksPageState extends State<TasksPage> {
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
     TaskStatusNotifier.removeListener(_onExternalTaskChange);
+    ProjectScope.activeProjectId.removeListener(_onProjectScopeChanged);
     super.dispose();
   }
 
@@ -65,6 +69,13 @@ class _TasksPageState extends State<TasksPage> {
   /// initState does not run again when the user switches back to Tasks —
   /// without this signal the main list keeps showing the stale status.
   void _onExternalTaskChange() {
+    _load();
+  }
+
+  void _onProjectScopeChanged() {
+    final next = ProjectScope.activeProjectId.value;
+    if (pid == next) return;
+    setState(() => pid = next);
     _load();
   }
 
@@ -77,10 +88,8 @@ class _TasksPageState extends State<TasksPage> {
       // A project may have been removed while this tab remained alive in the
       // shell. Refresh the list before using its saved filter value.
       projects = await ProjectCache.get(ApiService(), forceRefresh: true);
-      final validIds = projects
-          .map((p) => p['project_id'])
-          .whereType<int>()
-          .toSet();
+      final validIds =
+          projects.map((p) => p['project_id']).whereType<int>().toSet();
       if (pid != null && !validIds.contains(pid)) pid = null;
       if (projects.isNotEmpty) {
         // Default to ALL projects so a supervisor sees every task instead of
@@ -102,17 +111,18 @@ class _TasksPageState extends State<TasksPage> {
   // projects (pid == null). Previously a supervisor without a project
   // switcher only ever saw the first project's tasks.
   Future<List> _loadTasks(int? targetPid) async {
-    if (targetPid != null) {
-      return await ApiService().getTasks(targetPid);
-    }
-    final all = await Future.wait(
-      projects.map((p) => ApiService().getTasks(p['project_id'] as int)),
-    );
-    return all.expand((t) => t).toList();
+    return ApiService().getSupervisorTasks(pid: targetPid);
   }
 
   Future<void> _switchProject(int? newPid) async {
-    setState(() { pid = newPid; ld = true; });
+    if (ProjectScope.activeProjectId.value != newPid) {
+      ProjectScope.select(newPid);
+      return;
+    }
+    setState(() {
+      pid = newPid;
+      ld = true;
+    });
     try {
       tasks = await _loadTasks(newPid);
     } finally {
@@ -121,7 +131,10 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   void _openNewTask() async {
-    if (projects.isEmpty) { toast('Create a project first'); return; }
+    if (projects.isEmpty) {
+      toast('Create a project first');
+      return;
+    }
     // pid may be null (viewing ALL projects); TaskForm falls back to the
     // first project and still lets the user switch projects inside the form.
     final created = await showDialog<bool>(
@@ -143,24 +156,28 @@ class _TasksPageState extends State<TasksPage> {
           physics: const AlwaysScrollableScrollPhysics(),
           child: SizedBox(
             height: c.maxHeight,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  TextButton.icon(
-                    onPressed: ld ? null : _load,
-                    icon: const Icon(Icons.refresh_rounded, size: 16),
-                    label: Text(AppStrings.t('common.retry')),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.accent,
-                      textStyle: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w700),
-                    ),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: ld ? null : _load,
+                            icon: const Icon(Icons.refresh_rounded, size: 16),
+                            label: Text(AppStrings.t('common.retry')),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.accent,
+                              textStyle: const TextStyle(
+                                  fontSize: 12.5, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ]),
                   ),
+                  Expanded(child: child),
                 ]),
-              ),
-              Expanded(child: child),
-            ]),
           ),
         );
       }),
@@ -168,13 +185,15 @@ class _TasksPageState extends State<TasksPage> {
   }
 
   /// Saved status of a task, lower-cased.
-  static String _statusOf(Map t) => (t['status'] as String? ?? '').toLowerCase();
+  static String _statusOf(Map t) =>
+      (t['status'] as String? ?? '').toLowerCase();
 
   /// Derived "Overdue": the task is still open but its due date already passed.
   /// The backend Task model has no overdue column, so this single rule feeds the
   /// card tag, the list filter and the segment counter alike.
   static bool _isOverdue(Map t) {
-    if (_statusOf(t) == 'completed') return false;
+    final status = _statusOf(t);
+    if (status == 'completed' || status == 'approved') return false;
     final due = DateTime.tryParse((t['due_date'] ?? '').toString());
     if (due == null) return false;
     final now = DateTime.now();
@@ -198,6 +217,10 @@ class _TasksPageState extends State<TasksPage> {
         return true;
       case 'Overdue':
         return _isOverdue(t);
+      case 'Awaiting Review':
+        return _statusOf(t) == 'submitted';
+      case 'Completed':
+        return _statusOf(t) == 'completed' || _statusOf(t) == 'approved';
       default:
         return _statusOf(t) == segment.toLowerCase().replaceAll(' ', '_');
     }
@@ -231,7 +254,8 @@ class _TasksPageState extends State<TasksPage> {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          constraints:
+              const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
@@ -246,7 +270,7 @@ class _TasksPageState extends State<TasksPage> {
                 worker: false,
               ),
               const SizedBox(height: 14),
-                            // ── Search + Filters ──
+              // ── Search + Filters ──
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: TaskFilterBar(
@@ -270,76 +294,85 @@ class _TasksPageState extends State<TasksPage> {
                     : (_loadError != null && tasks.isEmpty)
                         ? FailureState(error: _loadError, onRetry: _load)
                         : _filtered.isEmpty
-                        ? _refreshableEmpty(
-                            (_searchQuery.isEmpty &&
-                                    _statusFilter == 'All' &&
-                                    _priorityFilter == 'All')
-                                ? GuidedEmptyState(
-                                    icon: Icons.task_alt_rounded,
-                                    title: AppStrings.t('empty.tasks.title'),
-                                    description: AppStrings.t('empty.tasks.desc'),
-                                    primaryLabel: AppStrings.t('empty.tasks.action'),
-                                    onPrimary: _openNewTask,
-                                  )
-                                : FilteredEmptyState(
-                                    title: AppStrings.t('empty.tasks.noMatch'),
-                                    description:
-                                        AppStrings.t('empty.tasks.noMatchDesc'),
-                                    clearLabel: AppStrings.t('empty.clearFilters'),
-                                    onClear: () => setState(() {
-                                      _searchQuery = '';
-                                      _statusFilter = 'All';
-                                      _priorityFilter = 'All';
-                                    }),
-                                  ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: _load,
-                            child: AppScrollbar(
-                              controller: _scrollCtrl,
-                              child: LayoutBuilder(builder: (ctx, constraints) {
-                                // Two columns only when each card still gets a
-                                // comfortable width. The card carries a status
-                                // tag, a priority row and a skill/crew chip row,
-                                // so a fixed mainAxisExtent is used instead of
-                                // an aspect ratio to keep the taller content
-                                // from overflowing.
-                                final wide = constraints.maxWidth >= 900;
-                                // Filter once per build; the lazy lists below
-                                // only build the rows that become visible.
-                                final rows = _filtered;
-                                if (!wide) {
-                                  return ListView.builder(
-                                    controller: _scrollCtrl,
-                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                    itemCount: rows.length,
-                                    addAutomaticKeepAlives: false,
-                                    itemBuilder: (ctx, i) => TaskCard(
-                                      task: rows[i],
-                                      onChanged: _load,
-                                    ),
-                                  );
-                                }
-                                return GridView.builder(
+                            ? _refreshableEmpty(
+                                (_searchQuery.isEmpty &&
+                                        _statusFilter == 'All' &&
+                                        _priorityFilter == 'All')
+                                    ? GuidedEmptyState(
+                                        icon: Icons.task_alt_rounded,
+                                        title:
+                                            AppStrings.t('empty.tasks.title'),
+                                        description:
+                                            AppStrings.t('empty.tasks.desc'),
+                                        primaryLabel:
+                                            AppStrings.t('empty.tasks.action'),
+                                        onPrimary: _openNewTask,
+                                      )
+                                    : FilteredEmptyState(
+                                        title:
+                                            AppStrings.t('empty.tasks.noMatch'),
+                                        description: AppStrings.t(
+                                            'empty.tasks.noMatchDesc'),
+                                        clearLabel:
+                                            AppStrings.t('empty.clearFilters'),
+                                        onClear: () => setState(() {
+                                          _searchQuery = '';
+                                          _statusFilter = 'All';
+                                          _priorityFilter = 'All';
+                                        }),
+                                      ),
+                              )
+                            : RefreshIndicator(
+                                onRefresh: _load,
+                                child: AppScrollbar(
                                   controller: _scrollCtrl,
-                                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    mainAxisSpacing: AppSpacing.md,
-                                    crossAxisSpacing: AppSpacing.md,
-                                    mainAxisExtent: 272,
-                                  ),
-                                  itemCount: rows.length,
-                                  addAutomaticKeepAlives: false,
-                                  itemBuilder: (ctx, i) => TaskCard(
-                                    task: rows[i],
-                                    onChanged: _load,
-                                    inGrid: true,
-                                  ),
-                                );
-                              }),
-                            ),
-                          ),
+                                  child: LayoutBuilder(
+                                      builder: (ctx, constraints) {
+                                    // Two columns only when each card still gets a
+                                    // comfortable width. The card carries a status
+                                    // tag, a priority row and a skill/crew chip row,
+                                    // so a fixed mainAxisExtent is used instead of
+                                    // an aspect ratio to keep the taller content
+                                    // from overflowing.
+                                    final wide = constraints.maxWidth >= 900;
+                                    // Filter once per build; the lazy lists below
+                                    // only build the rows that become visible.
+                                    final rows = _filtered;
+                                    if (!wide) {
+                                      return ListView.builder(
+                                        controller: _scrollCtrl,
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 0, 16, 24),
+                                        itemCount: rows.length,
+                                        addAutomaticKeepAlives: false,
+                                        itemBuilder: (ctx, i) => TaskCard(
+                                          task: rows[i],
+                                          onChanged: _load,
+                                        ),
+                                      );
+                                    }
+                                    return GridView.builder(
+                                      controller: _scrollCtrl,
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 0, 16, 24),
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: AppSpacing.md,
+                                        crossAxisSpacing: AppSpacing.md,
+                                        mainAxisExtent: 272,
+                                      ),
+                                      itemCount: rows.length,
+                                      addAutomaticKeepAlives: false,
+                                      itemBuilder: (ctx, i) => TaskCard(
+                                        task: rows[i],
+                                        onChanged: _load,
+                                        inGrid: true,
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ),
               ),
             ]),
           ),
@@ -347,7 +380,6 @@ class _TasksPageState extends State<TasksPage> {
       ),
     );
   }
-
 }
 
 // ──────────────── Task Card ────────────────

@@ -67,7 +67,12 @@ def auth(email="boss@buildsmart.com", user_type="supervisor"):
 def test_state_machine_declares_reopen_edges_once():
     """The reopen edges live in TASK_STATUS_TRANSITIONS, tagged as reopen-only."""
     assert TASK_STATUS_TRANSITIONS["completed"] == {"in_progress", "pending"}
-    assert REOPEN_ONLY_TRANSITIONS == {("completed", "in_progress"), ("completed", "pending")}
+    assert REOPEN_ONLY_TRANSITIONS == {
+        ("completed", "in_progress"),
+        ("completed", "pending"),
+        ("approved", "in_progress"),
+        ("approved", "pending"),
+    }
     # Every reopen-only edge must be declared in the shared map and vice versa.
     declared = {(src, dst) for src, dsts in TASK_STATUS_TRANSITIONS.items() for dst in dsts}
     assert REOPEN_ONLY_TRANSITIONS <= declared
@@ -87,9 +92,62 @@ def test_validator_blocks_reopen_without_opt_in():
 def test_validator_allows_reopen_with_opt_in():
     _validate_status_transition("completed", "in_progress", allow_reopen=True)
     _validate_status_transition("completed", "pending", allow_reopen=True)
+    _validate_status_transition("approved", "in_progress", allow_reopen=True)
     # Unknown edges are still rejected even with the flag on.
     with pytest.raises(HTTPException):
         _validate_status_transition("pending", "completed", allow_reopen=True)
+
+
+def test_supervisor_review_approves_submitted_task(client, db):
+    p = make_project(db)
+    t = Task(
+        task_name="Review concrete finish",
+        project_id=p.project_id,
+        status="submitted",
+        progress=100,
+    )
+    db.add(t)
+    db.commit()
+    make_supervisor(db, name="Alice Tan")
+
+    resp = client.post(
+        f"/api/tasks/{t.task_id}/review",
+        json={"decision": "approved"},
+        headers=auth(),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "approved"
+
+    db.expire_all()
+    task = db.get(Task, t.task_id)
+    assert task.status == "approved"
+    assert task.progress == 100
+    assert task.completed_at is not None
+    log = db.query(TaskProgressLog).filter(TaskProgressLog.task_id == t.task_id).first()
+    assert log.action == "approve"
+
+
+def test_supervisor_rejection_requires_reason(client, db):
+    p = make_project(db)
+    t = Task(task_name="Review wall", project_id=p.project_id, status="submitted", progress=100)
+    db.add(t)
+    db.commit()
+    make_supervisor(db)
+
+    missing = client.post(
+        f"/api/tasks/{t.task_id}/review",
+        json={"decision": "rejected"},
+        headers=auth(),
+    )
+    assert missing.status_code == 400
+
+    resp = client.post(
+        f"/api/tasks/{t.task_id}/review",
+        json={"decision": "rejected", "reason": "Please repair the edge finish."},
+        headers=auth(),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "rejected"
 
 
 # ── generic update endpoint keeps refusing backward moves ───────────────────

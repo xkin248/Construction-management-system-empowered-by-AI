@@ -102,7 +102,9 @@ class ApiService {
                 _out?.call();
               }
             } else if (c == 410) {
-              m = d is Map ? d['detail'] ?? 'Check-in was auto-cancelled' : 'Check-in cancelled';
+              m = d is Map
+                  ? d['detail'] ?? 'Check-in was auto-cancelled'
+                  : 'Check-in cancelled';
             } else {
               m = d is Map && d['detail'] != null
                   ? d['detail'].toString()
@@ -183,18 +185,20 @@ class ApiService {
   }
 
   // ───────── Worker in-app notifications ─────────
-  Future<List> getWorkerNotifications(int workerId, {bool unreadOnly = false}) async {
-    final r = await dio.get('/notifications/worker/$workerId', queryParameters: {
+  Future<List> getWorkerNotifications(int workerId,
+      {bool unreadOnly = false}) async {
+    final r =
+        await dio.get('/notifications/worker/$workerId', queryParameters: {
       if (unreadOnly) 'unread_only': 'true',
     });
     return (r.data as List).toList();
   }
 
-  Future<Map> workerUnreadCount(int workerId) async =>
-      Map.from((await dio.get('/notifications/worker/$workerId/unread-count')).data);
+  Future<Map> workerUnreadCount(int workerId) async => Map.from(
+      (await dio.get('/notifications/worker/$workerId/unread-count')).data);
 
-  Future<Map> workerMarkAllRead(int workerId) async =>
-      Map.from((await dio.put('/notifications/worker/$workerId/read-all')).data);
+  Future<Map> workerMarkAllRead(int workerId) async => Map.from(
+      (await dio.put('/notifications/worker/$workerId/read-all')).data);
 
   // ───────── Worker Authenticated Attendance ─────────
   Future<Map> workerCheckIn({
@@ -216,7 +220,8 @@ class ApiService {
         if (deviceId != null) 'device_id': deviceId,
         if (photoBase64 != null) 'photo_base64': photoBase64,
         if (photoMimeType != null) 'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   Future<Map> workerCheckOut({
     required double lat,
@@ -233,7 +238,8 @@ class ApiService {
         if (deviceType != null) 'device_type': deviceType,
         if (photoBase64 != null) 'photo_base64': photoBase64,
         if (photoMimeType != null) 'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   Future<Map> workerTodayAttendance() async =>
       Map.from((await dio.get('/attendance/worker/today')).data);
@@ -258,7 +264,8 @@ class ApiService {
         if (deviceId != null) 'device_id': deviceId,
         if (photoBase64 != null) 'photo_base64': photoBase64,
         if (photoMimeType != null) 'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   Future<Map> supervisorCheckOut({
     required double lat,
@@ -275,7 +282,8 @@ class ApiService {
         if (deviceType != null) 'device_type': deviceType,
         if (photoBase64 != null) 'photo_base64': photoBase64,
         if (photoMimeType != null) 'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   Future<Map> supervisorTodayAttendance() async =>
       Map.from((await dio.get('/attendance/supervisor/today')).data);
@@ -289,18 +297,21 @@ class ApiService {
         'attendance_id': attendanceId,
         'lat': lat,
         'lng': lng,
-      })).data);
+      }))
+          .data);
 
   // ───────── Worker AI Task Board ─────────
   Future<Map> workerTaskBoard({bool refresh = false}) async =>
       Map.from((await dio.get('/worker/task-board', queryParameters: {
         'refresh': refresh ? 'true' : 'false',
-      })).data);
+      }))
+          .data);
 
   Future<Map> workerTasksSync({String? sinceLastUpdated}) async =>
       Map.from((await dio.get('/worker/tasks/sync', queryParameters: {
         if (sinceLastUpdated != null) 'since_last_updated': sinceLastUpdated,
-      })).data);
+      }))
+          .data);
 
   // ───────── Daily common tasks (briefing / toolbox / housekeeping) ─────────
 
@@ -311,7 +322,8 @@ class ApiService {
       Map.from((await dio.get('/common-tasks/today', queryParameters: {
         if (projectId != null) 'project_id': projectId,
         if (workDate != null) 'work_date': workDate,
-      })).data);
+      }))
+          .data);
 
   /// Daily-record history of the three common tasks, newest date first.
   ///
@@ -321,8 +333,8 @@ class ApiService {
       (await dio.get('/common-tasks', queryParameters: {
         if (projectId != null) 'project_id': projectId,
         'days': days,
-      })).data as List;
-
+      }))
+          .data as List;
 
   /// Close one daily job with the mandatory site photo.
   ///
@@ -336,7 +348,8 @@ class ApiService {
       Map.from((await dio.post('/common-tasks/$instanceId/complete', data: {
         'photo_base64': photoBase64,
         'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   /// Authenticated URL of a daily-job photo. The endpoint needs the Bearer
   /// token, so pair it with [authHeaders] (or use the Dio client instead).
@@ -357,7 +370,8 @@ class ApiService {
         'photo_base64': photoBase64,
         'photo_mime_type': photoMimeType,
         if (projectId != null) 'project_id': projectId,
-      })).data);
+      }))
+          .data);
 
   /// Bring one or more tools back under a single shared photo.
   Future<Map> toolboxReturn({
@@ -369,7 +383,8 @@ class ApiService {
         'issue_ids': issueIds,
         'photo_base64': photoBase64,
         'photo_mime_type': photoMimeType,
-      })).data);
+      }))
+          .data);
 
   /// Everything this worker has not brought back yet — the digital replacement
   /// for the paper toolbox register.
@@ -394,7 +409,8 @@ class ApiService {
         'project_id': pid,
         'lat': lat,
         'lng': lng,
-      })).data);
+      }))
+          .data);
 
   Future<Map> heartbeat({
     required int aid,
@@ -405,7 +421,8 @@ class ApiService {
         'attendance_id': aid,
         'lat': lat,
         'lng': lng,
-      })).data);
+      }))
+          .data);
 
   Future<Map> checkOut({
     required int aid,
@@ -416,7 +433,8 @@ class ApiService {
         'attendance_id': aid,
         'lat': lat,
         'lng': lng,
-      })).data);
+      }))
+          .data);
 
   Future<Map?> workerToday(int wid) async {
     try {
@@ -428,6 +446,9 @@ class ApiService {
 
   Future<List> getTasks(int pid) async =>
       (await dio.get('/projects/$pid/tasks')).data as List;
+  Future<List> getSupervisorTasks({int? pid}) async => (await dio.get('/tasks',
+          queryParameters: pid == null ? null : {'project_id': pid}))
+      .data as List;
   Future<Map> getTask(int taskId) async =>
       Map.from((await dio.get('/tasks/$taskId')).data);
   Future<Map> createTask(Map d) async =>
@@ -451,7 +472,8 @@ class ApiService {
         'photo_mime_type': photoMimeType,
         if (completionNote != null && completionNote.trim().isNotEmpty)
           'completion_note': completionNote.trim(),
-      })).data);
+      }))
+          .data);
   Future<Map> deleteTask(int taskId) async =>
       Map.from((await dio.delete('/tasks/$taskId')).data);
   Future<List> getTaskLogs(int taskId) async =>
@@ -469,15 +491,28 @@ class ApiService {
               data: {'status': targetStatus, 'reason': reason}))
           .data);
 
+  /// Supervisor-only evidence decision.  Completion is deliberately a second
+  /// step: a worker submission is not counted as an approved task until this
+  /// endpoint records the review.
+  Future<Map> reviewTask(int taskId, String decision, {String? reason}) async =>
+      Map.from((await dio.post('/tasks/$taskId/review', data: {
+        'decision': decision,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      }))
+          .data);
+
   Future<Map> aiAutoAssign(int? projectId,
-          {List<int>? taskIds, bool dryRun = false, bool sameProjectOnly = true}) async =>
+          {List<int>? taskIds,
+          bool dryRun = false,
+          bool sameProjectOnly = true}) async =>
       Map.from((await dio.post('/ai/tasks/auto-assign', data: {
         if (projectId != null) 'project_id': projectId,
         if (taskIds != null) 'task_ids': taskIds,
         'dry_run': dryRun,
         'same_project_only': sameProjectOnly,
         'top_k': 3,
-      })).data);
+      }))
+          .data);
 
   /// Rank workers for a task's required skill level *before* the task exists
   /// (POST /ai/tasks/match).
@@ -488,7 +523,8 @@ class ApiService {
   /// preview in the New Task sheet always failed. The parameters stay in the
   /// query string because the backend declares them as plain function
   /// arguments (required_trade, project_id), not as a request body.
-  Future<List> aiTaskMatch(String requiredTrade, int projectId, {String? requiredSpecialty}) async =>
+  Future<List> aiTaskMatch(String requiredTrade, int projectId,
+          {String? requiredSpecialty}) async =>
       (await dio.post('/ai/tasks/match', queryParameters: {
         'required_trade': requiredTrade,
         'project_id': projectId,
@@ -496,8 +532,8 @@ class ApiService {
       }))
           .data as List;
 
-  Future<Map> progressPrediction(int projectId) async =>
-      Map.from((await dio.get('/ai/projects/$projectId/progress-prediction')).data);
+  Future<Map> progressPrediction(int projectId) async => Map.from(
+      (await dio.get('/ai/projects/$projectId/progress-prediction')).data);
 
   /// Which engine the AI layer is actually running on (model id, circuit
   /// state, last error). Surfaced on the dashboard so a degraded rule-only run
@@ -507,10 +543,9 @@ class ApiService {
   Future<Map> getWorker(int wid) async =>
       Map.from((await dio.get('/workers/$wid')).data);
 
-  Future<List> getWorkers({int? pid}) async =>
-      (await dio.get('/workers',
-              queryParameters: pid != null ? {'project_id': pid} : null))
-          .data as List;
+  Future<List> getWorkers({int? pid}) async => (await dio.get('/workers',
+          queryParameters: pid != null ? {'project_id': pid} : null))
+      .data as List;
   Future<Map> createWorker(Map d) async =>
       Map.from((await dio.post('/workers', data: d)).data);
 
@@ -538,18 +573,19 @@ class ApiService {
     return Map<String, dynamic>.from(data);
   }
 
-
   Future<List> getIssues({int? pid, String? status}) async =>
       (await dio.get('/issues', queryParameters: {
         if (pid != null) 'project_id': pid,
         if (status != null) 'status': status,
-      })).data as List;
+      }))
+          .data as List;
   Future<Map> createIssue(Map d) async =>
       Map.from((await dio.post('/issues', data: d)).data);
   Future<Map> resolveIssue(int id) async =>
       Map.from((await dio.put('/issues/$id/resolve')).data);
 
-  Future<Map> getSettings() async => Map.from((await dio.get('/settings')).data);
+  Future<Map> getSettings() async =>
+      Map.from((await dio.get('/settings')).data);
   Future<Map> updateSettings(Map d) async =>
       Map.from((await dio.put('/settings', data: d)).data);
 
@@ -577,7 +613,8 @@ class ApiService {
         'project_id': p,
         'gps_lat': lat,
         'gps_lng': lng,
-      })).data);
+      }))
+          .data);
 
   // ───────── Weekly Attendance Stats (Dashboard) ─────────
   Future<Map> getWeeklyAttendanceStats() async =>
@@ -587,7 +624,9 @@ class ApiService {
   Future<List> getFiles({int? pid, String? category}) async {
     final params = <String, dynamic>{};
     if (pid != null && pid > 0) params['project_id'] = pid;
-    if (category != null && category != 'all') params['file_category'] = category;
+    if (category != null && category != 'all') {
+      params['file_category'] = category;
+    }
     return (await dio.get('/files', queryParameters: params)).data as List;
   }
 
@@ -595,13 +634,17 @@ class ApiService {
   /// file_picker's `path` is null on web and its cache file can be deleted on
   /// Android, so we always send bytes instead of re-reading the file.
   Future<Map> uploadFileBytes(Uint8List bytes, String fileName,
-      {int? pid, String? category}) async {
+      {int? pid,
+      String? category,
+      void Function(int sent, int total)? onProgress}) async {
     final formData = FormData.fromMap({
       'file': MultipartFile.fromBytes(bytes, filename: fileName),
       if (pid != null && pid > 0) 'project_id': pid,
       if (category != null && category != 'all') 'file_category': category,
     });
-    return Map.from((await dio.post('/files/upload', data: formData)).data);
+    return Map.from((await dio.post('/files/upload',
+            data: formData, onSendProgress: onProgress))
+        .data);
   }
 
   Future<Map> uploadFile(File file, {int? pid, String? category}) async {
@@ -648,7 +691,8 @@ class ApiService {
     }
     _downloadLinkCache[fileId] = _CachedDownloadLink(
       url,
-      DateTime.now().add(Duration(seconds: ttlSeconds > 90 ? ttlSeconds - 60 : 30)),
+      DateTime.now()
+          .add(Duration(seconds: ttlSeconds > 90 ? ttlSeconds - 60 : 30)),
     );
     return url;
   }
@@ -671,8 +715,8 @@ class ApiService {
     return resp.data is int ? resp.data : (resp.data['count'] ?? 0) as int;
   }
 
-  Future<Map> getNotificationSettings() async =>
-      Map<String, dynamic>.from((await dio.get('/notifications/settings')).data as Map);
+  Future<Map> getNotificationSettings() async => Map<String, dynamic>.from(
+      (await dio.get('/notifications/settings')).data as Map);
 
   Future<void> updateNotificationSettings(Map data) async =>
       await dio.put('/notifications/settings', data: data);
@@ -685,9 +729,8 @@ class ApiService {
   /// Fetching the bytes here also keeps the picture visible on Web, where
   /// custom headers on image requests are impossible.
   Future<Uint8List> fetchAttendancePhoto(String relativeUrl) async {
-    final path = relativeUrl.startsWith('/')
-        ? relativeUrl.substring(1)
-        : relativeUrl;
+    final path =
+        relativeUrl.startsWith('/') ? relativeUrl.substring(1) : relativeUrl;
     final resp = await dio.get(
       // Dio's base URL is `.../api` (without a trailing slash).  Supplying a
       // relative path would concatenate it as `.../apiattendance/...` on

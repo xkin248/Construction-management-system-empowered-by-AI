@@ -41,7 +41,14 @@ class TaskFilterBar extends StatelessWidget {
 
   /// Filter values stay English (they drive the where-clause); only the labels
   /// are translated through [displayOf].
-  static const statusSegments = ['All', 'Pending', 'In Progress', 'Completed', 'Overdue'];
+  static const statusSegments = [
+    'All',
+    'Pending',
+    'In Progress',
+    'Awaiting Review',
+    'Completed',
+    'Overdue',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -54,17 +61,22 @@ class TaskFilterBar extends StatelessWidget {
           textInputAction: TextInputAction.search,
           decoration: InputDecoration(
             hintText: AppStrings.t('tasks.searchHint'),
-            hintStyle: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textMuted),
-            prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
+            hintStyle:
+                GoogleFonts.inter(fontSize: 13.5, color: AppColors.textMuted),
+            prefixIcon: Icon(Icons.search_rounded,
+                size: 20, color: AppColors.textMuted),
             filled: true,
             fillColor: AppColors.bgCard,
             contentPadding: const EdgeInsets.symmetric(vertical: 0),
             border: OutlineInputBorder(
-                borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                borderRadius: AppRadius.rMd,
+                borderSide: BorderSide(color: AppColors.border)),
             enabledBorder: OutlineInputBorder(
-                borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
+                borderRadius: AppRadius.rMd,
+                borderSide: BorderSide(color: AppColors.border)),
             focusedBorder: OutlineInputBorder(
-                borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+                borderRadius: AppRadius.rMd,
+                borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
           ),
         ),
       ),
@@ -89,18 +101,23 @@ class TaskFilterBar extends StatelessWidget {
         if (projects.length > 1)
           _dropdown(
             context,
-            projects.map<String>((p) => p['project_name'] as String).toList()..insert(0, 'All'),
+            projects.map<String>((p) => p['project_name'] as String).toList()
+              ..insert(0, 'All'),
             selectedProjectId == null
                 ? 'All'
-                : (projects.where((p) => p['project_id'] == selectedProjectId).isEmpty
+                : (projects
+                        .where((p) => p['project_id'] == selectedProjectId)
+                        .isEmpty
                     ? 'All'
-                    : projects.firstWhere((p) => p['project_id'] == selectedProjectId)['project_name']
-                        as String),
+                    : projects.firstWhere((p) =>
+                        p['project_id'] ==
+                        selectedProjectId)['project_name'] as String),
             (v) {
               if (v == 'All') {
                 onProjectChanged(null);
               } else {
-                final found = projects.firstWhere((p) => p['project_name'] == v, orElse: () => null);
+                final found = projects.firstWhere((p) => p['project_name'] == v,
+                    orElse: () => null);
                 if (found != null) onProjectChanged(found['project_id']);
               }
             },
@@ -125,12 +142,14 @@ class TaskFilterBar extends StatelessWidget {
           decoration: BoxDecoration(
             color: active ? AppColors.navy : AppColors.bgCard,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: active ? AppColors.navy : AppColors.border),
+            border:
+                Border.all(color: active ? AppColors.navy : AppColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             // Overdue uses red so a non-zero count stands out even unselected.
             if (s == 'Overdue' && !active) ...[
-              Icon(Icons.error_outline_rounded, size: 14, color: AppColors.danger),
+              Icon(Icons.error_outline_rounded,
+                  size: 14, color: AppColors.danger),
               const SizedBox(width: 5),
             ],
             Text(
@@ -146,7 +165,9 @@ class TaskFilterBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: active ? Colors.white.withValues(alpha: 0.24) : AppColors.bgMain,
+                  color: active
+                      ? Colors.white.withValues(alpha: 0.24)
+                      : AppColors.bgMain,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text('$n',
@@ -155,7 +176,9 @@ class TaskFilterBar extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                       color: active
                           ? Colors.white
-                          : (s == 'Overdue' ? AppColors.danger : AppColors.textMuted),
+                          : (s == 'Overdue'
+                              ? AppColors.danger
+                              : AppColors.textMuted),
                     )),
               ),
             ],
@@ -211,9 +234,12 @@ class TaskFilterBar extends StatelessWidget {
         value: v,
         underline: const SizedBox(),
         isExpanded: true,
-        icon: Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textMuted),
+        icon: Icon(Icons.keyboard_arrow_down_rounded,
+            size: 18, color: AppColors.textMuted),
         style: GoogleFonts.inter(
-            fontSize: 13.5, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+            fontSize: 13.5,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600),
         items: items
             .map((s) => DropdownMenuItem(
                   value: s,

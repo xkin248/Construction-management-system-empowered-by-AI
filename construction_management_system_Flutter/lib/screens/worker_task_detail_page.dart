@@ -49,7 +49,6 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   /// no separate "review" status, so the worker-facing copy is driven from the
   /// completed state plus this flag: the worker always reads "Pending Supervisor
   /// Review" and never "Completed".
-  bool _submitted = false;
 
   @override
   void initState() {
@@ -61,8 +60,9 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 
   String get _status => wStatusKey(_task?['status']);
   bool get _isSubmittedState =>
-      _submitted || _status == 'submitted' || _status == 'pending_review';
-  bool get _isClosed => _status == 'completed' || _status == 'approved' || _status == 'verified';
+      _status == 'submitted' || _status == 'pending_review';
+  bool get _isClosed =>
+      _status == 'completed' || _status == 'approved' || _status == 'verified';
   bool get _isRejected => _status == 'rejected';
 
   int get _progress {
@@ -153,50 +153,51 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             ),
             const SizedBox(height: 12),
             Row(children: [
-                Icon(
+              Icon(
+                photoShot == null
+                    ? Icons.photo_camera_outlined
+                    : Icons.check_circle_rounded,
+                size: 20,
+                color:
+                    photoShot == null ? AppColors.textMuted : AppColors.success,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
                   photoShot == null
-                      ? Icons.photo_camera_outlined
-                      : Icons.check_circle_rounded,
-                  size: 20,
-                  color: photoShot == null ? AppColors.textMuted : AppColors.success,
+                      ? wT(en: 'No photo yet', ms: 'Belum ada foto', zh: '尚未拍照')
+                      : wT(en: 'Photo captured', ms: 'Foto diambil', zh: '已拍照'),
+                  style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    photoShot == null
-                        ? wT(en: 'No photo yet', ms: 'Belum ada foto', zh: '尚未拍照')
-                        : wT(en: 'Photo captured', ms: 'Foto diambil', zh: '已拍照'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    final shot = await PhotoCapture.takeEvidencePhoto();
+                    setLocal(() => photoShot = shot);
+                  } catch (e) {
+                    toast('$e');
+                  }
+                },
+                child: Text(wT(en: 'TAKE PHOTO', ms: 'AMBIL FOTO', zh: '拍照'),
                     style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    try {
-                      final shot = await PhotoCapture.takeEvidencePhoto();
-                      setLocal(() => photoShot = shot);
-                    } catch (e) {
-                      toast('$e');
-                    }
-                  },
-                  child: Text(wT(en: 'TAKE PHOTO', ms: 'AMBIL FOTO', zh: '拍照'),
-                      style: GoogleFonts.inter(
-                          fontSize: 13, fontWeight: FontWeight.w800)),
-                ),
+                        fontSize: 13, fontWeight: FontWeight.w800)),
+              ),
             ]),
           ]),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text(wT(en: 'CANCEL', ms: 'BATAL', zh: '取消'),
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
+                  style: GoogleFonts.inter(
+                      fontSize: 15, fontWeight: FontWeight.w700)),
             ),
             ElevatedButton(
-              onPressed: photoShot == null
-                  ? null
-                  : () => Navigator.pop(ctx, true),
+              onPressed:
+                  photoShot == null ? null : () => Navigator.pop(ctx, true),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(110, 48),
                 backgroundColor: AppColors.accentSolid,
@@ -204,7 +205,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                 shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
               ),
               child: Text(wT(en: 'SAVE', ms: 'SIMPAN', zh: '保存'),
-                  style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w800)),
+                  style: GoogleFonts.inter(
+                      fontSize: 15, fontWeight: FontWeight.w800)),
             ),
           ],
         ),
@@ -256,7 +258,6 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         photoMimeType: photo.mimeType,
       );
       if (!mounted) return;
-      setState(() => _submitted = true);
       toast(wT(
         en: 'SUBMITTED — PENDING SUPERVISOR REVIEW',
         ms: 'DIHANTAR — MENUNGGU SEMAKAN PENYELIA',
@@ -286,7 +287,9 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         title: Text(
           wT(en: 'Task Details', ms: 'Butiran Tugasan', zh: '任务详情'),
           style: GoogleFonts.inter(
-              fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary),
         ),
         actions: [
           IconButton(
@@ -330,11 +333,15 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                 : '')
             .toString());
     final name = (t['task_name'] ?? t['name'] ?? '').toString();
-    final projectName = (t['project_name'] ?? project['project_name'] ?? '').toString();
+    final projectName =
+        (t['project_name'] ?? project['project_name'] ?? '').toString();
     final due = _date(t['due_date']);
-    final assigned = _date(t['started_at'] ?? t['created_at'] ?? t['assigned_date']);
+    final assigned =
+        _date(t['started_at'] ?? t['created_at'] ?? t['assigned_date']);
     final desc = (t['description'] ?? '').toString().trim();
-    final location = (project['location_address'] ?? t['work_location'] ?? '').toString().trim();
+    final location = (project['location_address'] ?? t['work_location'] ?? '')
+        .toString()
+        .trim();
     final trade = (t['trade'] ?? t['required_skill'] ?? '').toString().trim();
     final photoUrl = (t['completion_photo_url'] ?? '').toString();
     final pct = _progress;
@@ -358,7 +365,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             color: AppColors.navy,
             borderRadius: AppRadius.rXl,
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(
                 child: Text(
@@ -372,7 +380,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
               ),
               const SizedBox(width: 10),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: chipColor,
                   borderRadius: BorderRadius.circular(999),
@@ -382,7 +391,9 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                   const SizedBox(width: 5),
                   Text(_chipLabel(),
                       style: GoogleFonts.inter(
-                          fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)),
                 ]),
               ),
             ]),
@@ -423,18 +434,24 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
           child: Column(children: [
             _kv(Icons.business_center_outlined,
                 wT(en: 'Project', ms: 'Projek', zh: '项目'), projectName),
-            _kv(Icons.event_outlined,
-                wT(en: 'Assigned date', ms: 'Tarikh ditugaskan', zh: '指派日期'), assigned),
+            _kv(
+                Icons.event_outlined,
+                wT(en: 'Assigned date', ms: 'Tarikh ditugaskan', zh: '指派日期'),
+                assigned),
             _kv(Icons.event_available_outlined,
                 wT(en: 'Due date', ms: 'Tarikh akhir', zh: '截止日期'), due),
-            _kv(Icons.flag_outlined,
-                wT(en: 'Priority', ms: 'Keutamaan', zh: '优先级'), _priorityLabel(t['priority'])),
+            _kv(
+                Icons.flag_outlined,
+                wT(en: 'Priority', ms: 'Keutamaan', zh: '优先级'),
+                _priorityLabel(t['priority'])),
             _kv(Icons.workspace_premium_outlined,
                 wT(en: 'Required skill', ms: 'Kemahiran', zh: '所需技能'), trade),
             _kv(Icons.person_outline_rounded,
                 wT(en: 'Supervisor', ms: 'Penyelia', zh: '监理'), supervisor),
-            _kv(Icons.place_outlined,
-                wT(en: 'Work location', ms: 'Lokasi kerja', zh: '工作地点'), location,
+            _kv(
+                Icons.place_outlined,
+                wT(en: 'Work location', ms: 'Lokasi kerja', zh: '工作地点'),
+                location,
                 last: true),
           ]),
         ),
@@ -444,13 +461,17 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
           title: wT(en: 'Description', ms: 'Keterangan', zh: '说明'),
           child: Text(
             desc.isEmpty
-                ? wT(en: 'No description provided.', ms: 'Tiada keterangan.', zh: '暂无说明')
+                ? wT(
+                    en: 'No description provided.',
+                    ms: 'Tiada keterangan.',
+                    zh: '暂无说明')
                 : desc,
             style: GoogleFonts.inter(
                 fontSize: 14,
                 height: 1.5,
                 fontWeight: FontWeight.w500,
-                color: desc.isEmpty ? AppColors.textMuted : AppColors.textPrimary),
+                color:
+                    desc.isEmpty ? AppColors.textMuted : AppColors.textPrimary),
           ),
         ),
 
@@ -458,7 +479,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
           const SizedBox(height: 12),
           _card(
             title: wT(en: 'Completion photo', ms: 'Foto penyiapan', zh: '完成照片'),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ClipRRect(
                 borderRadius: AppRadius.rMd,
                 child: Image.network(
@@ -471,7 +493,10 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                     alignment: Alignment.center,
                     color: AppColors.bgMain,
                     child: Text(
-                        wT(en: 'Photo not loaded', ms: 'Foto tidak dimuat', zh: '照片未加载'),
+                        wT(
+                            en: 'Photo not loaded',
+                            ms: 'Foto tidak dimuat',
+                            zh: '照片未加载'),
                         style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -485,7 +510,8 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                     en: 'Kept separate from the attendance selfie.',
                     ms: 'Berasingan daripada selfie kehadiran.',
                     zh: '与考勤自拍分开保存。'),
-                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
+                style:
+                    GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
               ),
             ]),
           ),
@@ -500,27 +526,34 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
                 final log = Map<String, dynamic>.from(raw as Map);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 5),
-                      child: Icon(Icons.circle, size: 7, color: AppColors.textMuted),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        (log['note'] ?? log['to_status'] ?? log['progress'] ?? '').toString(),
-                        style: GoogleFonts.inter(
-                            fontSize: 13,
-                            height: 1.35,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(_date(log['created_at']),
-                        style: GoogleFonts.inter(
-                            fontSize: 11, color: AppColors.textMuted)),
-                  ]),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Icon(Icons.circle,
+                              size: 7, color: AppColors.textMuted),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            (log['note'] ??
+                                    log['to_status'] ??
+                                    log['progress'] ??
+                                    '')
+                                .toString(),
+                            style: GoogleFonts.inter(
+                                fontSize: 13,
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(_date(log['created_at']),
+                            style: GoogleFonts.inter(
+                                fontSize: 11, color: AppColors.textMuted)),
+                      ]),
                 );
               }).toList(),
             ),
@@ -586,20 +619,24 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   Widget _reviewBanner({bool isClosed = false, bool isRejected = false}) {
     final Color color;
     final IconData icon;
-    final String title;
-    final String body;
+    String title;
+    String body;
     if (isRejected) {
       color = AppColors.danger;
       icon = Icons.cancel_rounded;
-      title = wT(en: 'Rejected by supervisor', ms: 'Ditolak penyelia', zh: '监理已拒绝');
+      title =
+          wT(en: 'Rejected by supervisor', ms: 'Ditolak penyelia', zh: '监理已拒绝');
       body = wT(
           en: 'Read the note, fix the work and submit again.',
           ms: 'Baca nota, baiki kerja dan hantar semula.',
           zh: '查看说明，整改后重新提交');
     } else if (isClosed) {
-      color = AppColors.warning;
-      icon = Icons.hourglass_top_rounded;
-      title = wT(en: 'Pending Supervisor Review', ms: 'Menunggu semakan penyelia', zh: '等待监理审核');
+      color = AppColors.success;
+      icon = Icons.verified_rounded;
+      title = wT(
+          en: 'Pending Supervisor Review',
+          ms: 'Menunggu semakan penyelia',
+          zh: '等待监理审核');
       body = wT(
           en: 'Photo submitted. The supervisor confirms the task.',
           ms: 'Foto dihantar. Penyelia akan mengesahkan.',
@@ -607,11 +644,25 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
     } else {
       color = AppColors.warning;
       icon = Icons.hourglass_top_rounded;
-      title = wT(en: 'Pending Supervisor Review', ms: 'Menunggu semakan penyelia', zh: '等待监理审核');
+      title = wT(
+          en: 'Pending Supervisor Review',
+          ms: 'Menunggu semakan penyelia',
+          zh: '等待监理审核');
       body = wT(
           en: 'Submitted. You can no longer edit this task.',
           ms: 'Dihantar. Tugasan tidak boleh diubah.',
           zh: '已提交，此任务不可再修改');
+    }
+    if (isClosed) {
+      title = wT(
+          en: 'Approved by supervisor',
+          ms: 'Diluluskan penyelia',
+          zh: 'Approved');
+      body = wT(
+        en: 'Your photo evidence was accepted. This task is complete.',
+        ms: 'Bukti foto anda diterima. Tugasan ini selesai.',
+        zh: 'Approved completion evidence.',
+      );
     }
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -625,14 +676,17 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         Icon(icon, size: 20, color: color),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title,
                 style: GoogleFonts.inter(
                     fontSize: 14, fontWeight: FontWeight.w800, color: color)),
             const SizedBox(height: 3),
             Text(body,
                 style: GoogleFonts.inter(
-                    fontSize: 12.5, height: 1.35, color: AppColors.textSecondary)),
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: AppColors.textSecondary)),
           ]),
         ),
       ]),
@@ -641,14 +695,15 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
 
   Color _chipColor() {
     if (_isRejected) return AppColors.danger;
-    if (_isClosed) return AppColors.warning;
+    if (_isClosed) return AppColors.success;
     if (_status == 'in_progress') return AppColors.accentSolid;
     return AppColors.warning;
   }
 
   IconData _chipIcon() {
     if (_isRejected) return Icons.cancel_rounded;
-    if (_isClosed || _isSubmittedState) return Icons.hourglass_top_rounded;
+    if (_isClosed) return Icons.verified_rounded;
+    if (_isSubmittedState) return Icons.hourglass_top_rounded;
     if (_status == 'in_progress') return Icons.timelapse_rounded;
     return Icons.flag_rounded;
   }
@@ -657,10 +712,15 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
   /// Review" â€” never "Completed".
   String _chipLabel() {
     if (_isRejected) return wT(en: 'REJECTED', ms: 'DITOLAK', zh: '已拒绝');
-    if (_isClosed || _isSubmittedState) {
+    if (_isClosed) {
+      return wT(en: 'COMPLETED', ms: 'SELESAI', zh: 'COMPLETED');
+    }
+    if (_isSubmittedState) {
       return wT(en: 'PENDING REVIEW', ms: 'MENUNGGU SEMAKAN', zh: '待审核');
     }
-    if (_status == 'in_progress') return wT(en: 'IN PROGRESS', ms: 'SEDANG KERJA', zh: '进行中');
+    // ignore: curly_braces_in_flow_control_structures
+    if (_status == 'in_progress')
+      return wT(en: 'IN PROGRESS', ms: 'SEDANG KERJA', zh: '进行中');
     return wT(en: 'TO DO', ms: 'BELUM MULA', zh: '待办');
   }
 
@@ -695,6 +755,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
     final open = !_isClosed && !_isSubmittedState && !_isRejected;
     final canStart = open && _status != 'in_progress';
     final canAct = open && _status == 'in_progress';
+    final canResubmit = _isRejected;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -708,13 +769,17 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             label: wT(en: 'Start Task', ms: 'Mula Tugasan', zh: '开始任务'),
             icon: Icons.play_arrow_rounded,
             loading: _busy,
-            loadingLabel: wT(en: 'Startingâ€¦', ms: 'Memulakanâ€¦', zh: '正在开始…'),
+            loadingLabel:
+                wT(en: 'Startingâ€¦', ms: 'Memulakanâ€¦', zh: '正在开始…'),
             onPressed: _busy ? null : _startTask,
             height: 52,
           ),
         if (canAct) ...[
           AppButton(
-            label: wT(en: 'Upload Progress Photo', ms: 'Muat Naik Foto Kemajuan', zh: '上传进度照片'),
+            label: wT(
+                en: 'Upload Progress Photo',
+                ms: 'Muat Naik Foto Kemajuan',
+                zh: '上传进度照片'),
             icon: Icons.add_a_photo_outlined,
             tone: AppButtonTone.secondary,
             onPressed: _busy ? null : _uploadProgress,
@@ -725,12 +790,26 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             label: wT(en: 'Mark as Completed', ms: 'Tanda Selesai', zh: '标记完成'),
             icon: Icons.check_circle_outline_rounded,
             loading: _busy,
-            loadingLabel: wT(en: 'Submittingâ€¦', ms: 'Menghantarâ€¦', zh: '正在提交…'),
+            loadingLabel:
+                wT(en: 'Submittingâ€¦', ms: 'Menghantarâ€¦', zh: '正在提交…'),
             onPressed: _busy ? null : _markCompleted,
             height: 52,
           ),
         ],
-        if (!canStart && !canAct) ...[
+        if (canResubmit)
+          AppButton(
+            label: wT(
+                en: 'Submit Corrected Photo',
+                ms: 'Hantar Foto Dibaiki',
+                zh: 'Submit Corrected Photo'),
+            icon: Icons.camera_alt_rounded,
+            loading: _busy,
+            loadingLabel: wT(
+                en: 'Submitting...', ms: 'Menghantar...', zh: 'Submitting...'),
+            onPressed: _busy ? null : _markCompleted,
+            height: 52,
+          ),
+        if (!canStart && !canAct && !canResubmit) ...[
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
@@ -740,19 +819,28 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
               border: Border.all(color: AppColors.border),
             ),
             child: Row(children: [
-              Icon(_isRejected ? Icons.cancel_rounded : Icons.lock_outline_rounded,
+              Icon(
+                  _isRejected
+                      ? Icons.cancel_rounded
+                      : Icons.lock_outline_rounded,
                   size: 18,
                   color: _isRejected ? AppColors.danger : AppColors.textMuted),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _isRejected
-                      ? wT(en: 'Waiting for supervisor to reopen',
+                      ? wT(
+                          en: 'Waiting for supervisor to reopen',
                           ms: 'Menunggu penyelia membuka semula',
                           zh: '等待监理重新打开')
-                      : wT(en: 'No action available', ms: 'Tiada tindakan', zh: '暂无可用操作'),
+                      : wT(
+                          en: 'No action available',
+                          ms: 'Tiada tindakan',
+                          zh: '暂无可用操作'),
                   style: GoogleFonts.inter(
-                      fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary),
                 ),
               ),
             ]),
@@ -767,7 +855,9 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
             child: Text(
               wT(en: 'Cancel', ms: 'Batal', zh: '取消'),
               style: GoogleFonts.inter(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textSecondary),
             ),
           ),
         ),
@@ -807,7 +897,9 @@ class _CompletionPreviewPageState extends State<_CompletionPreviewPage> {
         title: Text(
           wT(en: 'Check photo', ms: 'Semak foto', zh: '确认照片'),
           style: GoogleFonts.inter(
-              fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary),
         ),
       ),
       body: ListView(
@@ -836,7 +928,10 @@ class _CompletionPreviewPageState extends State<_CompletionPreviewPage> {
           ),
           const SizedBox(height: 20),
           AppButton(
-            label: wT(en: 'Submit for Review', ms: 'Hantar untuk Semakan', zh: '提交审核'),
+            label: wT(
+                en: 'Submit for Review',
+                ms: 'Hantar untuk Semakan',
+                zh: '提交审核'),
             icon: Icons.send_rounded,
             loading: false,
             onPressed: () => Navigator.of(context).pop(true),

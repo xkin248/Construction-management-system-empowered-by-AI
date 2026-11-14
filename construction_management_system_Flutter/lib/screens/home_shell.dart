@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/project_cache.dart';
+import '../services/project_scope.dart';
 import '../services/token_storage.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
@@ -147,6 +148,7 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     AppColors.darkMode.addListener(_onDarkChanged);
     AppSettings.lang.addListener(_onLangChanged);
+    ProjectScope.activeProjectId.addListener(_syncProjectScopeLabel);
     _guardWorkerEntry();
     _loadUser();
     _loadProjects();
@@ -164,6 +166,7 @@ class _HomeShellState extends State<HomeShell> {
   void dispose() {
     AppColors.darkMode.removeListener(_onDarkChanged);
     AppSettings.lang.removeListener(_onLangChanged);
+    ProjectScope.activeProjectId.removeListener(_syncProjectScopeLabel);
     super.dispose();
   }
 
@@ -220,7 +223,10 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _loadProjects() async {
     try {
       final projects = await ProjectCache.get(ApiService());
-      if (mounted) setState(() => _projects = projects);
+      if (mounted) {
+        setState(() => _projects = projects);
+        _syncProjectScopeLabel();
+      }
     } catch (_) {
       // A failed optional selector must not block the supervisor shell.
     }
@@ -232,6 +238,30 @@ class _HomeShellState extends State<HomeShell> {
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(context,
         MaterialPageRoute(builder: (_) => const LoginPage()), (_) => false);
+  }
+
+  void _changeProject(String projectName) {
+    final selected = _projects.whereType<Map>().cast<Map>().where(
+          (project) =>
+              (project['project_name'] ?? '').toString() == projectName,
+        );
+    final project = selected.isEmpty ? null : selected.first;
+    final rawId = project?['project_id'];
+    final projectId = rawId is int ? rawId : int.tryParse('$rawId');
+    setState(() => _currentProject = projectName);
+    ProjectScope.select(projectId);
+  }
+
+  void _syncProjectScopeLabel() {
+    final activeId = ProjectScope.activeProjectId.value;
+    final found = _projects.whereType<Map>().cast<Map>().where(
+          (project) => project['project_id'] == activeId,
+        );
+    final name =
+        found.isEmpty ? '' : (found.first['project_name'] ?? '').toString();
+    if (mounted && _currentProject != name) {
+      setState(() => _currentProject = name);
+    }
   }
 
   void _go(int i, {bool fromDrawer = false}) {
@@ -271,7 +301,7 @@ class _HomeShellState extends State<HomeShell> {
             user: _user,
             onNav: (i) => _go(i),
             onLogout: _logout,
-            onProjectChanged: (p) => setState(() => _currentProject = p),
+            onProjectChanged: _changeProject,
           );
         }
         return _NarrowLayout(
@@ -283,7 +313,7 @@ class _HomeShellState extends State<HomeShell> {
           userLoaded: _userLoaded,
           onNav: (i) => _go(i),
           onLogout: _logout,
-          onProjectChanged: (p) => setState(() => _currentProject = p),
+          onProjectChanged: _changeProject,
         );
       },
     );

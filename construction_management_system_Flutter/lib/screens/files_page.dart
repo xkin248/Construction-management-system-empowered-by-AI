@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
 import '../services/project_cache.dart';
+import '../services/project_scope.dart';
 import '../l10n/app_strings.dart';
 import '../models/file.dart';
 import '../utils/download_saver.dart';
@@ -66,10 +67,12 @@ class _FilesPageState extends State<FilesPage> {
   @override
   void initState() {
     super.initState();
-    _selectedProjectId = widget.initialProjectId;
+    _selectedProjectId =
+        widget.initialProjectId ?? ProjectScope.activeProjectId.value;
     _pendingPreviewFileId = widget.initialFileId;
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
+    ProjectScope.activeProjectId.addListener(_onProjectScopeChanged);
     _load();
   }
 
@@ -82,7 +85,15 @@ class _FilesPageState extends State<FilesPage> {
     _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
+    ProjectScope.activeProjectId.removeListener(_onProjectScopeChanged);
     super.dispose();
+  }
+
+  void _onProjectScopeChanged() {
+    final next = ProjectScope.activeProjectId.value;
+    if (_selectedProjectId == next) return;
+    setState(() => _selectedProjectId = next);
+    _load();
   }
 
   Future<void> _load() async {
@@ -106,11 +117,10 @@ class _FilesPageState extends State<FilesPage> {
       ];
       final results = await Future.wait(futures);
       _projects = results[0].cast<Map<String, dynamic>>();
-      final validIds = _projects
-          .map((p) => p['project_id'])
-          .whereType<int>()
-          .toSet();
-      if (_selectedProjectId != null && !validIds.contains(_selectedProjectId)) {
+      final validIds =
+          _projects.map((p) => p['project_id']).whereType<int>().toSet();
+      if (_selectedProjectId != null &&
+          !validIds.contains(_selectedProjectId)) {
         _selectedProjectId = null;
       }
       final rawFiles = <dynamic>[
@@ -169,8 +179,7 @@ class _FilesPageState extends State<FilesPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style:
-                TextButton.styleFrom(foregroundColor: AppColors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.red),
             child: Text(AppStrings.t('files.delete')),
           ),
         ],
@@ -186,6 +195,29 @@ class _FilesPageState extends State<FilesPage> {
     }
   }
 
+  Widget _fileActions(FileItem file) => PopupMenuButton<String>(
+        tooltip: 'File actions',
+        icon: Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+        onSelected: (action) {
+          switch (action) {
+            case 'preview':
+              _openPreview(file);
+              break;
+            case 'download':
+              _downloadFile(file);
+              break;
+            case 'delete':
+              _deleteFile(file);
+              break;
+          }
+        },
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 'preview', child: Text('Preview')),
+          PopupMenuItem(value: 'download', child: Text('Download')),
+          PopupMenuItem(value: 'delete', child: Text('Delete')),
+        ],
+      );
+
   // Maps the merged "Drawings & Photos" chip (and legacy 'all') to a concrete
   // backend category based on the file extension. Images -> photos, everything
   // else picked under Drawings & Photos -> drawings.
@@ -194,8 +226,16 @@ class _FilesPageState extends State<FilesPage> {
     final dot = name.lastIndexOf('.');
     final ext = dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
     const imageExts = [
-      'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
-      'heic', 'heif', 'svg', 'tiff',
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'webp',
+      'bmp',
+      'heic',
+      'heif',
+      'svg',
+      'tiff',
     ];
     if (imageExts.contains(ext)) return 'photos';
     return cat == 'drawings_photos' ? 'drawings' : 'documents';
@@ -205,9 +245,13 @@ class _FilesPageState extends State<FilesPage> {
     int? pid = _selectedProjectId;
     String cat = _selectedCategory == 'all'
         ? 'documents'
-        : (_selectedCategory == 'drawings_photos' ? 'drawings_photos' : _selectedCategory);
+        : (_selectedCategory == 'drawings_photos'
+            ? 'drawings_photos'
+            : _selectedCategory);
     Uint8List? pickedBytes;
     String? pickedName;
+    bool uploading = false;
+    double uploadProgress = 0;
 
     showModalBottomSheet(
       context: context,
@@ -219,8 +263,7 @@ class _FilesPageState extends State<FilesPage> {
           padding: EdgeInsets.fromLTRB(24, 0, 24, 24 + pad),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
-            borderRadius:
-                AppRadius.bSheet,
+            borderRadius: AppRadius.bSheet,
           ),
           child: SingleChildScrollView(
             child: Column(
@@ -233,8 +276,7 @@ class _FilesPageState extends State<FilesPage> {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: AppRadius.rHair),
+                        color: AppColors.border, borderRadius: AppRadius.rHair),
                   ),
                 ),
                 Text(AppStrings.t('files.uploadTitle'),
@@ -245,25 +287,27 @@ class _FilesPageState extends State<FilesPage> {
                 const SizedBox(height: 16),
                 // Pick file from system file picker (mobile friendly)
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    final res =
-                        await FilePicker.platform.pickFiles(withData: true);
-                    if (res == null || res.files.isEmpty) return;
-                    final f = res.files.single;
-                    if (f.bytes == null) {
-                      toast('Could not read the selected file');
-                      return;
-                    }
-                    setD(() {
-                      pickedBytes = f.bytes;
-                      pickedName = f.name;
-                      // Infer the concrete category from the file extension
-                      // when the merged "Drawings & Photos" or legacy "All"
-                      // chip is active, so images land in Photos and drawings
-                      // (pdf etc.) land in Drawings.
-                      cat = _resolveUploadCategory(cat, f.name);
-                    });
-                  },
+                  onPressed: uploading
+                      ? null
+                      : () async {
+                          final res = await FilePicker.platform
+                              .pickFiles(withData: true);
+                          if (res == null || res.files.isEmpty) return;
+                          final f = res.files.single;
+                          if (f.bytes == null) {
+                            toast('Could not read the selected file');
+                            return;
+                          }
+                          setD(() {
+                            pickedBytes = f.bytes;
+                            pickedName = f.name;
+                            // Infer the concrete category from the file extension
+                            // when the merged "Drawings & Photos" or legacy "All"
+                            // chip is active, so images land in Photos and drawings
+                            // (pdf etc.) land in Drawings.
+                            cat = _resolveUploadCategory(cat, f.name);
+                          });
+                        },
                   icon: Icon(Icons.folder_open_rounded,
                       size: 20, color: AppColors.accent),
                   label: Text(
@@ -280,8 +324,7 @@ class _FilesPageState extends State<FilesPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 16),
                     side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.rMd),
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -313,48 +356,78 @@ class _FilesPageState extends State<FilesPage> {
                   items: _categories
                       .where((c) => c['value'] != 'all')
                       .map((c) => DropdownMenuItem<String>(
-                          value: c['value'],
-                          child: Text(c['label']!)))
+                          value: c['value'], child: Text(c['label']!)))
                       .toList(),
                   onChanged: (v) => setD(() => cat = v!),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
-                  onPressed: () async {
-                    // Mandatory: file + project + category.
-                    if (pickedBytes == null || pickedBytes!.isEmpty) {
-                      toast('Please pick a file first');
-                      return;
-                    }
-                    if (pid == null || pid! <= 0) {
-                      toast('Please select a project');
-                      return;
-                    }
-                    if (cat.isEmpty || cat == 'all') {
-                      toast('Please select a category');
-                      return;
-                    }
-                    try {
-                      await ApiService().uploadFileBytes(
-                          pickedBytes!, pickedName ?? 'upload.bin',
-                          pid: pid, category: _resolveUploadCategory(cat, pickedName ?? ''));
-                      if (ctx.mounted) Navigator.pop(ctx);
-                      toast('File uploaded!');
-                      _load();
-                    } on DioException catch (e) {
-                      toast(e.message ?? 'Upload failed');
-                    }
-                  },
+                  onPressed: uploading
+                      ? null
+                      : () async {
+                          // Mandatory: file + project + category.
+                          if (pickedBytes == null || pickedBytes!.isEmpty) {
+                            toast('Please pick a file first');
+                            return;
+                          }
+                          if (pid == null || pid! <= 0) {
+                            toast('Please select a project');
+                            return;
+                          }
+                          if (cat.isEmpty || cat == 'all') {
+                            toast('Please select a category');
+                            return;
+                          }
+                          setD(() {
+                            uploading = true;
+                            uploadProgress = 0;
+                          });
+                          try {
+                            await ApiService().uploadFileBytes(
+                                pickedBytes!, pickedName ?? 'upload.bin',
+                                pid: pid,
+                                category: _resolveUploadCategory(
+                                    cat, pickedName ?? ''),
+                                onProgress: (sent, total) {
+                              if (total > 0 && ctx.mounted) {
+                                setD(() => uploadProgress = sent / total);
+                              }
+                            });
+                            if (ctx.mounted) Navigator.pop(ctx);
+                            toast('File uploaded!');
+                            _load();
+                          } on DioException catch (e) {
+                            toast(e.message ?? 'Upload failed');
+                          } finally {
+                            if (ctx.mounted) setD(() => uploading = false);
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: AppColors.accentInk,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: AppRadius.rMd),
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                     minimumSize: const Size(0, 48),
                   ),
-                  child: Text(AppStrings.t('files.upload')),
+                  child: uploading
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                              const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2)),
+                              const SizedBox(width: 10),
+                              Text(
+                                  'Uploading ${(uploadProgress * 100).round()}%'),
+                            ])
+                      : Text(AppStrings.t('files.upload')),
                 ),
+                if (uploading) ...[
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(value: uploadProgress, minHeight: 5),
+                ],
               ],
             ),
           ),
@@ -372,8 +445,7 @@ class _FilesPageState extends State<FilesPage> {
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         decoration: BoxDecoration(
           color: AppColors.bgCard,
-          borderRadius:
-              AppRadius.bSheet,
+          borderRadius: AppRadius.bSheet,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -385,8 +457,7 @@ class _FilesPageState extends State<FilesPage> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: AppRadius.rHair),
+                    color: AppColors.border, borderRadius: AppRadius.rHair),
               ),
             ),
             Text(file.originalName,
@@ -431,8 +502,7 @@ class _FilesPageState extends State<FilesPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.accentInk,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.rMd),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.rMd),
                 ),
               ),
             ),
@@ -494,7 +564,8 @@ class _FilesPageState extends State<FilesPage> {
           heroTag: const ValueKey('fab_files'),
           onPressed: _openUpload,
           backgroundColor: AppColors.accent,
-          child: const Icon(Icons.upload_file_rounded, color: AppColors.accentInk),
+          child:
+              const Icon(Icons.upload_file_rounded, color: AppColors.accentInk),
         ),
       ),
       body: Column(children: [
@@ -509,7 +580,7 @@ class _FilesPageState extends State<FilesPage> {
           worker: false,
         ),
         const SizedBox(height: 14),
-                // â”€â”€ Project dropdown â”€â”€
+        // â”€â”€ Project dropdown â”€â”€
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Row(children: [
@@ -539,8 +610,7 @@ class _FilesPageState extends State<FilesPage> {
                       padding: const EdgeInsets.only(left: 12),
                       child: Text(AppStrings.t('files.allProjects'),
                           style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              color: AppColors.textMuted)),
+                              fontSize: 13.5, color: AppColors.textMuted)),
                     ),
                     items: [
                       DropdownMenuItem<int?>(
@@ -556,10 +626,7 @@ class _FilesPageState extends State<FilesPage> {
                             child: Text(p['project_name'] ?? ''),
                           ))),
                     ],
-                    onChanged: (v) {
-                      setState(() => _selectedProjectId = v);
-                      _load();
-                    },
+                    onChanged: (v) => ProjectScope.select(v),
                   ),
                 ),
               ),
@@ -573,18 +640,18 @@ class _FilesPageState extends State<FilesPage> {
                 color: AppColors.bgCard,
                 borderRadius: AppRadius.rMd,
                 child: semanticTapTarget(
-                  label: AppStrings.t('files.gridMode'),
-                  child: InkWell(
-                  borderRadius: AppRadius.rMd,
-                  onTap: () => setState(() => _gridMode = !_gridMode),
-                  child: Icon(
-                    _gridMode
-                        ? Icons.view_list_rounded
-                        : Icons.grid_view_rounded,
-                    color: AppColors.textSecondary,
-                    size: 22,
-                  ),
-                )),
+                    label: AppStrings.t('files.gridMode'),
+                    child: InkWell(
+                      borderRadius: AppRadius.rMd,
+                      onTap: () => setState(() => _gridMode = !_gridMode),
+                      child: Icon(
+                        _gridMode
+                            ? Icons.view_list_rounded
+                            : Icons.grid_view_rounded,
+                        color: AppColors.textSecondary,
+                        size: 22,
+                      ),
+                    )),
               ),
             ),
           ]),
@@ -604,44 +671,43 @@ class _FilesPageState extends State<FilesPage> {
                 label: (cat['label'] ?? cat['value']).toString(),
                 selected: selected,
                 child: GestureDetector(
-                onTap: () {
-                  setState(() => _selectedCategory = cat['value']!);
-                  _load();
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.accent : AppColors.bgCard,
-                    borderRadius: AppRadius.rMd,
-                    border: Border.all(
-                        color: selected
-                            ? AppColors.accent
-                            : AppColors.border),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(
-                      _catIcons[cat['value']] ?? Icons.folder_rounded,
-                      size: 17,
-                      color: selected
-                          ? AppColors.onAccent
-                          : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      cat['label']!,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w600,
-                        color: selected
-                            ? AppColors.onAccent
-                            : AppColors.textSecondary,
+                    onTap: () {
+                      setState(() => _selectedCategory = cat['value']!);
+                      _load();
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.accent : AppColors.bgCard,
+                        borderRadius: AppRadius.rMd,
+                        border: Border.all(
+                            color:
+                                selected ? AppColors.accent : AppColors.border),
                       ),
-                    ),
-                  ]),
-                )),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(
+                          _catIcons[cat['value']] ?? Icons.folder_rounded,
+                          size: 17,
+                          color: selected
+                              ? AppColors.onAccent
+                              : AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          cat['label']!,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w600,
+                            color: selected
+                                ? AppColors.onAccent
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ]),
+                    )),
               );
             },
           ),
@@ -654,11 +720,11 @@ class _FilesPageState extends State<FilesPage> {
               : (_loadError != null && _files.isEmpty)
                   ? FailureState(error: _loadError, onRetry: _load)
                   : _files.isEmpty
-                  ? _emptyState()
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: _gridMode ? _buildGrid() : _buildList(),
-                    ),
+                      ? _emptyState()
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: _gridMode ? _buildGrid() : _buildList(),
+                        ),
         ),
       ]),
     );
@@ -702,6 +768,7 @@ class _FilesPageState extends State<FilesPage> {
               cacheSize: thumbPx,
               onTap: () => _openPreview(_files[i]),
               onLongPress: () => _deleteFile(_files[i]),
+              actions: _fileActions(_files[i]),
             ),
           ),
         );
@@ -721,9 +788,9 @@ class _FilesPageState extends State<FilesPage> {
               file: _files[i],
               onTap: () => _openPreview(_files[i]),
               onLongPress: () => _deleteFile(_files[i]),
+              actions: _fileActions(_files[i]),
             ),
           ),
         ),
       );
-
 }

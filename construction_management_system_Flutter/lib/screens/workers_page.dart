@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/responsive.dart';
 import '../services/api_service.dart';
 import '../services/app_settings.dart';
+import '../services/project_scope.dart';
 import '../l10n/app_strings.dart';
 import '../constants/trade_levels.dart';
 import '../widgets/add_worker_sheet.dart';
@@ -26,9 +27,11 @@ class _WorkersPageState extends State<WorkersPage> {
   List workers = [];
   Object? _loadError;
   String _searchQuery = '';
+
   /// Active four-level filter (null = all levels). Values come from
   /// TradeLevels so the list, the forms and the AI recommendation agree.
   String? _tradeFilter;
+  bool _compactDesktop = true;
 
   /// Drives the always-visible scrollbar of the worker list.
   final ScrollController _scrollCtrl = ScrollController();
@@ -38,6 +41,7 @@ class _WorkersPageState extends State<WorkersPage> {
     super.initState();
     AppColors.darkMode.addListener(_rebuild);
     AppSettings.lang.addListener(_rebuild);
+    ProjectScope.activeProjectId.addListener(_onProjectScopeChanged);
     _load();
   }
 
@@ -50,8 +54,11 @@ class _WorkersPageState extends State<WorkersPage> {
     _scrollCtrl.dispose();
     AppColors.darkMode.removeListener(_rebuild);
     AppSettings.lang.removeListener(_rebuild);
+    ProjectScope.activeProjectId.removeListener(_onProjectScopeChanged);
     super.dispose();
   }
+
+  void _onProjectScopeChanged() => _load();
 
   Future<void> _load() async {
     setState(() {
@@ -59,7 +66,8 @@ class _WorkersPageState extends State<WorkersPage> {
       _loadError = null;
     });
     try {
-      workers = await ApiService().getWorkers();
+      workers = await ApiService()
+          .getWorkers(pid: ProjectScope.activeProjectId.value);
     } catch (e) {
       _loadError = e;
       toast('Failed to load workers: $e');
@@ -73,7 +81,8 @@ class _WorkersPageState extends State<WorkersPage> {
         final rawTrade = (w['trade'] as String? ?? '').toLowerCase();
         // Search by the level label too, so "skilled" finds workers whose
         // stored value is still a legacy fine-grained trade.
-        final levelTrade = TradeLevels.label(w['trade'] as String?).toLowerCase();
+        final levelTrade =
+            TradeLevels.label(w['trade'] as String?).toLowerCase();
         // The level filter also goes through normalise(), so a stored legacy
         // trade ("plumbing") still answers the "Skilled Worker" filter without
         // touching the database.
@@ -127,7 +136,8 @@ class _WorkersPageState extends State<WorkersPage> {
                   style: GoogleFonts.inter(
                     fontSize: 12.5,
                     fontWeight: active ? FontWeight.w800 : FontWeight.w600,
-                    color: active ? AppColors.accentText : AppColors.textSecondary,
+                    color:
+                        active ? AppColors.accentText : AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -155,7 +165,8 @@ class _WorkersPageState extends State<WorkersPage> {
       body: Align(
         alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+          constraints:
+              const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
           child: SizedBox(
             width: double.infinity,
             child: Column(children: [
@@ -170,7 +181,7 @@ class _WorkersPageState extends State<WorkersPage> {
                 worker: false,
               ),
               const SizedBox(height: 14),
-                            // Summary strip — derived from the already-loaded list (no API change)
+              // Summary strip — derived from the already-loaded list (no API change)
               if (!ld && workers.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -211,20 +222,50 @@ class _WorkersPageState extends State<WorkersPage> {
                   height: 44,
                   child: TextField(
                     onChanged: (v) => setState(() => _searchQuery = v),
-                    style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textPrimary),
+                    style: GoogleFonts.inter(
+                        fontSize: 13.5, color: AppColors.textPrimary),
                     decoration: InputDecoration(
                       hintText: AppStrings.t('workers.searchHint'),
-                      hintStyle: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
-                      prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textMuted),
-                      filled: true, fillColor: AppColors.bgCard,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-                      border: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(borderRadius: AppRadius.rMd, borderSide: BorderSide(color: AppColors.accent, width: 1.4)),
+                      hintStyle: GoogleFonts.inter(
+                          fontSize: 13, color: AppColors.textMuted),
+                      prefixIcon: Icon(Icons.search_rounded,
+                          size: 20, color: AppColors.textMuted),
+                      filled: true,
+                      fillColor: AppColors.bgCard,
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 0, horizontal: 16),
+                      border: OutlineInputBorder(
+                          borderRadius: AppRadius.rMd,
+                          borderSide: BorderSide(color: AppColors.border)),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: AppRadius.rMd,
+                          borderSide: BorderSide(color: AppColors.border)),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: AppRadius.rMd,
+                          borderSide:
+                              BorderSide(color: AppColors.accent, width: 1.4)),
                     ),
                   ),
                 ),
               ),
+              if (MediaQuery.sizeOf(c).width >= AppBreakpoints.navigation)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          setState(() => _compactDesktop = !_compactDesktop),
+                      icon: Icon(
+                          _compactDesktop
+                              ? Icons.grid_view_rounded
+                              : Icons.table_rows_rounded,
+                          size: 18),
+                      label:
+                          Text(_compactDesktop ? 'Card view' : 'Compact table'),
+                    ),
+                  ),
+                ),
               // Spec PART D: one filter row over the same four levels used by
               // registration, task assignment and the AI recommendation.
               if (!ld && workers.isNotEmpty) ...[
@@ -233,68 +274,94 @@ class _WorkersPageState extends State<WorkersPage> {
               ],
               Expanded(
                 child: ld
-                ? const SkeletonList(rows: 6)
-                : (_loadError != null && workers.isEmpty)
-                    ? FailureState(error: _loadError, onRetry: _load)
-                    : _filtered.isEmpty
-                    ? (_searchQuery.isEmpty && _tradeFilter == null
-                        ? GuidedEmptyState(
-                            icon: Icons.group_off_rounded,
-                            title: AppStrings.t('empty.workers.title'),
-                            description: AppStrings.t('empty.workers.desc'),
-                            primaryLabel: AppStrings.t('empty.workers.action'),
-                            primaryIcon: Icons.person_add_alt_1_rounded,
-                            onPrimary: _openAddWorker,
-                          )
-                        : FilteredEmptyState(
-                            title: AppStrings.t('workers.noWorkersFound'),
-                            description: AppStrings.t('empty.workers.noMatchDesc'),
-                            clearLabel: AppStrings.t('empty.clearSearch'),
-                            onClear: () => setState(() {
-                              _searchQuery = '';
-                              _tradeFilter = null;
-                            }),
-                          ))
-                    : RefreshIndicator(
-                        onRefresh: _load,
-                        child: AppScrollbar(
-                          controller: _scrollCtrl,
-                          child: LayoutBuilder(builder: (ctx, constraints) {
-                            // Filter once per build, then let the lazy list
-                            // drive which cards are actually constructed.
-                            final rows = _filtered;
-                            if (constraints.maxWidth < AppBreakpoints.phone) {
-                              return ListView.builder(
-                                controller: _scrollCtrl,
-                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                                itemCount: rows.length,
-                                addAutomaticKeepAlives: false,
-                                itemBuilder: (ctx, i) => _buildCard(rows[i]),
-                              );
-                            }
-                            // Tablet / desktop: two-column grid
-                            return GridView.builder(
-                              controller: _scrollCtrl,
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: AppSpacing.sm,
-                                crossAxisSpacing: AppSpacing.sm,
-                                mainAxisExtent: 152,
+                    ? const SkeletonList(rows: 6)
+                    : (_loadError != null && workers.isEmpty)
+                        ? FailureState(error: _loadError, onRetry: _load)
+                        : _filtered.isEmpty
+                            ? (_searchQuery.isEmpty && _tradeFilter == null
+                                ? GuidedEmptyState(
+                                    icon: Icons.group_off_rounded,
+                                    title: AppStrings.t('empty.workers.title'),
+                                    description:
+                                        AppStrings.t('empty.workers.desc'),
+                                    primaryLabel:
+                                        AppStrings.t('empty.workers.action'),
+                                    primaryIcon: Icons.person_add_alt_1_rounded,
+                                    onPrimary: _openAddWorker,
+                                  )
+                                : FilteredEmptyState(
+                                    title:
+                                        AppStrings.t('workers.noWorkersFound'),
+                                    description: AppStrings.t(
+                                        'empty.workers.noMatchDesc'),
+                                    clearLabel:
+                                        AppStrings.t('empty.clearSearch'),
+                                    onClear: () => setState(() {
+                                      _searchQuery = '';
+                                      _tradeFilter = null;
+                                    }),
+                                  ))
+                            : RefreshIndicator(
+                                onRefresh: _load,
+                                child: AppScrollbar(
+                                  controller: _scrollCtrl,
+                                  child: LayoutBuilder(
+                                      builder: (ctx, constraints) {
+                                    // Filter once per build, then let the lazy list
+                                    // drive which cards are actually constructed.
+                                    final rows = _filtered;
+                                    if (constraints.maxWidth <
+                                        AppBreakpoints.phone) {
+                                      return ListView.builder(
+                                        controller: _scrollCtrl,
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 8, 16, 24),
+                                        itemCount: rows.length,
+                                        addAutomaticKeepAlives: false,
+                                        itemBuilder: (ctx, i) =>
+                                            _buildCard(rows[i]),
+                                      );
+                                    }
+                                    if (_compactDesktop &&
+                                        constraints.maxWidth >=
+                                            AppBreakpoints.navigation) {
+                                      return ListView.separated(
+                                        controller: _scrollCtrl,
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 8, 16, 24),
+                                        itemCount: rows.length,
+                                        separatorBuilder: (_, __) =>
+                                            const SizedBox(height: 6),
+                                        itemBuilder: (ctx, i) =>
+                                            _buildCompactRow(rows[i]),
+                                      );
+                                    }
+                                    // Tablet / desktop: two-column grid
+                                    return GridView.builder(
+                                      controller: _scrollCtrl,
+                                      padding: const EdgeInsets.fromLTRB(
+                                          16, 8, 16, 24),
+                                      gridDelegate:
+                                          const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 2,
+                                        mainAxisSpacing: AppSpacing.sm,
+                                        crossAxisSpacing: AppSpacing.sm,
+                                        mainAxisExtent: 152,
+                                      ),
+                                      itemCount: rows.length,
+                                      addAutomaticKeepAlives: false,
+                                      itemBuilder: (ctx, i) =>
+                                          _buildCard(rows[i], inGrid: true),
+                                    );
+                                  }),
+                                ),
                               ),
-                              itemCount: rows.length,
-                              addAutomaticKeepAlives: false,
-                              itemBuilder: (ctx, i) => _buildCard(rows[i], inGrid: true),
-                            );
-                          }),
-                        ),
-                      ),
-              ),     // Expanded
-            ]),      // Column
+              ), // Expanded
+            ]), // Column
           ),
         ),
       ),
-    );         // Scaffold
+    ); // Scaffold
   }
 
   /// One lazy list item. The card itself is a standalone widget so scrolling
@@ -306,10 +373,80 @@ class _WorkersPageState extends State<WorkersPage> {
       worker: w,
       inGrid: inGrid,
       onTap: wid is int
-          ? () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => WorkerDetailPage(workerId: wid, initial: w)))
+          ? () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => WorkerDetailPage(workerId: wid, initial: w)))
           : null,
     );
   }
-}
 
+  Widget _buildCompactRow(Map w) {
+    final wid = w['worker_id'] ?? w['id'];
+    final name = (w['name'] ?? 'Worker').toString();
+    final project =
+        (w['project']?['project_name'] ?? w['project_name'] ?? 'Unassigned')
+            .toString();
+    final state = (w['today_status'] ?? 'absent').toString();
+    final stateColor = state == 'present'
+        ? AppColors.green
+        : state == 'late'
+            ? AppColors.warning
+            : AppColors.danger;
+    return Material(
+      color: AppColors.bgCard,
+      borderRadius: AppRadius.rMd,
+      child: InkWell(
+        borderRadius: AppRadius.rMd,
+        onTap: wid is int
+            ? () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        WorkerDetailPage(workerId: wid, initial: w)))
+            : null,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 58),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+              borderRadius: AppRadius.rMd,
+              border: Border.all(color: AppColors.border)),
+          child: Row(children: [
+            initialsAvatar(name, radius: 16),
+            const SizedBox(width: 10),
+            Expanded(
+                flex: 3,
+                child: Text(name,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary))),
+            Expanded(
+                flex: 2,
+                child: Text(TradeLevels.label(w['trade'] as String?),
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: AppColors.textSecondary))),
+            Expanded(
+                flex: 3,
+                child: Text(project,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                        fontSize: 12, color: AppColors.textSecondary))),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                  color: stateColor.withValues(alpha: 0.12),
+                  borderRadius: AppRadius.rPill),
+              child: Text(state.toUpperCase(),
+                  style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: stateColor)),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
