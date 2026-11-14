@@ -1,0 +1,56 @@
+name: Deploy Backend to Render
+
+# Render's own auto-deploy has silently missed commits before, which left the
+# production API running an older build than main. This workflow triggers the
+# Render deploy hook explicitly so the backend is never left behind.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'construction_management_system_Backend/**'
+      - 'render.yaml'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+jobs:
+  trigger-render-deploy:
+    name: Trigger Render deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not configured in this repository."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/render_deploy.out -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+          echo "Render deploy hook responded with HTTP $code"
+          if [ "$code" != "200" ] && [ "$code" != "201" ] && [ "$code" != "202" ]; then
+            echo "::error::Render rejected the deploy trigger (HTTP $code)."
+            cat /tmp/render_deploy.out || true
+            exit 1
+          fi
+          echo "Deploy triggered for commit ${GITHUB_SHA:0:7}"
+
+      - name: Probe production until the new build answers
+        env:
+          API_BASE: https://construction-management-system-empowered.onrender.com
+        run: |
+          # Render free instances take a few minutes; poll /health rather than
+          # blocking the job on the full build, and never fail the run on time.
+          for i in $(seq 1 20); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$API_BASE/health" || true)
+            echo "attempt $i: /health -> $code"
+            if [ "$code" = "200" ]; then
+              echo "Service responded; check the Render dashboard for deploy status."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::warning::Service did not answer /health within the polling window; verify the deploy in Render."
