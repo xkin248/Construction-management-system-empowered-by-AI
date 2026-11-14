@@ -356,7 +356,7 @@ def test_reopen_rejects_non_completed_task(client, db):
         headers=auth(),
     )
     assert resp.status_code == 400, resp.text
-    assert "Only a completed task" in resp.json()["detail"]
+    assert "Only an approved task" in resp.json()["detail"]
 
 
 def test_reopen_unknown_task_returns_404(client, db):

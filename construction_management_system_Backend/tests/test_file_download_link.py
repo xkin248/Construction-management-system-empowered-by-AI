@@ -227,10 +227,11 @@ def test_download_link_requires_login(client, db, tmp_path):
     db.commit()
 
     assert client.get(f"/api/files/{row.file_id}/download-link").status_code == 401
-    # A logged-in worker keeps the access it already had on /download.
+    # A logged-in worker outside this project gets the same refusal as /download:
+    # project scoping must not be wider than the download endpoint itself.
     assert client.get(
         f"/api/files/{row.file_id}/download-link", headers=auth("ali@site.com", "worker")
-    ).status_code == 200
+    ).status_code == 403
 
 
 def test_download_link_missing_file(client, db):
