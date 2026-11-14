@@ -12,6 +12,7 @@ from app.routers.auth import (
     require_any_authorized,
     require_site_supervisor,
 )
+from app.task_status import TERMINAL_TASK_STATUSES
 
 router = APIRouter(tags=["🏗️ Project Management"])
 
@@ -143,6 +144,9 @@ def kpi(user: CurrentUser = Depends(require_site_supervisor), db=Depends(get_db)
         pending_tasks=db.query(Task).filter(Task.project_id.in_(project_ids), Task.status.in_(["pending","in_progress"])).count(),
         open_issues=db.query(Issue).filter(Issue.project_id.in_(project_ids), Issue.status.in_(["open","in_progress"])).count(),
         today_reports=db.query(DailyReport).filter(DailyReport.project_id.in_(project_ids), DailyReport.report_date==t).count(),
-        completed_tasks=db.query(Task).filter(Task.project_id.in_(project_ids), Task.status=="completed").count(),
+        completed_tasks=db.query(Task).filter(
+            Task.project_id.in_(project_ids),
+            Task.status.in_(TERMINAL_TASK_STATUSES),
+        ).count(),
         in_progress_tasks=db.query(Task).filter(Task.project_id.in_(project_ids), Task.status=="in_progress").count(),
     )

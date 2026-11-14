@@ -1,19 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from urllib.parse import quote
 import os
 
 from app.database import get_db
-from app.models import File as DBFile, Project, Supervisor
-from app.schemas import FileOut, FileUpdate
+from app.models import File as DBFile, Project
+from app.schemas import CurrentUser, FileOut, FileUpdate
 from app.file_service import (
     save_upload_file, create_thumbnail, delete_file,
     UPLOAD_DIR, THUMBNAIL_DIR
 )
 from app.file_tokens import clamp_ttl, create_download_token, decode_download_token
-from app.routers.auth import cu
+from app.routers.auth import project_for_user, require_site_supervisor
 from app import storage_service
 from app.storage_service import StorageError
 
@@ -23,6 +24,22 @@ router = APIRouter(tags=["📁 File Management"])
 # restrict uploads to images, while project documents need PDFs, office files
 # and text checklists. The bucket is private; reads still use signed URLs.
 FILE_STORAGE_BUCKET = os.getenv("SUPABASE_FILE_BUCKET", "buildsmart-files")
+
+
+def _file_for_supervisor(
+    db: Session, file_id: int, user: CurrentUser
+) -> DBFile:
+    """Return a file only when it belongs to the caller's supervisor scope."""
+    file = db.query(DBFile).options(joinedload(DBFile.project)).filter(
+        DBFile.file_id == file_id
+    ).first()
+    if not file:
+        raise HTTPException(status_code=404, detail="File not found")
+    if file.project_id is not None:
+        project_for_user(db, user, file.project_id, supervisor_only=True)
+    elif file.uploaded_by != user.id:
+        raise HTTPException(status_code=403, detail="You do not have access to this file")
+    return file
 
 def _storage_keys(file: DBFile) -> list[str]:
     """Return compatible bucket keys for a legacy or current file record."""
@@ -64,8 +81,10 @@ async def upload_file(
     file_category: str = "attachment",
     project_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
+    if project_id is not None:
+        project_for_user(db, current_user, project_id, supervisor_only=True)
     file_path, stored_name, file_size, mime_type = await save_upload_file(file)
     thumbnail_path = create_thumbnail(file_path, stored_name, mime_type)
 
@@ -97,7 +116,7 @@ async def upload_file(
         mime_type=mime_type,
         file_category=file_category,
         thumbnail_path=thumbnail_path,
-        uploaded_by=current_user.supervisor_id,
+        uploaded_by=current_user.id,
         project_id=project_id
     )
 
@@ -112,7 +131,7 @@ def list_files(
     project_id: Optional[int] = None,
     file_category: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
     query = db.query(DBFile).options(
         joinedload(DBFile.uploader),
@@ -120,7 +139,13 @@ def list_files(
     )
 
     if project_id:
+        project_for_user(db, current_user, project_id, supervisor_only=True)
         query = query.filter(DBFile.project_id == project_id)
+    else:
+        query = query.outerjoin(Project).filter(or_(
+            Project.supervisor_id == current_user.id,
+            (DBFile.project_id.is_(None)) & (DBFile.uploaded_by == current_user.id),
+        ))
     if file_category:
         query = query.filter(DBFile.file_category == file_category)
 
@@ -131,12 +156,9 @@ def list_files(
 def download_file(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
-
+    file = _file_for_supervisor(db, file_id, current_user)
     return _file_response(file)
 
 
@@ -155,7 +177,7 @@ def create_file_download_link(
     request: Request,
     ttl: int = Query(default=300, ge=30, le=3600),
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
     """Return a short-lived, file-scoped URL the client can fetch without headers.
 
@@ -168,7 +190,8 @@ def create_file_download_link(
     Auth is the same ``cu`` dependency as ``/download``: minting a link grants
     exactly the access the caller already had, so no privilege is widened.
     """
-    file = _get_downloadable_file(db, file_id)
+    file = _file_for_supervisor(db, file_id, current_user)
+    _file_source(file)
     token = create_download_token(file.file_id, ttl)
     path = f"/api/files/download?token={quote(token)}"
     # Absolute URL derived from the request so the client does not have to guess
@@ -204,19 +227,19 @@ def update_file(
     file_id: int,
     file_update: FileUpdate,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
+    file = _file_for_supervisor(db, file_id, current_user)
 
     if file_update.original_name is not None:
         file.original_name = file_update.original_name
     if file_update.file_category is not None:
         file.file_category = file_update.file_category
     if file_update.project_id is not None:
-        if file_update.project_id and not db.query(Project).filter(Project.project_id == file_update.project_id).first():
-            raise HTTPException(status_code=404, detail="Project not found")
+        if file_update.project_id:
+            project_for_user(
+                db, current_user, file_update.project_id, supervisor_only=True
+            )
         file.project_id = file_update.project_id
 
     db.commit()
@@ -228,11 +251,9 @@ def update_file(
 def delete_file_endpoint(
     file_id: int,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor)
 ):
-    file = db.query(DBFile).filter(DBFile.file_id == file_id).first()
-    if not file:
-        raise HTTPException(status_code=404, detail="File not found")
+    file = _file_for_supervisor(db, file_id, current_user)
 
     # Remove the local-development copy and the durable Storage object.
     delete_file(file.file_path, file.thumbnail_path)

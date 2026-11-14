@@ -383,11 +383,25 @@ class _TeamAttendanceTabState extends State<_TeamAttendanceTab> {
     } else {
       window = AppSettings.t('This month', '本月', 'Bulan ini');
     }
+    final selectedProjectId = ProjectScope.activeProjectId.value;
+    final allProjects = AppSettings.t('All projects', '全部项目', 'Semua projek');
+    String projectLabel = allProjects;
+    if (selectedProjectId != null) {
+      for (final raw in projects) {
+        if (raw is Map && raw['project_id'] == selectedProjectId) {
+          final name = raw['project_name']?.toString().trim();
+          if (name != null && name.isNotEmpty) projectLabel = name;
+          break;
+        }
+      }
+      if (projectLabel == allProjects)
+        projectLabel = 'Project #$selectedProjectId';
+    }
     return Row(
       children: [
         Expanded(
           child: Text(
-            '$window · ${AppSettings.t('All projects', '全部项目', 'Semua projek')} · ${_fmtDate(now)}',
+            '$window · $projectLabel · ${_fmtDate(now)}',
             style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
             overflow: TextOverflow.ellipsis,
           ),

@@ -150,6 +150,44 @@ def test_supervisor_rejection_requires_reason(client, db):
     assert resp.json()["status"] == "rejected"
 
 
+def test_approved_worker_task_is_terminal_for_the_board_and_sync(client, db):
+    p = make_project(db)
+    worker = Worker(
+        name="Ali", email="ali@buildsmart.com", password_hash="x", role="worker",
+        project_id=p.project_id,
+    )
+    db.add(worker)
+    db.commit()
+    db.refresh(worker)
+    task = Task(
+        task_name="Approved slab pour",
+        project_id=p.project_id,
+        assigned_worker_id=worker.worker_id,
+        status="approved",
+        progress=100,
+        due_date=dt.date(2026, 1, 1),
+        completed_at=dt.datetime(2026, 1, 2, 10, 0, 0),
+    )
+    db.add(task)
+    db.commit()
+
+    headers = auth("ali@buildsmart.com", "worker")
+    board = client.get("/api/worker/task-board", headers=headers)
+    assert board.status_code == 200, board.text
+    body = board.json()
+    assert "1 completed" in body["summary"]
+    assert body["alert"] is None
+    assert body["ai_generated"] is False
+
+    sync = client.get(
+        "/api/worker/tasks/sync",
+        params={"since_last_updated": body["last_updated"]},
+        headers=headers,
+    )
+    assert sync.status_code == 200, sync.text
+    assert sync.json()["changed"] is False
+
+
 # ── generic update endpoint keeps refusing backward moves ───────────────────
 
 def test_put_task_still_rejects_backward_status(client, db):

@@ -162,6 +162,11 @@ Future<Map<String, double>?> _getSiteGps() async {
 // ─────────────────────────────────────────────
 //  Projects List Page
 // ─────────────────────────────────────────────
+bool _isTaskComplete(dynamic status) {
+  final value = (status ?? '').toString().toLowerCase();
+  return value == 'approved' || value == 'completed' || value == 'done';
+}
+
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
   @override
@@ -1232,7 +1237,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       );
     }
     final p = project!;
-    final completed = tasks.where((t) => t['status'] == 'completed').length;
+    final completed = tasks.where((t) => _isTaskComplete(t['status'])).length;
     final radius = (p['fence_radius'] as num?)?.toInt() ?? 5000;
     final lat = (p['center_lat'] as num?)?.toDouble() ?? 0.0;
     final lng = (p['center_lng'] as num?)?.toDouble() ?? 0.0;
@@ -1536,7 +1541,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             (row['today_status'] ?? row['status'] ?? '').toString() == 'late')
         .length;
     final remaining =
-        tasks.where((task) => task['status'] != 'completed').toList()
+        tasks.where((task) => !_isTaskComplete(task['status'])).toList()
           ..sort((a, b) {
             final da = DateTime.tryParse((a['due_date'] ?? '').toString()) ??
                 DateTime(9999);
@@ -1580,7 +1585,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           icon: Icons.assignment_turned_in_rounded,
           label: 'Tasks complete',
           value:
-              '${tasks.where((task) => task['status'] == 'completed').length}/${tasks.length}',
+              '${tasks.where((task) => _isTaskComplete(task['status'])).length}/${tasks.length}',
           detail: '${remaining.length} remaining',
           color: AppColors.accent,
           onTap: () => setState(() => _tab = 1),

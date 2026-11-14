@@ -102,7 +102,7 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
 
   // ── bucketing ────────────────────────────────────────────────────────────
 
-  bool _isCompleted(Map<String, dynamic> t) => wStatusKey(t['status']) == 'completed';
+  bool _isCompleted(Map<String, dynamic> t) => wIsTerminalStatus(t['status']);
 
   DateTime? _due(Map<String, dynamic> t) {
     final raw = t['due_date'] ?? t['due'];
@@ -174,7 +174,7 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
           worker: true,
         ),
         const SizedBox(height: 14),
-                WorkerLiveBadge(
+        WorkerLiveBadge(
           failed: _failed,
           loading: _refreshing,
           lastUpdated: _lastUpdated,
@@ -221,7 +221,9 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
-                      color: _tab == i ? AppColors.onAccent : AppColors.textSecondary,
+                      color: _tab == i
+                          ? AppColors.onAccent
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -257,7 +259,10 @@ class _WorkerTasksPageState extends State<WorkerTasksPage> {
           WEmpty(
             icon: _tab == 2 ? Icons.done_all_rounded : Icons.checklist_rounded,
             title: _tab == 2
-                ? wT(en: 'NOTHING FINISHED YET', ms: 'TIADA YANG SIAP', zh: '暂无已完成任务')
+                ? wT(
+                    en: 'NOTHING FINISHED YET',
+                    ms: 'TIADA YANG SIAP',
+                    zh: '暂无已完成任务')
                 : wT(en: 'NO TASKS', ms: 'TIADA TUGASAN', zh: '暂无任务'),
             actionLabel: wT(en: 'REFRESH', ms: 'MUAT SEMULA', zh: '刷新'),
             actionIcon: Icons.refresh_rounded,
@@ -304,8 +309,18 @@ class _TaskCard extends StatelessWidget {
       return wT(en: 'No deadline', ms: 'Tiada tarikh akhir', zh: '无截止时间');
     }
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '${d.day} ${months[d.month - 1]}';
   }
@@ -313,7 +328,7 @@ class _TaskCard extends StatelessWidget {
   bool get _overdue {
     final d = _due;
     if (d == null) return false;
-    if (wStatusKey(task['status']) == 'completed') return false;
+    if (wIsTerminalStatus(task['status'])) return false;
     final now = DateTime.now();
     return d.isBefore(DateTime(now.year, now.month, now.day));
   }
@@ -337,7 +352,8 @@ class _TaskCard extends StatelessWidget {
             borderRadius: AppRadius.rLg,
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               Expanded(
                 child: Text(
@@ -345,23 +361,28 @@ class _TaskCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                      fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textPrimary),
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.chevron_right_rounded, size: 24, color: AppColors.textMuted),
+              Icon(Icons.chevron_right_rounded,
+                  size: 24, color: AppColors.textMuted),
             ]),
             const SizedBox(height: 6),
             if (project.isNotEmpty)
               Row(children: [
-                Icon(Icons.location_city_rounded, size: 18, color: AppColors.textMuted),
+                Icon(Icons.location_city_rounded,
+                    size: 18, color: AppColors.textMuted),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     project,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(fontSize: 15, color: AppColors.textSecondary),
+                    style: GoogleFonts.inter(
+                        fontSize: 15, color: AppColors.textSecondary),
                   ),
                 ),
               ]),

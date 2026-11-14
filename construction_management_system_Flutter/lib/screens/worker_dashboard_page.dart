@@ -64,7 +64,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   String _lastUpdated = '';
   Timer? _syncTimer;
   bool _syncingNow = false;
-  bool _checkInError = false; // true when last check-in was rejected (outside fence)
+  bool _checkInError =
+      false; // true when last check-in was rejected (outside fence)
 
   /// The three daily jobs (briefing / toolbox / housekeeping) for today.
   List<Map<String, dynamic>> _commonTasks = [];
@@ -184,7 +185,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         final savedPid = sp.getInt('project_id');
         final exists = savedPid != null &&
             _projects.any((p) => p['project_id'] == savedPid);
-        _selectedProjectId = exists ? savedPid : _projects.first['project_id'] as int;
+        _selectedProjectId =
+            exists ? savedPid : _projects.first['project_id'] as int;
       }
     } catch (_) {}
   }
@@ -199,7 +201,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           _checkedOut = r['checked_out'] ?? false;
           _hoursToday = (r['hours_today'] as num?)?.toDouble() ?? 0;
           _checkInWindow = r['check_in_window']?.toString() ?? _checkInWindow;
-          _checkOutWindow = r['check_out_window']?.toString() ?? _checkOutWindow;
+          _checkOutWindow =
+              r['check_out_window']?.toString() ?? _checkOutWindow;
           _breakWindow = r['break_window']?.toString() ?? _breakWindow;
           _windowEnforced = r['window_enforced'] == true;
           final inWin = _checkInWindow.split(' - ');
@@ -208,7 +211,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             _workHours = '${inWin.first} - ${outWin.last}';
           }
           final att = r['attendance'] as Map?;
-          final rawStatus = (r['status'] ?? att?['status'] ?? '').toString().toLowerCase();
+          final rawStatus =
+              (r['status'] ?? att?['status'] ?? '').toString().toLowerCase();
           if (rawStatus == 'rejected') {
             // The server refused the last attempt (geofence / window). Never
             // report "checked in" in that case — surface the reason instead.
@@ -300,7 +304,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     if (_syncingNow) return;
     _syncingNow = true;
     try {
-      final r = await ApiService().workerTasksSync(sinceLastUpdated: _lastUpdated);
+      final r =
+          await ApiService().workerTasksSync(sinceLastUpdated: _lastUpdated);
       if (r['changed'] == true) {
         final newBoard = r['board'] as Map?;
         if (newBoard != null && mounted) {
@@ -397,7 +402,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         _checkInError = false;
         _attendanceId = r['attendance_id'] as int?;
         _inAt = _fmtTime(r['check_in_time']);
-        _statusMsg = 'Checked in successfully at ${_fmtTime(r['check_in_time'])}';
+        _statusMsg =
+            'Checked in successfully at ${_fmtTime(r['check_in_time'])}';
         _checkInLoading = false;
       });
       toast('Checked in! Device: $_deviceType');
@@ -428,7 +434,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
   /// Returns null when the worker cancels or the camera is unavailable, after
   /// showing the reason — the caller then aborts the check-in.
   Future<CapturedPhoto?> _captureCheckInPhoto() async {
-    setState(() => _statusMsg = 'Opening camera — take a photo of yourself on site...');
+    setState(() =>
+        _statusMsg = 'Opening camera — take a photo of yourself on site...');
     try {
       final photo = await PhotoCapture.takeSelfie();
       setState(() => _statusMsg = 'Photo captured, submitting check-in...');
@@ -465,7 +472,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         if (pos == null) {
           setState(() {
             _checkInError = true;
-            _statusMsg = '❌ Check-out failed — location permission denied or GPS unavailable';
+            _statusMsg =
+                '❌ Check-out failed — location permission denied or GPS unavailable';
             _checkInLoading = false;
           });
           toast('Check-out failed: location unavailable');
@@ -497,7 +505,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         _checkInError = false;
         _attendanceId = null;
         _outAt = _fmtTime(r['check_out_time']);
-        _statusMsg = '👋 Checked out at ${_fmtTime(r['check_out_time'])}. Thank you for today!';
+        _statusMsg =
+            '👋 Checked out at ${_fmtTime(r['check_out_time'])}. Thank you for today!';
         _checkInLoading = false;
       });
       toast('👋 Checked out successfully. See you tomorrow!');
@@ -547,7 +556,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
+        constraints:
+            const BoxConstraints(maxWidth: AppBreakpoints.maxContentWidth),
         child: SizedBox(
           width: double.infinity,
           child: RefreshIndicator(onRefresh: _loadAll, child: _content()),
@@ -623,7 +633,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                   sub,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
+                  style: GoogleFonts.inter(
+                      fontSize: 13, color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -663,7 +674,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
           // Spec A3 order: greeting -> current site & status -> big
           // CLOCK IN / CLOCK OUT -> "N Tasks Today" -> the three common tasks
           // -> ordinary task list.
-          WorkerLiveBadge(loading: _loadingCommonTasks, failed: _commonTasksError != null, onRefresh: _loadAll),
+          WorkerLiveBadge(
+              loading: _loadingCommonTasks,
+              failed: _commonTasksError != null,
+              onRefresh: _loadAll),
           const SizedBox(height: 12),
           _greeting(),
           // Spec A3 §2: the current site comes before the clock button, so a
@@ -700,7 +714,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-                fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary),
           ),
           const SizedBox(height: 2),
           Text(
@@ -708,7 +724,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
-                fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.navyText),
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.navyText),
           ),
         ],
       ),
@@ -841,7 +859,8 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
         : working
             ? wT(en: 'CHECK OUT', ms: 'KELUAR', zh: '下班打卡')
             : wT(en: 'CHECK IN', ms: 'MASUK', zh: '上班打卡');
-    final VoidCallback? onTap = done ? null : (working ? _doCheckOut : _doCheckIn);
+    final VoidCallback? onTap =
+        done ? null : (working ? _doCheckOut : _doCheckIn);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -939,10 +958,13 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                    fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary),
               ),
             ),
-            Icon(Icons.swap_horiz_rounded, size: 24, color: AppColors.textMuted),
+            Icon(Icons.swap_horiz_rounded,
+                size: 24, color: AppColors.textMuted),
           ]),
         ),
       ),
@@ -967,7 +989,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
             padding: const EdgeInsets.all(14),
             child: Text(wT(en: 'MY SITE', ms: 'TAPAK SAYA', zh: '我的工地'),
                 style: GoogleFonts.inter(
-                    fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
           ),
           Flexible(
             child: ListView(
@@ -984,7 +1008,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                     child: Row(children: [
                       Icon(Icons.apartment_rounded,
                           size: 26,
-                          color: selected ? AppColors.accent : AppColors.textMuted),
+                          color: selected
+                              ? AppColors.accent
+                              : AppColors.textMuted),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -993,12 +1019,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
                               fontSize: 17,
-                              fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                              fontWeight:
+                                  selected ? FontWeight.w900 : FontWeight.w700,
                               color: AppColors.textPrimary),
                         ),
                       ),
                       if (selected)
-                        Icon(Icons.check_circle_rounded, size: 24, color: AppColors.green),
+                        Icon(Icons.check_circle_rounded,
+                            size: 24, color: AppColors.green),
                     ]),
                   ),
                 );
@@ -1020,9 +1048,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     final board = _taskBoard;
     if (board == null) return 0;
     final tasks = (board['tasks'] as List?) ?? [];
-    return tasks
-        .where((e) => wStatusKey((e as Map)['status']) != 'completed')
-        .length;
+    return tasks.where((e) => !wIsTerminalStatus((e as Map)['status'])).length;
   }
 
   /// Spec A3: "N Tasks Today" has to read as a sentence, not just as a bare
@@ -1044,7 +1070,9 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
               Text(
                 '$left',
                 style: GoogleFonts.inter(
-                    fontSize: 26, fontWeight: FontWeight.w900, color: AppColors.navyText),
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.navyText),
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -1095,7 +1123,10 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     if (_taskBoardError != null && _taskBoard == null) {
       return WErrorHint(
         title: wT(en: 'NO SIGNAL', ms: 'TIADA ISYARAT', zh: '网络不通'),
-        hint: wT(en: 'Check internet. Try again.', ms: 'Semak internet. Cuba lagi.', zh: '检查网络后再试'),
+        hint: wT(
+            en: 'Check internet. Try again.',
+            ms: 'Semak internet. Cuba lagi.',
+            zh: '检查网络后再试'),
         onRetry: _loadTaskBoard,
       );
     }
@@ -1120,14 +1151,14 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
     }
     final preview = tasks.take(3).toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 8),
-          child: WorkerLiveBadge(
-            loading: _loadingTasks,
-            failed: false,
-            onRefresh: _loadTaskBoard,
-          ),
+      Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 8),
+        child: WorkerLiveBadge(
+          loading: _loadingTasks,
+          failed: false,
+          onRefresh: _loadTaskBoard,
         ),
+      ),
       ...preview.map((t) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: WTaskRow(task: t, onTap: () => _openTask(t)),

@@ -22,6 +22,13 @@ const double kWRowTap = 56;
 String wStatusKey(dynamic status) =>
     (status?.toString() ?? 'pending').toLowerCase().replaceAll(' ', '_');
 
+/// New tasks finish as `approved`; `completed` remains valid for historical
+/// records created before the supervisor-review workflow was introduced.
+bool wIsTerminalStatus(dynamic status) {
+  final key = wStatusKey(status);
+  return key == 'approved' || key == 'completed' || key == 'verified';
+}
+
 /// Status colour contract from the reference flow:
 /// green = done / verified, orange = to-do / in progress / awaiting review,
 /// red = rejected / overdue, grey = inactive.
@@ -90,7 +97,7 @@ int wProgress(Map<String, dynamic> task) {
   final raw = task['progress'];
   if (raw is num) return raw.round().clamp(0, 100);
   final s = wStatusKey(task['status']);
-  if (s == 'completed') return 100;
+  if (wIsTerminalStatus(s)) return 100;
   if (s == 'in_progress') return 50;
   return 0;
 }
@@ -158,7 +165,10 @@ class WBigAction extends StatelessWidget {
                       label,
                       maxLines: 1,
                       style: GoogleFonts.inter(
-                          fontSize: 16, fontWeight: FontWeight.w900, color: fg, letterSpacing: 0.2),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: fg,
+                          letterSpacing: 0.2),
                     ),
                   ]),
                 ),
@@ -178,7 +188,8 @@ class WBigAction extends StatelessWidget {
             decoration: outlined
                 ? BoxDecoration(
                     borderRadius: AppRadius.rLg,
-                    border: Border.all(color: color.withValues(alpha: 0.55), width: 2),
+                    border: Border.all(
+                        color: color.withValues(alpha: 0.55), width: 2),
                   )
                 : null,
             child: child,
@@ -195,7 +206,11 @@ class WChip extends StatelessWidget {
   final String label;
   final Color color;
 
-  const WChip({super.key, required this.icon, required this.label, required this.color});
+  const WChip(
+      {super.key,
+      required this.icon,
+      required this.label,
+      required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -245,21 +260,26 @@ class WNumberTile extends StatelessWidget {
         Container(
           width: 44,
           height: 44,
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
           child: Icon(icon, size: 24, color: color),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w900, color: color)),
+                style: GoogleFonts.inter(
+                    fontSize: 30, fontWeight: FontWeight.w900, color: color)),
             Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary)),
           ]),
         ),
       ]),
@@ -299,14 +319,16 @@ class WTaskRow extends StatelessWidget {
               width: 8,
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: const BorderRadius.horizontal(left: Radius.circular(10)),
+                borderRadius:
+                    const BorderRadius.horizontal(left: Radius.circular(10)),
               ),
             ),
             const SizedBox(width: 10),
             Container(
               width: 44,
               height: 44,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
               child: Icon(wStatusIcon(status), size: 24, color: color),
             ),
             const SizedBox(width: 10),
@@ -316,7 +338,9 @@ class WTaskRow extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
-                    fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary),
               ),
             ),
             const SizedBox(width: 8),
@@ -324,7 +348,8 @@ class WTaskRow extends StatelessWidget {
                 style: GoogleFonts.inter(
                     fontSize: 24, fontWeight: FontWeight.w900, color: color)),
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right_rounded, size: 24, color: AppColors.textMuted),
+            Icon(Icons.chevron_right_rounded,
+                size: 24, color: AppColors.textMuted),
             const SizedBox(width: 8),
           ]),
         ),
@@ -361,14 +386,20 @@ class WErrorHint extends StatelessWidget {
         Icon(Icons.warning_amber_rounded, size: 30, color: AppColors.red),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title,
                 style: GoogleFonts.inter(
-                    fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textPrimary)),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textPrimary)),
             const SizedBox(height: 2),
             Text(hint,
                 style: GoogleFonts.inter(
-                    fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textSecondary, height: 1.3)),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                    height: 1.3)),
             if (onRetry != null) ...[
               const SizedBox(height: 10),
               SizedBox(
@@ -376,8 +407,11 @@ class WErrorHint extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh_rounded, size: 26),
-                  label: Text(retryLabel ?? wT(en: 'TRY AGAIN', ms: 'CUBA LAGI', zh: '再试一次'),
-                      style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w900)),
+                  label: Text(
+                      retryLabel ??
+                          wT(en: 'TRY AGAIN', ms: 'CUBA LAGI', zh: '再试一次'),
+                      style: GoogleFonts.inter(
+                          fontSize: 18, fontWeight: FontWeight.w900)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.red,
                     foregroundColor: AppColors.onAccent,
@@ -421,7 +455,9 @@ class WEmpty extends StatelessWidget {
       Text(title,
           textAlign: TextAlign.center,
           style: GoogleFonts.inter(
-              fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.textSecondary)),
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textSecondary)),
       const SizedBox(height: 16),
       if (actionLabel != null && onAction != null)
         WBigAction(

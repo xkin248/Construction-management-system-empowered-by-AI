@@ -35,6 +35,7 @@ from app.models import (
     Worker, Task, TaskWorker, AttendanceLog, Project, DailyReport, Issue,
     PredictionHistory, AIDecisionLog,
 )
+from app.task_status import TERMINAL_TASK_STATUSES, is_terminal_task_status
 from app.worker_pool import get_project_workers
 from app import trade_levels
 from app.trade_levels import (
@@ -1634,7 +1635,7 @@ def generate_daily_report(db, project_id: int, report_date: date) -> str:
     ).all()
 
     present_count = sum(1 for a in attendance if a.status in ("checked_in", "checked_out"))
-    completed_tasks = sum(1 for t in tasks if t.status == "completed")
+    completed_tasks = sum(1 for t in tasks if is_terminal_task_status(t.status))
     pending_tasks = sum(1 for t in tasks if t.status == "pending")
     in_progress_tasks = sum(1 for t in tasks if t.status == "in_progress")
 
@@ -1706,11 +1707,11 @@ def _worker_metrics(db, worker: Worker) -> Dict[str, Any]:
             pass
 
     tasks = db.query(Task).filter(Task.assigned_worker_id == worker.worker_id).all()
-    active_tasks = [t for t in tasks if (t.status or "pending") != "completed"]
+    active_tasks = [t for t in tasks if not is_terminal_task_status(t.status)]
     completed_30 = 0
     overdue_active = 0
     for t in tasks:
-        if (t.status or "pending") == "completed":
+        if is_terminal_task_status(t.status):
             completed_30 += 1
         else:
             if t.due_date and t.due_date < today:
@@ -1870,7 +1871,7 @@ def _auto_assign_tasks_impl(
         q = q.filter(Task.project_id == project_id)
     if task_ids:
         q = q.filter(Task.task_id.in_(task_ids))
-    q = q.filter(Task.status != "completed")
+    q = q.filter(~Task.status.in_(TERMINAL_TASK_STATUSES))
     tasks = q.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.task_id.asc()).all()
 
     # A task normally stays within its project.  Cross-project matching remains
@@ -2108,11 +2109,19 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
     # ── Core metrics ──
     all_tasks = db.query(Task).filter(Task.project_id == project_id).all()
     total_tasks = len(all_tasks)
-    completed = sum(1 for t in all_tasks if t.status == "completed")
+    completed = sum(1 for t in all_tasks if is_terminal_task_status(t.status))
     in_progress = sum(1 for t in all_tasks if t.status == "in_progress")
     pending = sum(1 for t in all_tasks if t.status == "pending")
-    overdue = sum(1 for t in all_tasks if t.due_date and t.due_date < today and t.status != "completed")
-    unassigned = sum(1 for t in all_tasks if not t.assigned_worker_id and t.status != "completed")
+    overdue = sum(
+        1
+        for t in all_tasks
+        if t.due_date and t.due_date < today and not is_terminal_task_status(t.status)
+    )
+    unassigned = sum(
+        1
+        for t in all_tasks
+        if not t.assigned_worker_id and not is_terminal_task_status(t.status)
+    )
     current_progress = round(completed / total_tasks * 100, 1) if total_tasks > 0 else 0.0
 
     # ── Scheduled progress (linear plan timeline vs actual) ──
@@ -2169,7 +2178,7 @@ def predict_site_progress(db, project_id: int) -> Dict[str, Any]:
     workers_sem = get_project_workers(db, project_id)
     total_workers_sem = len(workers_sem)
     for t in all_tasks:
-        if t.status == "completed":
+        if is_terminal_task_status(t.status):
             continue
         tt = f"{t.task_name} {t.description or ''}".lower()
         scores = _semantic_trade_scores(tt)

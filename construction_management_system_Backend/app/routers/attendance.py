@@ -23,7 +23,12 @@ from app.attendance_photo import (
     save_photo,
 )
 from app.storage_service import DEFAULT_SIGNED_URL_TTL
-from app.routers.auth import require_worker, require_any_authorized, require_site_supervisor
+from app.routers.auth import (
+    project_for_user,
+    require_worker,
+    require_any_authorized,
+    require_site_supervisor,
+)
 
 router = APIRouter(prefix="/attendance", tags=["📍 GPS Geofence Attendance"])
 
@@ -282,22 +287,45 @@ def _apply_heartbeat(d: HeartbeatReq, db: Session) -> AttendanceOut:
 
 
 @router.get("/worker/{wid}/today", response_model=Optional[AttendanceOut])
-def worker_today(wid: int, db: Session = Depends(get_db)):
+def worker_today(
+    wid: int,
+    user: CurrentUser = Depends(require_any_authorized),
+    db: Session = Depends(get_db),
+):
+    """Today's record, restricted to the worker or that worker's supervisor."""
+    worker = db.get(Worker, wid)
+    if not worker:
+        raise HTTPException(404, "Worker does not exist")
+    if user.user_type == "worker" and user.id != wid:
+        raise HTTPException(403, "You can only view your own attendance")
+    if user.user_type == "supervisor" and worker.project_id is not None:
+        project_for_user(db, user, worker.project_id, supervisor_only=True)
+
     a = db.query(AttendanceLog).filter(
         AttendanceLog.worker_id == wid,
         AttendanceLog.check_in_time >= _today_start(),
     ).order_by(AttendanceLog.attendance_id.desc()).first()
     if not a:
         return None
+    if user.user_type == "supervisor":
+        project_for_user(db, user, a.project_id, supervisor_only=True)
     return _to_out(a)
 
 
 @router.get("/today", response_model=AttendanceSummary)
-def today_summary(project_id: Optional[int] = None, db: Session = Depends(get_db)):
+def today_summary(
+    project_id: Optional[int] = None,
+    user: CurrentUser = Depends(require_site_supervisor),
+    db: Session = Depends(get_db),
+):
+    """Supervisor-only attendance summary, always restricted to owned sites."""
     if project_id:
+        project_for_user(db, user, project_id, supervisor_only=True)
         workers = get_project_workers(db, project_id)
     else:
-        workers = db.query(Worker).all()
+        workers = db.query(Worker).join(
+            Project, Worker.project_id == Project.project_id
+        ).filter(Project.supervisor_id == user.id).all()
 
     rows: list[WorkerWithStatus] = []
     present = late = absent = 0
@@ -541,7 +569,7 @@ def worker_self_heartbeat(
 def weekly_attendance_stats(
     project_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    user: CurrentUser = Depends(require_any_authorized),
+    user: CurrentUser = Depends(require_site_supervisor),
 ):
     """
     Current week (Mon-Sun) attendance trend for the dashboard.
@@ -564,11 +592,15 @@ def weekly_attendance_stats(
              .astimezone(timezone.utc).replace(tzinfo=None))
     end = start + timedelta(days=7)
 
-    q = db.query(AttendanceLog).filter(
+    q = db.query(AttendanceLog).join(
+        Project, AttendanceLog.project_id == Project.project_id
+    ).filter(
         AttendanceLog.check_in_time >= start,
         AttendanceLog.check_in_time < end,
+        Project.supervisor_id == user.id,
     )
     if project_id:
+        project_for_user(db, user, project_id, supervisor_only=True)
         q = q.filter(AttendanceLog.project_id == project_id)
     logs = q.all()
 

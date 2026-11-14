@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
@@ -27,6 +27,7 @@ from app.task_photo import (
     task_photo_url,
 )
 from app.storage_service import DEFAULT_SIGNED_URL_TTL
+from app.task_status import is_terminal_task_status
 from app.trade_levels import (
     DEFAULT_LEVEL,
     TRADE_LEVEL_RANK,
@@ -1233,25 +1234,25 @@ def _ai_build_summary(worker: Worker, tasks: List[Task]) -> str:
     total = len(tasks)
     pending = sum(1 for t in tasks if t.status == "pending")
     in_progress = sum(1 for t in tasks if t.status == "in_progress")
-    completed = sum(1 for t in tasks if t.status == "completed")
+    completed = sum(1 for t in tasks if is_terminal_task_status(t.status))
     high = sum(1 for t in tasks if t.priority == "high")
     trade = level_label(worker.trade) or "General Worker"
     return (
         f"Good day, {worker.name.split()[0]}! As {trade}, today you have {total} assigned task(s): "
         f"{pending} pending, {in_progress} in progress, {completed} completed. "
         + (f"{high} task(s) flagged HIGH priority — please attend to them first. " if high else "")
-        + "AI confidence scores updated in real time as site conditions change."
+        + "Task guidance is based on your assigned work and skill level; confirm site-specific details with your supervisor."
     )
 
 def _ai_detect_alert(tasks: List[Task], worker: Worker) -> Optional[str]:
     alerts: List[str] = []
     today = date.today()
     for t in tasks:
-        if t.status == "completed":
+        if is_terminal_task_status(t.status):
             continue
         if t.priority == "high" and t.status == "pending":
             alerts.append(f"High priority task '{t.task_name[:40]}' not started yet")
-        if t.due_date and t.due_date < today and t.status != "completed":
+        if t.due_date and t.due_date < today and not is_terminal_task_status(t.status):
             alerts.append(f"Task '{t.task_name[:40]}' is OVERDUE since {t.due_date}")
         if t.ai_confidence is not None and t.ai_confidence < 0.4:
             alerts.append(f"Low AI confidence on '{t.task_name[:40]} — confirm with supervisor")
@@ -1288,8 +1289,6 @@ def worker_task_board(
     ).order_by(
         Task.status.asc(), Task.priority.desc()).all()
 
-    now = datetime.utcnow()
-
     task_items: List[WorkerTaskItem] = []
     used_sections: set = set()
     for t in query:
@@ -1314,17 +1313,48 @@ def worker_task_board(
             )),
         ))
 
+    # A stable version timestamp prevents the client from re-downloading an
+    # unchanged board on every poll.  Task rows lack updated_at, so use the
+    # newest assignment, progress/audit log, start/completion, or evidence time.
+    # Normalise database/ORM timestamps to naive UTC.  SQLite often returns
+    # naive values while PostgreSQL can return timezone-aware values; comparing
+    # the two directly would otherwise raise TypeError in production.
+    version_times = []
+    task_ids = []
+    for task in query:
+        task_ids.append(task.task_id)
+        version_times.extend(
+            value.replace(tzinfo=None) for value in (
+                task.started_at,
+                task.completed_at,
+                task.completion_photo_at,
+            ) if value is not None
+        )
+        version_times.extend(
+            link.assigned_at.replace(tzinfo=None) for link in task.task_workers
+            if link.assigned_at is not None
+        )
+    if task_ids:
+        latest_log = db.query(func.max(TaskProgressLog.created_at)).filter(
+            TaskProgressLog.task_id.in_(task_ids)
+        ).scalar()
+        if latest_log is not None:
+            version_times.append(latest_log.replace(tzinfo=None))
+    last_updated = max(version_times) if version_times else datetime(1970, 1, 1)
+
     summary = _ai_build_summary(worker, query)
     alert = _ai_detect_alert(query, worker)
 
     return WorkerTaskBoardResponse(
         worker_id=worker.worker_id,
         worker_name=worker.name,
-        last_updated=now,
+        last_updated=last_updated,
         tasks=task_items,
         summary=summary,
         alert=alert,
-        ai_generated=True,
+        # The work-section guidance above is deterministic, role-based copy;
+        # do not claim that it came from a live model inference.
+        ai_generated=False,
     )
 
 

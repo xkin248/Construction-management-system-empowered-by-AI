@@ -344,6 +344,7 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
         .trim();
     final trade = (t['trade'] ?? t['required_skill'] ?? '').toString().trim();
     final photoUrl = (t['completion_photo_url'] ?? '').toString();
+    final taskId = (t['task_id'] as num?)?.toInt();
     final pct = _progress;
     final chipColor = _chipColor();
 
@@ -484,7 +485,10 @@ class _WorkerTaskDetailPageState extends State<WorkerTaskDetailPage> {
               ClipRRect(
                 borderRadius: AppRadius.rMd,
                 child: Image.network(
-                  photoUrl,
+                  taskId == null
+                      ? photoUrl
+                      : ApiService().taskCompletionPhotoUrl(taskId),
+                  headers: ApiService().authHeaders,
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,

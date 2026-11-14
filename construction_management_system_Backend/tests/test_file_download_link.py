@@ -107,6 +107,37 @@ def auth(email="boss@buildsmart.com", user_type="supervisor"):
     return {"Authorization": f"Bearer {mk_tok(email, user_type)}"}
 
 
+def test_foreign_supervisor_cannot_list_or_mutate_project_file(client, db, tmp_path):
+    owner = make_supervisor(db, "owner@buildsmart.com", "Owner")
+    other = make_supervisor(db, "other@buildsmart.com", "Other")
+    project = Project(
+        project_name="Owner site",
+        location_address="Private address",
+        supervisor_id=owner.supervisor_id,
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    row = make_file(
+        db,
+        tmp_path,
+        project_id=project.project_id,
+        uploaded_by=owner.supervisor_id,
+    )
+
+    foreign = auth(other.email)
+    listed = client.get("/api/files", headers=foreign)
+    assert listed.status_code == 200, listed.text
+    assert all(item["file_id"] != row.file_id for item in listed.json())
+    assert client.get(
+        f"/api/files/{row.file_id}/download-link", headers=foreign
+    ).status_code == 403
+    assert client.put(
+        f"/api/files/{row.file_id}", json={"original_name": "stolen.pdf"}, headers=foreign
+    ).status_code == 403
+    assert client.delete(f"/api/files/{row.file_id}", headers=foreign).status_code == 403
+
+
 # ── token primitives ────────────────────────────────────────────────────────
 
 def test_clamp_ttl_bounds():

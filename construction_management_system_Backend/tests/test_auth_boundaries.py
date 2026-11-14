@@ -83,6 +83,25 @@ def test_worker_cannot_view_supervisor_attendance(api, seeded):
     assert resp.status_code == 403, resp.text
 
 
+def test_attendance_summary_requires_a_supervisor_session(api, seeded):
+    assert api.get("/api/attendance/today").status_code == 401
+    assert api.get("/api/attendance/today", headers=worker_headers()).status_code == 403
+    assert api.get("/api/attendance/today", headers=supervisor_headers()).status_code == 200
+    assert api.get("/api/attendance/weekly-stats").status_code == 401
+    assert api.get(
+        "/api/attendance/weekly-stats", headers=worker_headers()
+    ).status_code == 403
+    assert api.get(
+        "/api/attendance/weekly-stats", headers=supervisor_headers()
+    ).status_code == 200
+
+
+def test_worker_today_record_is_not_public_or_cross_worker(api, seeded):
+    path = f"/api/attendance/worker/{seeded['worker'].worker_id}/today"
+    assert api.get(path).status_code == 401
+    assert api.get(path, headers=worker_headers()).status_code == 200
+
+
 def test_supervisor_passes_role_gate_on_supervisor_endpoint(api, seeded):
     """Sanity check that the 403s above come from the role gate, not a broken
     token: the supervisor reaches the handler (200 with an empty summary)."""
