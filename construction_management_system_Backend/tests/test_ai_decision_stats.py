@@ -34,8 +34,14 @@ from scripts.trade_decision_report import (
 BASE_TIME = dt.datetime(2026, 9, 1, 9, 0, 0)
 
 
-def make_project(db, name="Site A"):
-    project = Project(project_name=name, location_address="KL", status="active", progress=0)
+def make_project(db, name="Site A", supervisor_id=None):
+    project = Project(
+        project_name=name,
+        location_address="KL",
+        status="active",
+        progress=0,
+        supervisor_id=supervisor_id,
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -273,6 +279,12 @@ def _supervisor(db, email="boss@buildsmart.com"):
     return sup
 
 
+def _own_project(db, project_id, supervisor):
+    project = db.get(Project, project_id)
+    project.supervisor_id = supervisor.supervisor_id
+    db.commit()
+
+
 def _auth(email="boss@buildsmart.com"):
     return {"Authorization": f"Bearer {mk_tok(email, 'supervisor')}"}
 
@@ -291,8 +303,9 @@ def test_stats_endpoint_rejects_worker_role(client, db):
 
 
 def test_stats_endpoint_returns_payload(client, db, seeded):
-    _supervisor(db)
-    resp = client.get("/api/ai/decision-log/stats", headers=_auth())
+    sup = _supervisor(db)
+    _own_project(db, seeded, sup)
+    resp = client.get("/api/ai/decision-log/stats", params={"project_id": seeded}, headers=_auth())
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["total_decisions"] == 8
@@ -303,7 +316,8 @@ def test_stats_endpoint_returns_payload(client, db, seeded):
 
 
 def test_stats_endpoint_supports_filters(client, db, seeded):
-    _supervisor(db)
+    sup = _supervisor(db)
+    _own_project(db, seeded, sup)
     resp = client.get(
         "/api/ai/decision-log/stats",
         params={"project_id": seeded, "stage": "auto_assign",
@@ -318,8 +332,13 @@ def test_stats_endpoint_supports_filters(client, db, seeded):
 
 
 def test_stats_endpoint_empty_table_is_200(client, db):
-    _supervisor(db)
-    resp = client.get("/api/ai/decision-log/stats", headers=_auth())
+    sup = _supervisor(db)
+    project = make_project(db, supervisor_id=sup.supervisor_id)
+    resp = client.get(
+        "/api/ai/decision-log/stats",
+        params={"project_id": project.project_id},
+        headers=_auth(),
+    )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["total_decisions"] == 0
@@ -340,6 +359,12 @@ def test_stats_endpoint_400_for_inverted_range(client, db):
         params={"start": "2026-10-01T00:00:00", "end": "2026-09-01T00:00:00"},
         headers=_auth(),
     )
+    assert resp.status_code == 400
+
+
+def test_stats_endpoint_requires_a_project_scope(client, db):
+    _supervisor(db)
+    resp = client.get("/api/ai/decision-log/stats", headers=_auth())
     assert resp.status_code == 400
 
 

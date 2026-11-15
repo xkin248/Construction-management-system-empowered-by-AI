@@ -167,7 +167,7 @@ class _WorkerDashboardPageState extends State<WorkerDashboardPage> {
 
   bool _isCommonDone(Map<String, dynamic> t) {
     final s = (t['status'] ?? '').toString().toLowerCase();
-    return s == 'done' || s == 'completed';
+    return s == 'done' || s == 'completed' || s == 'approved';
   }
 
   Future<void> _loadMe() async {

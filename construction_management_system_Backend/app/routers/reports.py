@@ -1,11 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
+import logging
 
 from app.database import get_db
 from app.models import DailyReport
 from app.schemas import DailyReportCreate, DailyReportOut, CurrentUser
 from app.routers.auth import cu, project_for_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["📝 Daily Reports"])
 
@@ -29,8 +32,9 @@ def list_reports(
         project_for_user(db, current_user, pid, supervisor_only=True)
     except HTTPException:
         raise  # Re-raise 403 as-is so the client gets a proper 403, not 500
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Auth check failed: {exc}") from exc
+    except Exception:
+        logger.exception("Daily-report authorization check failed")
+        raise HTTPException(status_code=500, detail="Unable to verify report access right now")
 
     try:
         return (
@@ -39,8 +43,9 @@ def list_reports(
             .order_by(DailyReport.report_date.desc())
             .all()
         )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to query reports: {exc}") from exc
+    except Exception:
+        logger.exception("Daily-report query failed")
+        raise HTTPException(status_code=500, detail="Unable to load reports right now")
 
 
 

@@ -42,15 +42,19 @@ jobs:
         env:
           API_BASE: https://construction-management-system-empowered.onrender.com
         run: |
-          # Render free instances take a few minutes; poll /health rather than
-          # blocking the job on the full build, and never fail the run on time.
+          # Render free instances take a few minutes. A 200 from /health alone
+          # is not enough: it could be the previous healthy deployment. The
+          # backend reports Render's built-in commit SHA as ``revision``.
           for i in $(seq 1 20); do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$API_BASE/health" || true)
-            echo "attempt $i: /health -> $code"
-            if [ "$code" = "200" ]; then
-              echo "Service responded; check the Render dashboard for deploy status."
+            body=$(mktemp)
+            code=$(curl -sS -o "$body" -w "%{http_code}" --max-time 30 "$API_BASE/health" || true)
+            revision=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('revision', 'unknown'))" "$body" 2>/dev/null || echo unknown)
+            rm -f "$body"
+            echo "attempt $i: /health -> $code (revision: $revision)"
+            if [ "$code" = "200" ] && [ "$revision" = "$GITHUB_SHA" ]; then
+              echo "Production is serving commit ${GITHUB_SHA:0:7}."
               exit 0
             fi
             sleep 15
           done
-          echo "::warning::Service did not answer /health within the polling window; verify the deploy in Render."
+          echo "::warning::Production did not report commit ${GITHUB_SHA:0:7} within the polling window; verify the Render deploy."

@@ -3,18 +3,17 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from jose import jwt
 from datetime import datetime, timedelta
+import hmac
 import hashlib
+import logging
 
-try:
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=4)
-    _BC = True
-except Exception:
-    _BC = False
-    class _F:
-        def hash(self, r): return "sha256$"+hashlib.sha256(r.encode()).hexdigest()
-        def verify(self, r, h): return h.startswith("sha256$") and h=="sha256$"+hashlib.sha256(r.encode()).hexdigest()
-    pwd_context = _F()
+from passlib.context import CryptContext
+
+# Account passwords must never silently fall back to a fast SHA-256 digest.
+# bcrypt is pinned in requirements.txt; if it is unavailable the service should
+# fail safely rather than accepting a weak new password hash.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+logger = logging.getLogger(__name__)
 
 from app.database import get_db, settings
 from app.models import Project, Supervisor, Worker
@@ -29,14 +28,31 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=Fals
 
 # ────────────────── Password Helpers ──────────────────
 def hpw(r):
-    if not _BC: return pwd_context.hash(r)
-    try: return pwd_context.hash(r)
-    except: return "sha256$"+hashlib.sha256(r.encode()).hexdigest()
+    return pwd_context.hash(r)
+
+
 def vpw(r, h):
     try:
-        if h.startswith("sha256$"): return h=="sha256$"+hashlib.sha256(r.encode()).hexdigest()
+        # Keep verification for historical hashes only, so an account created
+        # by an old build can sign in once and be upgraded below. New accounts
+        # are always bcrypt hashed.
+        if h.startswith("sha256$"):
+            legacy = "sha256$" + hashlib.sha256(r.encode()).hexdigest()
+            return hmac.compare_digest(h, legacy)
         return pwd_context.verify(r, h)
-    except: return False
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
+def _password_needs_upgrade(password_hash: str) -> bool:
+    if not password_hash:
+        return False
+    if password_hash.startswith("sha256$"):
+        return True
+    try:
+        return pwd_context.needs_update(password_hash)
+    except (AttributeError, TypeError, ValueError):
+        return False
 def mk_tok(sub, user_type, m=None):
     exp = datetime.utcnow()+timedelta(minutes=m or settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(
@@ -206,9 +222,10 @@ def register_worker(d: WorkerAuthCreate, db=Depends(get_db)):
         return w
     except HTTPException:
         raise
-    except Exception as ex:
+    except Exception:
         db.rollback()
-        raise HTTPException(500, f"Worker registration failed: {ex}")
+        logger.exception("Worker registration failed")
+        raise HTTPException(500, "Unable to create worker account. Please try again.")
 
 # ────────────────── Legacy /register endpoint ──────────────────
 @router.post("/register", response_model=SupervisorOut)
@@ -256,6 +273,17 @@ def login(f: OAuth2PasswordRequestForm=Depends(), db=Depends(get_db)):
                 f"Only 'worker' and 'site_supervisor' can access the system.",
             )
 
+        # Upgrade weak legacy hashes (and bcrypt hashes with old work factors)
+        # only after the correct password has been supplied. A failed optional
+        # upgrade must not turn a valid login into an outage.
+        if _password_needs_upgrade(user_obj.password_hash):
+            try:
+                user_obj.password_hash = hpw(f.password)
+                db.commit()
+            except Exception:
+                db.rollback()
+                logger.exception("Password hash upgrade failed for authenticated user")
+
         token = mk_tok(e, user_type)
 
         if user_type == "supervisor":
@@ -296,8 +324,9 @@ def login(f: OAuth2PasswordRequestForm=Depends(), db=Depends(get_db)):
             }
     except HTTPException:
         raise
-    except Exception as ex:
-        raise HTTPException(500, f"Login failed: {ex}")
+    except Exception:
+        logger.exception("Login failed")
+        raise HTTPException(500, "Unable to sign in right now. Please try again.")
 
 # ────────────────── /me — returns profile for any authorized user ──────────────────
 @router.get("/me")

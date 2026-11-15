@@ -11,9 +11,9 @@ from app.models import (
 from app.schemas import (
     AITaskAnalysisRequest, AITaskAnalysisResponse,
     AIAutoAssignRequest, AIAutoAssignResponse,
-    SiteProgressPrediction
+    SiteProgressPrediction, CurrentUser
 )
-from app.routers.auth import cu, require_site_supervisor
+from app.routers.auth import project_for_user, require_site_supervisor
 from app.ai_service import (
     analyze_task, auto_assign_tasks, predict_site_progress, llm_status
 )
@@ -22,17 +22,31 @@ from app.ai_stats import build_decision_stats, empty_stats
 router = APIRouter(tags=["🤖 AI Services"])
 
 
+def _owned_project_ids(db: Session, user: CurrentUser) -> List[int]:
+    """Return only projects the current supervisor may use as an AI pool."""
+    return [
+        int(project_id)
+        for (project_id,) in db.query(Project.project_id)
+        .filter(Project.supervisor_id == user.id)
+        .all()
+    ]
+
+
 @router.post("/ai/tasks/analyze", response_model=AITaskAnalysisResponse)
 def task_analysis(
     request: AITaskAnalysisRequest,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor),
 ):
+    project_for_user(db, current_user, request.project_id, supervisor_only=True)
     task_info = {}
     if request.task_id:
         task = db.query(Task).options(
             joinedload(Task.project)
-        ).filter(Task.task_id == request.task_id).first()
+        ).filter(
+            Task.task_id == request.task_id,
+            Task.project_id == request.project_id,
+        ).first()
         if task:
             task_info["task_id"] = task.task_id
             task_info["task_name"] = task.task_name
@@ -48,10 +62,11 @@ def task_analysis(
     result = analyze_task(
         db, task_info, request.project_id,
         same_project_only=request.same_project_only,
+        allowed_project_ids=_owned_project_ids(db, current_user),
+        # Preview clicks are not supervisor-confirmed decisions. Keeping them
+        # out of the audit dataset prevents misleading AI accuracy metrics.
+        log_decision=False,
     )
-    # analyze_task appends an ai_decision_log row (the future evaluation set);
-    # persist it so the preview actually feeds the data loop.
-    db.commit()
     return AITaskAnalysisResponse(**result)
 
 
@@ -59,8 +74,23 @@ def task_analysis(
 def ai_auto_assign_tasks(
     request: AIAutoAssignRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(require_site_supervisor)
+    current_user: CurrentUser = Depends(require_site_supervisor),
 ):
+    if request.project_id is None:
+        raise HTTPException(status_code=400, detail="project_id is required for auto-assign")
+    project_for_user(db, current_user, request.project_id, supervisor_only=True)
+    if request.task_ids:
+        requested_ids = {int(task_id) for task_id in request.task_ids}
+        matched_ids = {
+            int(task_id)
+            for (task_id,) in db.query(Task.task_id).filter(
+                Task.project_id == request.project_id,
+                Task.task_id.in_(requested_ids),
+            ).all()
+        }
+        if matched_ids != requested_ids:
+            # Avoid disclosing whether an id belongs to another supervisor.
+            raise HTTPException(status_code=404, detail="One or more tasks were not found in this project")
     return auto_assign_tasks(
         db=db,
         project_id=request.project_id,
@@ -68,6 +98,7 @@ def ai_auto_assign_tasks(
         dry_run=request.dry_run,
         top_k=request.top_k,
         same_project_only=request.same_project_only,
+        allowed_project_ids=_owned_project_ids(db, current_user),
     )
 
 
@@ -75,7 +106,7 @@ def ai_auto_assign_tasks(
 def get_progress_prediction(
     pid: int,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor),
 ):
     """
     AI-powered site progress prediction for a specific project.
@@ -83,6 +114,7 @@ def get_progress_prediction(
     and uses Gemini AI to predict completion date, future progress milestones,
     risk factors and recommendations.
     """
+    project_for_user(db, current_user, pid, supervisor_only=True)
     result = predict_site_progress(db, pid)
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
@@ -93,15 +125,13 @@ def get_progress_prediction(
 def prediction_history(
     pid: int,
     db: Session = Depends(get_db),
-    current_user: Supervisor = Depends(cu)
+    current_user: CurrentUser = Depends(require_site_supervisor),
 ):
     """
     Recent AI prediction snapshots for a project, oldest -> newest, for
     "predicted vs actual" accuracy comparison on the dashboard.
     """
-    project = db.query(Project).filter(Project.project_id == pid).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
+    project = project_for_user(db, current_user, pid, supervisor_only=True)
 
     rows = (
         db.query(PredictionHistory)
@@ -176,10 +206,11 @@ def decision_log_stats(
     if start and end and start > end:
         raise HTTPException(status_code=400, detail="start must be earlier than end")
 
-    if project_id is not None:
-        exists = db.query(Project.project_id).filter(Project.project_id == project_id).first()
-        if not exists:
-            raise HTTPException(status_code=404, detail="Project not found")
+    if project_id is None:
+        # A global aggregate would expose every supervisor's decision history.
+        # The dashboard already renders AI metrics for one selected project.
+        raise HTTPException(status_code=400, detail="project_id is required for decision statistics")
+    project_for_user(db, current_user, project_id, supervisor_only=True)
 
     try:
         return build_decision_stats(

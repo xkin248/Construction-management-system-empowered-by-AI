@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.database import get_db
 from app.models import Project, Supervisor, Task, Worker
+from app.routers.ai import router as ai_router
 from app.routers.ai_task import router as tasks_router
 from app.routers.auth import mk_tok
 from app.routers.common_task import router as common_task_router
@@ -33,6 +34,7 @@ def api(session_factory):
     app.include_router(settings_router, prefix="/api")
     app.include_router(safety_router, prefix="/api")
     app.include_router(common_task_router, prefix="/api")
+    app.include_router(ai_router, prefix="/api")
     return TestClient(app)
 
 
@@ -134,3 +136,39 @@ def test_supervisor_dashboard_gets_three_common_task_summaries(api, scoped):
         "housekeeping",
     ]
     assert all(item["project_count"] == 1 for item in body["tasks"])
+
+
+def test_ai_endpoints_are_limited_to_the_supervisors_projects(api, scoped):
+    """AI suggestions and history are project data, not a global supervisor tool."""
+    foreign = scoped["project_b"]
+
+    assert api.post(
+        "/api/ai/tasks/analyze",
+        json={"project_id": foreign, "task_name": "Install wiring"},
+        headers=scoped["alpha"],
+    ).status_code == 403
+    assert api.post(
+        "/api/ai/tasks/auto-assign",
+        json={"project_id": foreign, "dry_run": True},
+        headers=scoped["alpha"],
+    ).status_code == 403
+    assert api.get(
+        f"/api/ai/projects/{foreign}/progress-prediction",
+        headers=scoped["alpha"],
+    ).status_code == 403
+    assert api.get(
+        f"/api/ai/projects/{foreign}/prediction-history",
+        headers=scoped["alpha"],
+    ).status_code == 403
+    assert api.get(
+        "/api/ai/decision-log/stats",
+        params={"project_id": foreign},
+        headers=scoped["alpha"],
+    ).status_code == 403
+
+    # Workers cannot use supervisor-only analysis even for their own project.
+    assert api.post(
+        "/api/ai/tasks/analyze",
+        json={"project_id": scoped["project_a"], "task_name": "Install wiring"},
+        headers=scoped["worker"],
+    ).status_code == 403

@@ -24,6 +24,14 @@ logger = logging.getLogger("buildsmart.startup")
 # scan. Keep the API booting instead and surface the state on /health.
 DB_READY = False
 DB_BOOTSTRAP_ERROR = ""
+# Render provides this built-in value for Git-backed deploys.  Returning it from
+# health lets CI distinguish a healthy *old* instance from the commit it just
+# asked Render to deploy.
+BUILD_REVISION = (
+    os.getenv("RENDER_GIT_COMMIT")
+    or os.getenv("GIT_COMMIT")
+    or "local"
+).strip()
 
 
 def _bootstrap_database() -> None:
@@ -137,6 +145,7 @@ def health():
     storage = storage_service.status()
     return {
         "status": "ok",
+        "revision": BUILD_REVISION,
         "database": "ok" if DB_READY else "unavailable",
         "database_error": DB_BOOTSTRAP_ERROR or None,
         "models": models,

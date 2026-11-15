@@ -1463,12 +1463,25 @@ def analyze_task(
     project_id: int,
     same_project_only: bool = False,
     log_decision: bool = True,
+    allowed_project_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     started = time.perf_counter()
     if same_project_only:
         workers = get_project_workers(db, project_id)
     else:
-        workers = db.query(Worker).all()
+        worker_query = db.query(Worker)
+        # A supervisor may deliberately search across their own projects, but
+        # must never receive another supervisor's worker profiles in an AI
+        # suggestion.  ``None`` keeps this service function usable by offline
+        # maintenance scripts; every HTTP route supplies its allowed scope.
+        if allowed_project_ids is not None:
+            allowed_ids = {int(pid) for pid in allowed_project_ids}
+            if not allowed_ids:
+                workers = []
+            else:
+                workers = worker_query.filter(Worker.project_id.in_(allowed_ids)).all()
+        else:
+            workers = worker_query.all()
     project = db.query(Project).filter(Project.project_id == project_id).first()
 
     task_name = task_info.get("task_name", "")
@@ -1766,11 +1779,27 @@ def _copy_decision_meta(target: Dict[str, Any], source: Dict[str, Any]) -> None:
             target[key] = source[key]
 
 
-def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, top_k: int = 5, same_project_only: bool = False, log_decision: bool = True) -> Dict[str, Any]:
+def recommend_workers_for_task(
+    db,
+    task_info: Dict[str, Any],
+    project_id: int,
+    top_k: int = 5,
+    same_project_only: bool = False,
+    log_decision: bool = True,
+    allowed_project_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
     if same_project_only:
         workers = get_project_workers(db, project_id)
     else:
-        workers = db.query(Worker).all()
+        worker_query = db.query(Worker)
+        if allowed_project_ids is not None:
+            allowed_ids = {int(pid) for pid in allowed_project_ids}
+            workers = (
+                worker_query.filter(Worker.project_id.in_(allowed_ids)).all()
+                if allowed_ids else []
+            )
+        else:
+            workers = worker_query.all()
     task_name = task_info.get("task_name", "")
     description = task_info.get("description", "")
 
@@ -1802,7 +1831,12 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
                 temperature=0.2,
             )
             parsed = _extract_json(text or "")
-            base_for_trades = analyze_task(db, task_info, project_id, same_project_only=same_project_only, log_decision=log_decision)
+            base_for_trades = analyze_task(
+                db, task_info, project_id,
+                same_project_only=same_project_only,
+                log_decision=log_decision,
+                allowed_project_ids=allowed_project_ids,
+            )
             if isinstance(parsed, dict) and isinstance(parsed.get("suggested_workers"), list):
                 out = parsed
                 out["suggested_workers"] = out["suggested_workers"][:top_k]
@@ -1822,7 +1856,12 @@ def recommend_workers_for_task(db, task_info: Dict[str, Any], project_id: int, t
         except Exception:
             pass
 
-    base = analyze_task(db, task_info, project_id, same_project_only=same_project_only, log_decision=log_decision)
+    base = analyze_task(
+        db, task_info, project_id,
+        same_project_only=same_project_only,
+        log_decision=log_decision,
+        allowed_project_ids=allowed_project_ids,
+    )
     base["suggested_workers"] = (base.get("suggested_workers") or [])[:top_k]
     return base
 
@@ -1833,7 +1872,8 @@ def auto_assign_tasks(
     task_ids: Optional[List[int]] = None,
     dry_run: bool = True,
     top_k: int = 3,
-    same_project_only: bool = True
+    same_project_only: bool = True,
+    allowed_project_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     """Run a batch auto-assignment with a bounded Gemini budget.
 
@@ -1853,6 +1893,7 @@ def auto_assign_tasks(
             dry_run=dry_run,
             top_k=top_k,
             same_project_only=same_project_only,
+            allowed_project_ids=allowed_project_ids,
         )
     finally:
         clear_llm_budget()
@@ -1864,13 +1905,19 @@ def _auto_assign_tasks_impl(
     task_ids: Optional[List[int]] = None,
     dry_run: bool = True,
     top_k: int = 3,
-    same_project_only: bool = True
+    same_project_only: bool = True,
+    allowed_project_ids: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     q = db.query(Task)
     if project_id is not None:
         q = q.filter(Task.project_id == project_id)
     if task_ids:
         q = q.filter(Task.task_id.in_(task_ids))
+    if allowed_project_ids is not None:
+        allowed_ids = {int(pid) for pid in allowed_project_ids}
+        if not allowed_ids:
+            return {"project_id": project_id, "dry_run": dry_run, "assignments": []}
+        q = q.filter(Task.project_id.in_(allowed_ids))
     q = q.filter(~Task.status.in_(TERMINAL_TASK_STATUSES))
     tasks = q.order_by(Task.due_date.is_(None), Task.due_date.asc(), Task.task_id.asc()).all()
 
@@ -1879,7 +1926,11 @@ def _auto_assign_tasks_impl(
     if same_project_only and project_id is not None:
         workers = get_project_workers(db, project_id)
     else:
-        workers = db.query(Worker).all()
+        worker_query = db.query(Worker)
+        if allowed_project_ids is not None:
+            workers = worker_query.filter(Worker.project_id.in_(allowed_ids)).all()
+        else:
+            workers = worker_query.all()
     worker_ids = {w.worker_id for w in workers}
 
     assignments = []
@@ -1898,6 +1949,7 @@ def _auto_assign_tasks_impl(
         rec = recommend_workers_for_task(
             db, task_info, project_id, top_k=max(1, top_k),
             same_project_only=same_project_only, log_decision=False,
+            allowed_project_ids=allowed_project_ids,
         )
         suggested = rec.get("suggested_workers") or []
         matched_trades = set(rec.get("matched_trades") or [])
