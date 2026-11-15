@@ -61,6 +61,8 @@ jobs:
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('construction_management_system_Flutter/android/**/*.gradle*', 'construction_management_system_Flutter/android/gradle/wrapper/gradle-wrapper.properties', 'construction_management_system_Flutter/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       # ── Dependencies ──────────────────────────────────────────
       - name: 📦 Install Flutter Dependencies
